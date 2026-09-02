@@ -274,7 +274,7 @@ export const MemberRosterManager: React.FC = () => {
               Placing <strong>{probationTarget.full_name}</strong> on Chapter Probation #{probationTarget.probation_count + 1}.
               {probationTarget.probation_count + 1 >= 2 && (
                 <span style={{ display: 'block', color: 'var(--color-terracotta)', fontWeight: 700, marginTop: '4px' }}>
-                  ⚠️ Notice: This is the student's 2nd probation. Accumulating 2 probations results in immediate Dismissal and Account Restriction.
+                  Notice: This is the student's 2nd probation. Accumulating 2 probations results in immediate Dismissal and Account Restriction.
                 </span>
               )}
             </p>

@@ -373,7 +373,7 @@ export const AllowlistManager: React.FC = () => {
               lineHeight: '1.5',
               textAlign: 'left',
             }}>
-              ⚠️ <strong>Important Notice for Leadership:</strong> This code is shown only once. Please send it directly to the member so they can sign in. Once logged in, they can change this passcode at any time.
+              <strong>Important Notice for Leadership:</strong> This code is shown only once. Please send it directly to the member so they can sign in. Once logged in, they can change this passcode at any time.
             </div>
 
             <div style={{ marginTop: '1.5rem' }}>

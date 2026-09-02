@@ -121,7 +121,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               </div>
             )}
             <div style={{ fontSize: '0.78rem', color: '#92400E' }}>
-              ⚠️ <strong>Warning:</strong> Accumulating a 2nd probation will result in immediate chapter dismissal. Work with leadership to return to good standing.
+              <strong>Warning:</strong> Accumulating a 2nd probation will result in immediate chapter dismissal. Work with leadership to return to good standing.
             </div>
           </div>
         </div>
@@ -177,7 +177,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="kpi-subtext">
-            {attendanceStats.absences} absences recorded ({attendanceStats.absences >= 2 ? '⚠️ Probation Threshold' : `${2 - attendanceStats.absences} left before warning`})
+            {attendanceStats.absences} absences recorded ({attendanceStats.absences >= 2 ? 'Probation Threshold Reached' : `${2 - attendanceStats.absences} left before warning`})
           </div>
         </div>
 

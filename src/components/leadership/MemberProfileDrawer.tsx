@@ -208,7 +208,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.82rem' }}>
               <div><strong>Present:</strong> {attendedCount} meetings</div>
               <div style={{ color: absenceCount > 0 ? 'var(--color-terracotta)' : 'inherit' }}>
-                <strong>Unexcused Absences:</strong> {absenceCount} {absenceCount >= 2 ? '(⚠️ Triggered Probation)' : ''}
+                <strong>Unexcused Absences:</strong> {absenceCount} {absenceCount >= 2 ? '(Triggered Probation)' : ''}
               </div>
             </div>
           </section>
