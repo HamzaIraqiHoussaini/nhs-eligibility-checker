@@ -131,14 +131,111 @@ function PortalContent() {
     fetchActiveSemester();
   }, [activeTab]);
 
-  // Unauthenticated visitors CANNOT access internal portal tabs.
-  // They remain on the clean public homepage and are prompted to log in.
-  if (!user) {
+  // Standalone Public Screener Page (No login required, no dashboard sidebar)
+  if (activeTab === 'screener') {
+    return (
+      <div style={{ minHeight: '100vh', width: '100%', backgroundColor: 'var(--color-bg-base)' }}>
+        {/* Clean Header */}
+        <header
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: 'rgba(255, 255, 255, 0.96)',
+            backdropFilter: 'blur(10px)',
+            borderBottom: '1px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '1280px',
+              margin: '0 auto',
+              padding: '0.85rem 1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1.5rem',
+            }}
+          >
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }}
+              onClick={() => navigateTo('home')}
+            >
+              <img
+                src="/cas-logo.png"
+                alt="Casablanca American School"
+                style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+              />
+              <div>
+                <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748B', lineHeight: 1, marginBottom: '2px' }}>
+                  Casablanca American School
+                </div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
+                  National Honor Society
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+                onClick={() => navigateTo('home')}
+              >
+                ← Back to Homepage
+              </button>
+
+              {user ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  onClick={() => navigateTo('dashboard')}
+                >
+                  <LayoutDashboard size={14} />
+                  <span>Member Portal</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  onClick={() => setIsAuthModalOpen(true)}
+                >
+                  <LogIn size={14} />
+                  <span>Sign In</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Screener View */}
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+          <ScreenerView />
+        </main>
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  // Unauthenticated visitors trying to access other internal portal tabs are prompted to log in:
+  if (!user && activeTab !== 'home') {
     return (
       <div style={{ minHeight: '100vh', width: '100%' }}>
         <PublicHomepage
-          onNavigate={() => {
-            setIsAuthModalOpen(true);
+          onNavigate={(t) => {
+            if (t === 'screener') {
+              navigateTo('screener');
+            } else {
+              setIsAuthModalOpen(true);
+            }
           }}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           user={null}
@@ -151,7 +248,7 @@ function PortalContent() {
     );
   }
 
-  // Authenticated members on home tab:
+  // Public Homepage for visitors and authenticated members on home tab:
   if (activeTab === 'home') {
     return (
       <div style={{ minHeight: '100vh', width: '100%' }}>
@@ -221,7 +318,7 @@ function PortalContent() {
 
           <button
             type="button"
-            className={`stitch-nav-item ${activeTab === 'screener' ? 'active' : ''}`}
+            className="stitch-nav-item"
             onClick={() => navigateTo('screener')}
           >
             <CheckCircle2 size={16} />
@@ -406,7 +503,6 @@ function PortalContent() {
       <main className="stitch-main-content">
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
-        {activeTab === 'screener' && <ScreenerView />}
         {activeTab === 'rules' && <ChapterRules />}
         {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
         {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}

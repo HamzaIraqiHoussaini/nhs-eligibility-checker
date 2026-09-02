@@ -45,7 +45,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       <div className="institution-hero" style={{ marginTop: '2rem', marginBottom: '2rem' }}>
         <h1 className="hero-title">
           Casablanca American School<br />
-          <span>Candidate Screener & Batch Auditor</span>
+          <span>Academic Eligibility Screener</span>
         </h1>
       </div>
 
@@ -74,17 +74,17 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                 <UploadCloud size={28} className="animate-pulse" />
               </div>
               <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', marginBottom: '0.4rem' }}>
-                Auditing Document Contents
+                Checking Report Card
               </h3>
               <p className="progress-label" style={{ marginBottom: '1.25rem' }}>
-                {progressMessage || 'Processing page structures and extracting academic records...'}
+                {progressMessage || 'Extracting grades and evaluating eligibility rules...'}
               </p>
               <div className="progress-track">
                 <div className="progress-bar-fill" />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <span>Scanning in progress</span>
-                <span>Please keep tab open</span>
+                <span>Please wait</span>
               </div>
             </div>
           ) : (
@@ -93,10 +93,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                 <UploadCloud size={28} />
               </div>
               <h3 className="dropzone-title">
-                Drop Report Card or Master Batch PDF Here
+                Drop CAS Report Card PDF Here
               </h3>
               <p className="dropzone-desc">
-                Upload any report card file
+                Upload your semester report card to check eligibility
               </p>
               <button
                 type="button"
@@ -113,13 +113,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                   <CheckCircle2 size={13} color="var(--color-sage)" /> Official CAS Format
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle2 size={13} color="var(--color-sage)" /> Auto-Detects Single vs Batch
+                  <CheckCircle2 size={13} color="var(--color-sage)" /> Single or Multi-Page PDF
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle2 size={13} color="var(--color-sage)" /> 1,000+ Page Batch Ready
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle2 size={13} color="var(--color-sage)" /> 100% In-Browser Secure
+                  <CheckCircle2 size={13} color="var(--color-sage)" /> Instant GPA & Rules Calculation
                 </span>
               </div>
             </>

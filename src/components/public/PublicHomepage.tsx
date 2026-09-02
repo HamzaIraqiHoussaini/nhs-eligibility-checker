@@ -143,12 +143,10 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               type="button"
               className="btn-secondary"
               style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
-              onClick={() => handleAction('screener')}
-              title={user ? 'Open Academic Eligibility Screener' : 'Sign in to check eligibility'}
+              onClick={() => onNavigate('screener')}
             >
-              {!user && <Lock size={13} style={{ marginRight: '2px' }} />}
               <CheckCircle2 size={14} color="var(--color-oxford)" />
-              <span>Check Eligibility</span>
+              <span>Check Academic Eligibility</span>
             </button>
 
             {user ? (
@@ -240,9 +238,8 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   type="button"
                   className="btn-secondary"
                   style={{ padding: '0.8rem 1.4rem', fontSize: '0.95rem' }}
-                  onClick={() => handleAction('screener')}
+                  onClick={() => onNavigate('screener')}
                 >
-                  {!user && <Lock size={14} />}
                   <CheckCircle2 size={16} color="var(--color-oxford)" />
                   <span>Check Academic Eligibility</span>
                 </button>
@@ -478,7 +475,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   Check Your Eligibility
                 </h3>
                 <p style={{ fontSize: '0.9rem', color: '#CBD5E1', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                  Sign in with your CAS account to access the screener tool. Upload your report card PDF or enter your marks to check your GPA against chapter rules.
+                  Upload your report card PDF or enter your marks into our screener tool to immediately check your GPA against chapter rules.
                 </p>
                 <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0 1.5rem' }}>
                   <li>Calculates Grade 10 vs. IB Grade 11/12 scale</li>
@@ -498,10 +495,9 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   padding: '0.85rem',
                   fontSize: '0.92rem',
                 }}
-                onClick={() => handleAction('screener')}
+                onClick={() => onNavigate('screener')}
               >
-                {!user && <Lock size={15} />}
-                <span>{user ? 'Open Eligibility Screener' : 'Sign In to Check Eligibility'}</span>
+                <span>Check Academic Eligibility</span>
                 <ArrowRight size={16} />
               </button>
             </div>
