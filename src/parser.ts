@@ -268,7 +268,7 @@ function analyzeStudentSection(section: string, minGrade: number): StudentResult
 
   const grades = extractGradesFromText(section);
   const hasAEorBE = checkAEorBE(section);
-  const has3OrLower = grades.some(g => g <= 3);
+  const has3OrLower = grades.some(g => g < 3);
 
   let average = 0;
   if (grades.length > 0) {
@@ -279,7 +279,7 @@ function analyzeStudentSection(section: string, minGrade: number): StudentResult
   if (grades.length === 0) failReasons.push('No grades found');
   if (average < 5.8) failReasons.push(`Average ${average.toFixed(2)} < 5.8`);
   if (hasAEorBE) failReasons.push('Has AE or BE marks');
-  if (has3OrLower) failReasons.push('Has grade of 3 or lower');
+  if (has3OrLower) failReasons.push('Has grade below 3');
   if (gradeLevel > 0 && gradeLevel < minGrade) {
     failReasons.push(`Grade ${gradeLevel} is below minimum Grade ${minGrade} required`);
   }
@@ -301,7 +301,7 @@ function analyzeStudentSection(section: string, minGrade: number): StudentResult
 function analyzeSingleStudent(text: string, fullText: string, studentName: string): ParseResult {
   const grades = extractGradesFromText(text);
   const hasAEorBE = checkAEorBE(text);
-  const has3OrLower = grades.some(g => g <= 3);
+  const has3OrLower = grades.some(g => g < 3);
 
   let average = 0;
   if (grades.length > 0) {
