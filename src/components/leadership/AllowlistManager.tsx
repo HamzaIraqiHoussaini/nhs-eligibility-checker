@@ -1,11 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
 import type { AllowlistEntry, UserRole } from '../../types/nhs';
-import { UserPlus, Trash2 } from 'lucide-react';
+import { UserPlus, Trash2, Key, Copy, Check, ShieldCheck, RefreshCw, X } from 'lucide-react';
+
+function generateAccessCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let randomStr = '';
+  const array = new Uint8Array(20);
+  crypto.getRandomValues(array);
+  for (let i = 0; i < 20; i++) {
+    randomStr += chars[array[i] % chars.length];
+  }
+  return `CAS-${randomStr}`;
+}
+
+interface RevealCodeData {
+  email: string;
+  fullName: string;
+  role: UserRole;
+  code: string;
+  isReset?: boolean;
+}
 
 export const AllowlistManager: React.FC = () => {
-  const { user } = useAuth();
   const [entries, setEntries] = useState<AllowlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -13,13 +30,12 @@ export const AllowlistManager: React.FC = () => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>('member');
-  const [adding, setAdding] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Bulk Add
-  const [showBulk, setShowBulk] = useState(false);
-  const [bulkEmails, setBulkEmails] = useState('');
+  // Reveal Modal state
+  const [revealData, setRevealData] = useState<RevealCodeData | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const loadAllowlist = async () => {
     setLoading(true);
@@ -41,91 +57,99 @@ export const AllowlistManager: React.FC = () => {
     loadAllowlist();
   }, []);
 
-  const handleAddSingle = async (e: React.FormEvent) => {
+  const handleAuthorizeAndGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) return;
 
-    setAdding(true);
+    setProvisioning(true);
     setErrorMsg(null);
-    setSuccessMsg(null);
+
+    const generatedCode = generateAccessCode();
+    const memberName = fullName.trim() || cleanEmail.split('@')[0];
 
     try {
-      const { error } = await supabase.from('allowlist').upsert({
-        email: cleanEmail,
-        full_name: fullName.trim() || cleanEmail.split('@')[0],
-        role,
-        added_by: user?.email || 'leadership',
+      // Call Supabase Edge Function to provision member in auth.users and allowlist
+      const { data, error } = await supabase.functions.invoke('provision-member', {
+        body: {
+          email: cleanEmail,
+          full_name: memberName,
+          role,
+          password: generatedCode,
+        },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Also update profile if user already signed up
-      await supabase.from('profiles').update({ role }).eq('email', cleanEmail);
+      // Show one-time code reveal modal
+      setRevealData({
+        email: cleanEmail,
+        fullName: memberName,
+        role,
+        code: generatedCode,
+        isReset: false,
+      });
 
-      setSuccessMsg(`Added ${cleanEmail} as ${role}.`);
       setEmail('');
       setFullName('');
       setRole('member');
       await loadAllowlist();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed adding to allowlist.');
+      console.error('Provisioning failed:', err);
+      setErrorMsg(err.message || 'Failed to provision member account.');
     } finally {
-      setAdding(false);
+      setProvisioning(false);
     }
   };
 
-  const handleBulkAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const emailsList = bulkEmails
-      .split(/[\n,;]+/)
-      .map(e => e.trim().toLowerCase())
-      .filter(e => e.includes('@'));
+  const handleResetCode = async (entry: AllowlistEntry) => {
+    if (!confirm(`Generate a new access code for ${entry.email}? Their old code will be invalidated.`)) return;
 
-    if (emailsList.length === 0) return;
-
-    setAdding(true);
-    setErrorMsg(null);
+    const newCode = generateAccessCode();
+    setProvisioning(true);
 
     try {
-      const rows = emailsList.map(em => ({
-        email: em,
-        full_name: em.split('@')[0],
-        role: 'member' as UserRole,
-        added_by: user?.email || 'leadership',
-      }));
+      const { data, error } = await supabase.functions.invoke('provision-member', {
+        body: {
+          email: entry.email,
+          full_name: entry.full_name || entry.email.split('@')[0],
+          role: entry.role,
+          password: newCode,
+        },
+      });
 
-      const { error } = await supabase.from('allowlist').upsert(rows, { onConflict: 'email' });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      setShowBulk(false);
-      setBulkEmails('');
-      setSuccessMsg(`Successfully allowlisted ${emailsList.length} member emails.`);
-      await loadAllowlist();
+      setRevealData({
+        email: entry.email,
+        fullName: entry.full_name || entry.email.split('@')[0],
+        role: entry.role,
+        code: newCode,
+        isReset: true,
+      });
     } catch (err: any) {
-      setErrorMsg(err.message || 'Bulk addition failed.');
+      alert(`Failed to reset access code: ${err.message}`);
     } finally {
-      setAdding(false);
+      setProvisioning(false);
     }
   };
 
-  const handleUpdateRole = async (targetEmail: string, newRole: UserRole) => {
-    try {
-      await supabase.from('allowlist').update({ role: newRole }).eq('email', targetEmail);
-      await supabase.from('profiles').update({ role: newRole }).eq('email', targetEmail);
-      await loadAllowlist();
-    } catch (err) {
-      console.error('Failed updating role:', err);
-    }
+  const handleCopyCode = () => {
+    if (!revealData) return;
+    navigator.clipboard.writeText(revealData.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleRemove = async (targetEmail: string) => {
     if (targetEmail.toLowerCase() === 'hiraqihoussaini@cas.ac.ma') {
-      alert('The primary super admin cannot be removed from the allowlist.');
+      alert('The primary super admin cannot be removed.');
       return;
     }
 
-    if (!confirm(`Revoke registration authorization for ${targetEmail}?`)) return;
+    if (!confirm(`Revoke access for ${targetEmail}?`)) return;
 
     try {
       await supabase.from('allowlist').delete().eq('email', targetEmail);
@@ -139,22 +163,16 @@ export const AllowlistManager: React.FC = () => {
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-oxford)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-            Security & Access Control
-          </div>
-          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-            Member Allowlist & Roles
-          </h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-            Registration on this portal is strictly invitation-only. Add authorized CAS student and faculty emails below.
-          </p>
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+          <ShieldCheck size={16} /> Access Control & Account Provisioning
         </div>
-
-        <button className="btn-secondary" onClick={() => setShowBulk(true)}>
-          Bulk Add Emails
-        </button>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
+          Member Onboarding & Access Codes
+        </h1>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
+          Add authorized students and officers. An automated 24-character one-time passcode is generated for you to send to each person.
+        </p>
       </div>
 
       {errorMsg && (
@@ -163,21 +181,15 @@ export const AllowlistManager: React.FC = () => {
         </div>
       )}
 
-      {successMsg && (
-        <div style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--color-sage-bg)', border: '1px solid #A7F3D0', color: 'var(--color-sage-text)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-          {successMsg}
-        </div>
-      )}
-
-      {/* Add Single Email Form */}
-      <div className="sharp-card" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
-          Authorize Individual Member or Officer
+      {/* Provision Form */}
+      <div className="sharp-card" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
+        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
+          Onboard New Student or Chapter Advisor
         </h3>
-        <form onSubmit={handleAddSingle} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-              Student / Advisor Email *
+              CAS Email *
             </label>
             <input
               type="email"
@@ -185,20 +197,21 @@ export const AllowlistManager: React.FC = () => {
               placeholder="student@cas.ac.ma"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-              Full Name
+              Full Name *
             </label>
             <input
               type="text"
+              required
               placeholder="First & Last Name"
               value={fullName}
               onChange={e => setFullName(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             />
           </div>
 
@@ -209,7 +222,7 @@ export const AllowlistManager: React.FC = () => {
             <select
               value={role}
               onChange={e => setRole(e.target.value as UserRole)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             >
               <option value="member">Member</option>
               <option value="leadership">Leadership (Officer)</option>
@@ -217,34 +230,35 @@ export const AllowlistManager: React.FC = () => {
             </select>
           </div>
 
-          <button type="submit" className="btn-primary" disabled={adding} style={{ padding: '0.5rem 1rem' }}>
-            <UserPlus size={14} /> Authorize Email
+          <button type="submit" className="btn-primary" disabled={provisioning} style={{ padding: '0.55rem 1rem' }}>
+            <UserPlus size={14} />
+            {provisioning ? 'Generating...' : 'Authorize & Generate Code'}
           </button>
         </form>
       </div>
 
-      {/* Allowlist Roster */}
+      {/* Roster Table */}
       <div className="roster-table-wrapper">
         <table className="roster-table">
           <thead>
             <tr>
-              <th>Authorized Email</th>
+              <th>Authorized Member</th>
               <th>Full Name</th>
-              <th>Assigned Chapter Role</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
+              <th>Assigned Role</th>
+              <th style={{ textAlign: 'right' }}>Security & Code Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  Loading allowlist...
+                  Loading authorized members...
                 </td>
               </tr>
             ) : entries.length === 0 ? (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  Allowlist is empty.
+                  No members currently authorized.
                 </td>
               </tr>
             ) : (
@@ -255,26 +269,31 @@ export const AllowlistManager: React.FC = () => {
                   </td>
                   <td>{item.full_name || '—'}</td>
                   <td>
-                    <select
-                      value={item.role}
-                      onChange={e => handleUpdateRole(item.email, e.target.value as UserRole)}
-                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', border: '1px solid var(--color-border)', fontWeight: 600 }}
-                    >
-                      <option value="member">Member</option>
-                      <option value="leadership">Leadership (Officer)</option>
-                      <option value="supervisor">Supervisor (Advisor)</option>
-                    </select>
+                    <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
+                      {item.role}
+                    </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    {item.email.toLowerCase() !== 'hiraqihoussaini@cas.ac.ma' && (
+                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                       <button
                         className="btn-inspect"
-                        style={{ color: 'var(--color-terracotta)' }}
-                        onClick={() => handleRemove(item.email)}
+                        style={{ color: 'var(--color-oxford)' }}
+                        title="Generate a new one-time passcode for this member"
+                        onClick={() => handleResetCode(item)}
                       >
-                        <Trash2 size={13} /> Revoke
+                        <RefreshCw size={12} /> Reset Code
                       </button>
-                    )}
+
+                      {item.email.toLowerCase() !== 'hiraqihoussaini@cas.ac.ma' && (
+                        <button
+                          className="btn-inspect"
+                          style={{ color: 'var(--color-terracotta)' }}
+                          onClick={() => handleRemove(item.email)}
+                        >
+                          <Trash2 size={12} /> Revoke
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -283,38 +302,85 @@ export const AllowlistManager: React.FC = () => {
         </table>
       </div>
 
-      {/* Bulk Add Modal */}
-      {showBulk && (
-        <div className="drawer-backdrop" onClick={() => setShowBulk(false)}>
+      {/* ONE-TIME PASSCODE REVEAL MODAL */}
+      {revealData && (
+        <div className="drawer-backdrop" onClick={() => setRevealData(null)}>
           <div
             className="sharp-card"
-            style={{ width: '100%', maxWidth: '520px', margin: 'auto', backgroundColor: 'var(--color-surface)', padding: '2rem' }}
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              margin: 'auto',
+              backgroundColor: 'var(--color-surface)',
+              padding: '2.5rem',
+              position: 'relative',
+              textAlign: 'center',
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-              Bulk Allowlist Ingestion
-            </h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-              Paste student emails (one per line or comma-separated). They will be added as active <strong>Members</strong>.
+            <button
+              onClick={() => setRevealData(null)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'inline-flex', padding: '1rem', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', marginBottom: '1rem' }}>
+              <Key size={32} color="var(--color-gold-text)" />
+            </div>
+
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+              {revealData.isReset ? 'New One-Time Access Code Generated' : 'One-Time Member Access Code'}
+            </h2>
+            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', margin: '0 0 1.5rem' }}>
+              Generated for <strong>{revealData.fullName}</strong> ({revealData.email}) • Role: <strong style={{ textTransform: 'capitalize' }}>{revealData.role}</strong>
             </p>
-            <form onSubmit={handleBulkAdd}>
-              <textarea
-                rows={6}
-                required
-                placeholder="student1@cas.ac.ma&#10;student2@cas.ac.ma&#10;student3@cas.ac.ma"
-                value={bulkEmails}
-                onChange={e => setBulkEmails(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', marginBottom: '1.25rem' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowBulk(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={adding}>
-                  Authorize All Emails
-                </button>
-              </div>
-            </form>
+
+            {/* Monospace Code Display */}
+            <div style={{
+              backgroundColor: '#0F172A',
+              color: '#38BDF8',
+              padding: '1.25rem',
+              fontFamily: 'monospace',
+              fontSize: '1.3rem',
+              letterSpacing: '0.08em',
+              fontWeight: 700,
+              border: '2px solid var(--color-oxford)',
+              marginBottom: '1rem',
+              userSelect: 'all',
+              wordBreak: 'break-all',
+            }}>
+              {revealData.code}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              <button
+                className="btn-primary"
+                onClick={handleCopyCode}
+                style={{ padding: '0.65rem 1.5rem' }}
+              >
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? 'Copied to Clipboard!' : 'Copy Access Code'}
+              </button>
+            </div>
+
+            <div style={{
+              padding: '0.85rem',
+              backgroundColor: '#FFFBEB',
+              border: '1px solid #FDE68A',
+              fontSize: '0.78rem',
+              color: '#92400E',
+              lineHeight: '1.5',
+              textAlign: 'left',
+            }}>
+              ⚠️ <strong>Important Notice for Leadership:</strong> This code is shown only once. Please send it directly to the member so they can sign in. Once logged in, they can change this passcode at any time.
+            </div>
+
+            <div style={{ marginTop: '1.5rem' }}>
+              <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setRevealData(null)}>
+                I Have Copied / Shared the Code
+              </button>
+            </div>
           </div>
         </div>
       )}

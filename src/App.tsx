@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/auth/AuthModal';
+import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
 import { MemberDashboard } from './components/member/MemberDashboard';
 import { MyProjectsView } from './components/member/MyProjectsView';
 import { ChapterRules } from './components/member/ChapterRules';
@@ -24,6 +25,7 @@ import {
   LogOut,
   AlertTriangle,
   ShieldAlert,
+  Key,
 } from 'lucide-react';
 import './index.css';
 
@@ -42,6 +44,7 @@ function PortalContent() {
   const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -88,13 +91,22 @@ function PortalContent() {
                 </div>
               </div>
 
+              <button
+                className="btn-secondary"
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem' }}
+                title="Change your personal access code"
+                onClick={() => setIsChangePasswordOpen(true)}
+              >
+                <Key size={13} /> Change Code
+              </button>
+
               <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem' }} onClick={signOut}>
                 <LogOut size={14} /> Sign Out
               </button>
             </div>
           ) : (
             <button className="btn-primary" onClick={() => setIsAuthModalOpen(true)}>
-              <LogIn size={14} /> Sign In / Register
+              <LogIn size={14} /> Sign In
             </button>
           )}
         </div>
@@ -210,6 +222,12 @@ function PortalContent() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      {/* Change Password / Access Code Modal */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
       />
 
     </div>
