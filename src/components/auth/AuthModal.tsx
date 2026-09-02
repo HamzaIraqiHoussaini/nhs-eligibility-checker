@@ -25,22 +25,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     const cleanEmail = email.trim().toLowerCase();
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: password.trim(),
       });
 
       if (error) {
-        if (error.message.toLowerCase().includes('invalid login credentials')) {
-          throw new Error('Invalid email or access code. Please verify your credentials or contact leadership.');
+        const msg = error.message || '';
+        if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid email or password')) {
+          setErrorMsg('Invalid email or access code. Please verify your credentials or contact leadership.');
+        } else if (msg.toLowerCase().includes('email not confirmed')) {
+          setErrorMsg('Your account email has not been confirmed. Contact chapter leadership.');
+        } else if (msg) {
+          setErrorMsg(msg);
+        } else {
+          setErrorMsg('Authentication failed. Please try again.');
         }
-        throw error;
+        return;
       }
 
-      await refreshProfile();
+      if (data?.user) {
+        await refreshProfile();
+      }
       onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during authentication.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : typeof err === 'string' ? err : 'An unexpected error occurred. Please try again.';
+      setErrorMsg(message);
     } finally {
       setLoading(false);
     }

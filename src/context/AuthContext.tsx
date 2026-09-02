@@ -35,7 +35,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshProfile = async () => {
-    if (user) {
+    // Use the live session user rather than potentially-stale state
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      setUser(currentUser);
+      await loadProfile(currentUser);
+    } else if (user) {
       await loadProfile(user);
     }
   };
