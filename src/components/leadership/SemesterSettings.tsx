@@ -813,7 +813,7 @@ export const SemesterSettings: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.2rem' }}>
-                  Chapter Bylaw Enforcement
+                  Chapter Rules Enforcement
                 </div>
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: 0 }}>
                   Semester Rollover & Transition Audit
@@ -832,10 +832,10 @@ export const SemesterSettings: React.FC = () => {
               </button>
             </div>
 
-            {/* Bylaw Rules Explanation Card */}
+            {/* Rules Explanation Card */}
             <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.15rem', marginBottom: '1.5rem', fontSize: '0.82rem', lineHeight: '1.6' }}>
               <div style={{ fontWeight: 700, color: 'var(--color-navy)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldAlert size={15} color="var(--color-oxford)" /> Automated Chapter Bylaw Rules:
+                <ShieldAlert size={15} color="var(--color-oxford)" /> Automated Chapter Rules:
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <li>

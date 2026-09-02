@@ -247,7 +247,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             }}
           >
             <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-            <strong>Proposal Limit Exceeded:</strong> Chapter bylaws limit each member to a maximum of 2 projects per semester (4 projects per year). You cannot submit additional proposals for this term.
+            <strong>Proposal Limit Exceeded:</strong> Chapter rules limit each member to a maximum of 2 projects per semester (4 projects per year). You cannot submit additional proposals for this term.
           </div>
         )}
 

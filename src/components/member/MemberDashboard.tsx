@@ -166,7 +166,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               Membership Dismissed • Account Restricted
             </div>
             <p style={{ fontSize: '0.88rem', color: 'var(--color-terracotta-text)', margin: '0.5rem 0' }}>
-              {profile?.restricted_reason || 'You have accumulated two probations, which violates official CAS NHS Chapter bylaws. Membership privileges and project proposal submissions are now locked.'}
+              {profile?.restricted_reason || 'You have accumulated two probations, which violates official CAS NHS Chapter rules. Membership privileges and project proposal submissions are now locked.'}
             </p>
             <div style={{ fontSize: '0.78rem', color: '#7F1D1D' }}>
               Please schedule a meeting with Ms. Laura Hayes (Chapter Advisor) or Chapter Leadership regarding your status.
@@ -383,13 +383,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         >
           <Award size={24} color="var(--color-gold)" style={{ marginBottom: '0.75rem' }} />
           <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.4rem' }}>
-            Official Chapter Bylaws
+            Chapter Rules
           </h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
             Review Grade 10 vs 11/12 criteria, 4 IB HL exemptions, Senior rules, probation triggers, and dismissal guidelines.
           </p>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            Read Constitution <ArrowRight size={14} />
+            View Rules <ArrowRight size={14} />
           </div>
         </div>
 

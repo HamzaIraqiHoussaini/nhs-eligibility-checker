@@ -6,13 +6,13 @@ export const ChapterRules: React.FC = () => {
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-gold-text)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          <BookOpen size={16} /> Official Chapter Governance & Constitution
+          <BookOpen size={16} /> Official Chapter Rules
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-          CAS National Honor Society Bylaws & Standards
+          CAS National Honor Society Rules
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', marginTop: '0.35rem' }}>
-          Official eligibility prerequisites, participation quotas, probation mechanisms, dismissal criteria, and leadership application factors for the Casablanca American School Chapter.
+          Official academic requirements, participation quotas, probation rules, and dismissal criteria for the Casablanca American School Chapter.
         </p>
       </div>
 

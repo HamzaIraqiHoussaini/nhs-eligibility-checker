@@ -53,7 +53,7 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
   dashboard: '/dashboard',
   projects: '/project_hub',
   screener: '/screener',
-  rules: '/bylaws',
+  rules: '/rules',
   review: '/review_desk',
   attendance: '/attendance',
   treasury: '/treasury',
@@ -131,6 +131,27 @@ function PortalContent() {
     fetchActiveSemester();
   }, [activeTab]);
 
+  // Unauthenticated visitors CANNOT access internal portal tabs.
+  // They remain on the clean public homepage and are prompted to log in.
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', width: '100%' }}>
+        <PublicHomepage
+          onNavigate={() => {
+            setIsAuthModalOpen(true);
+          }}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          user={null}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  // Authenticated members on home tab:
   if (activeTab === 'home') {
     return (
       <div style={{ minHeight: '100vh', width: '100%' }}>
@@ -213,7 +234,7 @@ function PortalContent() {
             onClick={() => navigateTo('rules')}
           >
             <BookOpen size={16} />
-            <span>Chapter Bylaws</span>
+            <span>Rules</span>
           </button>
 
           {/* Governance & Councils (Leadership & Supervisors) */}

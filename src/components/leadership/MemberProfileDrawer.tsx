@@ -201,7 +201,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   Chapter Dismissed • Account Restricted
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#991B1B' }}>
-                  Accumulated 2 probations. Violates chapter bylaws.
+                  Accumulated 2 probations. Violates chapter rules.
                 </div>
               </div>
             </div>
