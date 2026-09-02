@@ -474,19 +474,60 @@ export const ChapterTreasuryLedger: React.FC = () => {
           </table>
         </div>
 
-        {/* Informational Guidance Box */}
-        <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.5rem', lineHeight: '1.6' }}>
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-            Academic Year Continuation Guidelines
-          </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem' }}>
-            The <strong>Final Balance</strong> of each academic year seamlessly rolls into the starting baseline of the subsequent year.
-          </p>
-          <ul style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem', margin: 0 }}>
-            <li>Clicking <strong>NO / YES</strong> in the table toggles whether the expenditure has been officially reimbursed.</li>
-            <li>Only expenses with <strong>YES</strong> are subtracted from the chapter's master funds.</li>
-            <li>Revenues recorded as <strong>Income</strong> augment chapter funds directly.</li>
-          </ul>
+        {/* Informational Guidance Box & Pending Reimbursements Queue */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.5rem', lineHeight: '1.6' }}>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+              Academic Year Continuation Guidelines
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem' }}>
+              The <strong>Final Balance</strong> of each academic year seamlessly rolls into the starting baseline of the subsequent year.
+            </p>
+            <ul style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem', margin: 0 }}>
+              <li>Clicking <strong>NO / YES</strong> in the table toggles whether the expenditure has been officially reimbursed.</li>
+              <li>Only expenses with <strong>YES</strong> are subtracted from the chapter's master funds.</li>
+              <li>Revenues recorded as <strong>Income</strong> augment chapter funds directly.</li>
+            </ul>
+          </div>
+
+          {/* Stitch Feature: Pending Reimbursements Queue */}
+          {expenseEntries.filter((e) => e.reimbursed === 'NO').length > 0 && (
+            <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '4px solid var(--color-gold)', padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Pending Reimbursement Queue ({expenseEntries.filter((e) => e.reimbursed === 'NO').length})
+                </div>
+                <span style={{ fontSize: '0.76rem', color: '#92400E', fontWeight: 600 }}>
+                  Total Awaiting Payout: {expenseEntries.filter((e) => e.reimbursed === 'NO').reduce((a, c) => a + Number(c.amount_taken_out || 0), 0).toLocaleString()} DHS
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {expenseEntries.filter((e) => e.reimbursed === 'NO').map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--color-navy)' }}>{item.project_name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Payee: {item.who} • {item.transaction_date}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.88rem', color: 'var(--color-terracotta)' }}>
+                        {Number(item.amount_taken_out).toLocaleString()} DHS
+                      </span>
+                      {canManage && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
+                          onClick={() => handleToggleReimbursed(item)}
+                        >
+                          Mark Reimbursed
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
