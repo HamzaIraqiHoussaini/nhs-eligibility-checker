@@ -14,6 +14,7 @@ import { MemberRosterManager } from './components/leadership/MemberRosterManager
 import { SemesterSettings } from './components/leadership/SemesterSettings';
 import { AllowlistManager } from './components/leadership/AllowlistManager';
 import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
+import { PublicHomepage } from './components/public/PublicHomepage';
 import {
   LayoutDashboard,
   FileText,
@@ -30,10 +31,12 @@ import {
   ShieldAlert,
   Key,
   Coins,
+  Globe,
 } from 'lucide-react';
 import './index.css';
 
 type ActiveTab =
+  | 'home'
   | 'dashboard'
   | 'projects'
   | 'screener'
@@ -46,6 +49,7 @@ type ActiveTab =
   | 'roster';
 
 const TAB_ROUTES: Record<ActiveTab, string> = {
+  home: '/',
   dashboard: '/dashboard',
   projects: '/project_hub',
   screener: '/screener',
@@ -59,8 +63,9 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
 };
 
 const PATH_TO_TAB: Record<string, ActiveTab> = {
+  '/': 'home',
+  '/home': 'home',
   '/dashboard': 'dashboard',
-  '/': 'dashboard',
   '/project_hub': 'projects',
   '/projects': 'projects',
   '/screener': 'screener',
@@ -80,7 +85,7 @@ const PATH_TO_TAB: Record<string, ActiveTab> = {
 
 function getTabFromPath(path: string): ActiveTab {
   const normalized = path.replace(/\/$/, '') || '/';
-  return PATH_TO_TAB[normalized] || 'dashboard';
+  return PATH_TO_TAB[normalized] || 'home';
 }
 
 function PortalContent() {
@@ -99,11 +104,6 @@ function PortalContent() {
   };
 
   useEffect(() => {
-    // If on root, set URL to /dashboard without reloading
-    if (window.location.pathname === '/' || window.location.pathname === '') {
-      window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
-    }
-
     const handlePopState = () => {
       const tab = getTabFromPath(window.location.pathname);
       setActiveTab(tab);
@@ -163,6 +163,15 @@ function PortalContent() {
         <nav className="stitch-sidebar-nav">
           
           <div className="stitch-nav-section-label">General Workspace</div>
+
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={() => navigateTo('home')}
+          >
+            <Globe size={16} />
+            <span>Public Homepage</span>
+          </button>
 
           <button
             type="button"
@@ -354,6 +363,12 @@ function PortalContent() {
 
       {/* Stitch Main Content Area */}
       <main className="stitch-main-content">
+        {activeTab === 'home' && (
+          <PublicHomepage
+            onNavigate={(t) => navigateTo(t as ActiveTab)}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+          />
+        )}
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
         {activeTab === 'screener' && <ScreenerView />}
