@@ -13,6 +13,8 @@ dist-ssr
 *.local
 test*.js
 stitch_screens/
+.env
+.env*.local
 
 # Editor directories and files
 .vscode/*

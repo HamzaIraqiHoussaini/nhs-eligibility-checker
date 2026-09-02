@@ -1,136 +1,226 @@
 import { useState } from 'react';
-import { FileUploader } from './FileUploader';
-import { ExecutiveDashboard } from './ExecutiveDashboard';
-import { parseFile, parseBatchFile, type BatchResult, type ParseResult, type StudentResult } from './parser';
-import { RotateCcw, AlertTriangle } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthModal } from './components/auth/AuthModal';
+import { MemberDashboard } from './components/member/MemberDashboard';
+import { MyProjectsView } from './components/member/MyProjectsView';
+import { ChapterRules } from './components/member/ChapterRules';
+import { ScreenerView } from './components/screener/ScreenerView';
+import { TwoStageReviewDesk } from './components/leadership/TwoStageReviewDesk';
+import { AttendanceSheet } from './components/leadership/AttendanceSheet';
+import { MemberRosterManager } from './components/leadership/MemberRosterManager';
+import { SemesterSettings } from './components/leadership/SemesterSettings';
+import { AllowlistManager } from './components/leadership/AllowlistManager';
+import {
+  LayoutDashboard,
+  FileText,
+  CheckCircle2,
+  BookOpen,
+  ClipboardCheck,
+  CalendarCheck,
+  Users,
+  Calendar,
+  ShieldCheck,
+  LogIn,
+  LogOut,
+  AlertTriangle,
+  ShieldAlert,
+} from 'lucide-react';
 import './index.css';
 
-function App() {
-  const [isParsing, setIsParsing] = useState(false);
-  const [progress, setProgress] = useState('');
-  const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+type ActiveTab =
+  | 'dashboard'
+  | 'projects'
+  | 'screener'
+  | 'rules'
+  | 'review'
+  | 'attendance'
+  | 'roster'
+  | 'semesters'
+  | 'allowlist';
 
-  const handleFileSelect = async (file: File) => {
-    setIsParsing(true);
-    setError(null);
-    setBatchResult(null);
-    setProgress('Extracting document contents and analyzing page layout...');
-
-    try {
-      if (file.type === 'application/pdf') {
-        const result = await parseBatchFile(file, (_current, _total, status) => {
-          setProgress(status);
-        });
-
-        if (result.students.length === 0) {
-          // Fallback to parseFile if section boundaries weren't matched
-          const single = await parseFile(file);
-          setBatchResult(singleResultToBatchResult(single));
-        } else {
-          setBatchResult(result);
-        }
-      } else {
-        // Image upload (OCR)
-        const single = await parseFile(file);
-        setBatchResult(singleResultToBatchResult(single));
-      }
-    } catch (err) {
-      console.error('Audit extraction error:', err);
-      setError('An error occurred while reading the document. Please ensure the file is an authentic CAS report card.');
-    } finally {
-      setIsParsing(false);
-      setProgress('');
-    }
-  };
-
-  function singleResultToBatchResult(single: ParseResult): BatchResult {
-    const student: StudentResult = {
-      studentName: single.studentName || 'Student',
-      gradeLevel: 11,
-      average: single.average,
-      hasAEorBE: single.hasAEorBE,
-      has3OrLower: single.has3OrLower,
-      isEligible: single.isEligible,
-      grades: single.grades,
-      failReasons: !single.isEligible ? [
-        ...(single.average < 5.8 ? [`Average ${single.average.toFixed(2)} < 5.8`] : []),
-        ...(single.hasAEorBE ? ['Has AE or BE marks'] : []),
-        ...(single.has3OrLower ? ['Has grade of 3 or lower'] : []),
-      ] : [],
-    };
-
-    return {
-      semester: 1,
-      totalStudents: 1,
-      studentsSkipped: 0,
-      students: [student],
-      eligibleStudents: student.isEligible ? [student] : [],
-      ineligibleStudents: !student.isEligible ? [student] : [],
-    };
-  }
-
-  const handleReset = () => {
-    setBatchResult(null);
-    setError(null);
-  };
+function PortalContent() {
+  const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Institutional Navigation Bar */}
-      <nav className="top-nav">
+      
+      {/* Top Institutional Header */}
+      <header className="top-nav">
         <div className="brand-section">
-          <img src="/nhs-logo.png" alt="National Honor Society Keystone" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
+          <img
+            src="/nhs-logo.png"
+            alt="National Honor Society Crest"
+            style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
+          />
           <div>
             <div className="brand-title">Casablanca American School</div>
-            <div className="brand-subtitle">National Honor Society Chapter • Candidate Screener</div>
+            <div className="brand-subtitle">National Honor Society Chapter Portal</div>
           </div>
         </div>
 
         <div className="nav-actions">
-          {batchResult && (
-            <button className="btn-primary" onClick={handleReset}>
-              <RotateCcw size={14} />
-              New Audit Session
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>
+                  {profile?.full_name || user.email}
+                </div>
+                <div style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                  {isRestricted ? (
+                    <span style={{ color: 'var(--color-terracotta)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <ShieldAlert size={11} /> Dismissed (Restricted)
+                    </span>
+                  ) : profile?.is_on_probation ? (
+                    <span style={{ color: 'var(--color-gold-text)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <AlertTriangle size={11} /> On Probation
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--color-sage)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <CheckCircle2 size={11} /> Good Standing
+                    </span>
+                  )}
+                  <span style={{ color: 'var(--color-border)' }}>•</span>
+                  <span style={{ textTransform: 'capitalize', fontWeight: 600, color: isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
+                    {role || 'Member'}
+                  </span>
+                </div>
+              </div>
+
+              <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem' }} onClick={signOut}>
+                <LogOut size={14} /> Sign Out
+              </button>
+            </div>
+          ) : (
+            <button className="btn-primary" onClick={() => setIsAuthModalOpen(true)}>
+              <LogIn size={14} /> Sign In / Register
             </button>
           )}
         </div>
+      </header>
+
+      {/* Chapter Secondary Navigation Tabs */}
+      <nav style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '0 2rem', display: 'flex', gap: '0.25rem', overflowX: 'auto' }}>
+        <button
+          type="button"
+          className={`ingestion-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
+          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <LayoutDashboard size={14} /> Chapter Home
+        </button>
+
+        <button
+          type="button"
+          className={`ingestion-tab ${activeTab === 'projects' ? 'active' : ''}`}
+          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setActiveTab('projects')}
+        >
+          <FileText size={14} /> Project Proposal Hub
+        </button>
+
+        <button
+          type="button"
+          className={`ingestion-tab ${activeTab === 'screener' ? 'active' : ''}`}
+          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setActiveTab('screener')}
+        >
+          <CheckCircle2 size={14} /> {isLeadership || isSupervisor ? 'Report Card Auditor' : 'Verify My Report Card'}
+        </button>
+
+        <button
+          type="button"
+          className={`ingestion-tab ${activeTab === 'rules' ? 'active' : ''}`}
+          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+          onClick={() => setActiveTab('rules')}
+        >
+          <BookOpen size={14} /> Official Bylaws
+        </button>
+
+        {/* Leadership & Supervisor Management Tabs */}
+        {(isLeadership || isSupervisor) && (
+          <>
+            <span style={{ margin: '0.5rem 0.25rem', borderLeft: '1px solid var(--color-border)' }} />
+
+            <button
+              type="button"
+              className={`ingestion-tab ${activeTab === 'review' ? 'active' : ''}`}
+              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px', color: isSupervisor ? 'var(--color-oxford)' : undefined }}
+              onClick={() => setActiveTab('review')}
+            >
+              <ClipboardCheck size={14} /> Proposal Review Desk
+            </button>
+
+            <button
+              type="button"
+              className={`ingestion-tab ${activeTab === 'attendance' ? 'active' : ''}`}
+              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setActiveTab('attendance')}
+            >
+              <CalendarCheck size={14} /> Meeting Attendance
+            </button>
+
+            <button
+              type="button"
+              className={`ingestion-tab ${activeTab === 'roster' ? 'active' : ''}`}
+              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setActiveTab('roster')}
+            >
+              <Users size={14} /> Member Profiles & Standing
+            </button>
+
+            <button
+              type="button"
+              className={`ingestion-tab ${activeTab === 'semesters' ? 'active' : ''}`}
+              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setActiveTab('semesters')}
+            >
+              <Calendar size={14} /> Semester Dates
+            </button>
+
+            {isLeadership && (
+              <button
+                type="button"
+                className={`ingestion-tab ${activeTab === 'allowlist' ? 'active' : ''}`}
+                style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => setActiveTab('allowlist')}
+              >
+                <ShieldCheck size={14} /> Allowlist & Roles
+              </button>
+            )}
+          </>
+        )}
       </nav>
 
-      {/* Main View Area */}
-      <main style={{ flex: 1 }}>
-        {error && (
-          <div style={{
-            maxWidth: '780px',
-            margin: '2rem auto 0',
-            padding: '1rem 1.5rem',
-            backgroundColor: 'var(--color-terracotta-bg)',
-            border: '1px solid #FECACA',
-            color: 'var(--color-terracotta-text)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            fontSize: '0.88rem'
-          }}>
-            <AlertTriangle size={20} color="var(--color-terracotta)" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {!batchResult ? (
-          <FileUploader
-            onFileSelect={handleFileSelect}
-            isParsing={isParsing}
-            progressMessage={progress}
-          />
-        ) : (
-          <ExecutiveDashboard
-            result={batchResult}
-            onReset={handleReset}
-          />
-        )}
+      {/* Main Viewport Content */}
+      <main className="academic-canvas-bg" style={{ flex: 1, padding: '1.5rem 2rem' }}>
+        {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => setActiveTab(t as ActiveTab)} />}
+        {activeTab === 'projects' && <MyProjectsView />}
+        {activeTab === 'screener' && <ScreenerView />}
+        {activeTab === 'rules' && <ChapterRules />}
+        {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
+        {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
+        {activeTab === 'roster' && (isLeadership || isSupervisor) && <MemberRosterManager />}
+        {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
+        {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
       </main>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <PortalContent />
+    </AuthProvider>
   );
 }
 
