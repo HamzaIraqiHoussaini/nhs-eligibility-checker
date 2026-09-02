@@ -26,11 +26,17 @@ export const SemesterSettings: React.FC = () => {
 
   // Define New Semester State
   const [showModal, setShowModal] = useState(false);
-  const [selectedYear, setSelectedYear] = useState('2026-2027');
+  const [startYearInput, setStartYearInput] = useState('2026');
   const [selectedSemNum, setSelectedSemNum] = useState<1 | 2>(1);
   const [startDate, setStartDate] = useState('2026-09-01');
   const [endDate, setEndDate] = useState('2027-01-22');
   const [isActive, setIsActive] = useState(true);
+
+  // Derived academic year: e.g. typing 2026 -> 2026-2027
+  const parsedStartYear = parseInt(startYearInput.trim(), 10);
+  const computedAcademicYear = !isNaN(parsedStartYear) && parsedStartYear > 1900 && parsedStartYear < 2100
+    ? `${parsedStartYear}-${parsedStartYear + 1}`
+    : startYearInput.trim();
 
   // Past Semester Stats State
   const [selectedStatsSemester, setSelectedStatsSemester] = useState<Semester | null>(null);
@@ -61,7 +67,7 @@ export const SemesterSettings: React.FC = () => {
     loadSemesters();
   }, []);
 
-  const derivedTitle = `Semester ${selectedSemNum} (${selectedYear})`;
+  const derivedTitle = `Semester ${selectedSemNum} (${computedAcademicYear || startYearInput})`;
   const estDays = calculateDays(startDate, endDate);
 
   const activeSemester = semesters.find((s) => s.is_active);
@@ -81,7 +87,7 @@ export const SemesterSettings: React.FC = () => {
         start_date: startDate,
         end_date: endDate,
         is_active: isActive,
-        academic_year: selectedYear,
+        academic_year: computedAcademicYear || startYearInput,
         semester_number: selectedSemNum,
       });
 
@@ -379,22 +385,56 @@ export const SemesterSettings: React.FC = () => {
 
               <form onSubmit={handleCreateSemester} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 
-                {/* Academic Year Selection */}
+                {/* Academic Year Starting Year Input */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                    Academic Year *
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.35rem' }}>
+                    Academic Year (Starting Year) *
                   </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', fontFamily: 'monospace' }}
-                  >
-                    <option value="2024-2025">2024 - 2025</option>
-                    <option value="2025-2026">2025 - 2026</option>
-                    <option value="2026-2027">2026 - 2027</option>
-                    <option value="2027-2028">2027 - 2028</option>
-                    <option value="2028-2029">2028 - 2029</option>
-                  </select>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.75rem', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      min="2000"
+                      max="2099"
+                      required
+                      placeholder="e.g. 2026"
+                      value={startYearInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setStartYearInput(val);
+                        const yr = parseInt(val, 10);
+                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                          if (selectedSemNum === 1) {
+                            setStartDate(`${yr}-09-01`);
+                            setEndDate(`${yr + 1}-01-22`);
+                          } else {
+                            setStartDate(`${yr + 1}-01-26`);
+                            setEndDate(`${yr + 1}-06-15`);
+                          }
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.6rem 0.85rem',
+                        border: '1px solid var(--color-border)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        color: 'var(--color-navy)',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    />
+                    <div style={{ backgroundColor: '#F1F5F9', border: '1px solid var(--color-border)', padding: '0.55rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                        Academic Year:
+                      </span>
+                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem', color: 'var(--color-oxford)' }}>
+                        {computedAcademicYear || '—'}
+                      </strong>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.35rem' }}>
+                    Type the starting year (e.g. typing <strong>2026</strong> automatically sets <strong>2026-2027</strong>).
+                  </div>
                 </div>
 
                 {/* Term Definition Buttons: Semester 1 vs Semester 2 */}
@@ -414,7 +454,14 @@ export const SemesterSettings: React.FC = () => {
                         color: selectedSemNum === 1 ? '#FFFFFF' : 'var(--color-navy)',
                         cursor: 'pointer',
                       }}
-                      onClick={() => setSelectedSemNum(1)}
+                      onClick={() => {
+                        setSelectedSemNum(1);
+                        const yr = parseInt(startYearInput, 10);
+                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                          setStartDate(`${yr}-09-01`);
+                          setEndDate(`${yr + 1}-01-22`);
+                        }
+                      }}
                     >
                       Semester 1
                     </button>
@@ -430,7 +477,14 @@ export const SemesterSettings: React.FC = () => {
                         color: selectedSemNum === 2 ? '#FFFFFF' : 'var(--color-navy)',
                         cursor: 'pointer',
                       }}
-                      onClick={() => setSelectedSemNum(2)}
+                      onClick={() => {
+                        setSelectedSemNum(2);
+                        const yr = parseInt(startYearInput, 10);
+                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                          setStartDate(`${yr + 1}-01-26`);
+                          setEndDate(`${yr + 1}-06-15`);
+                        }
+                      }}
                     >
                       Semester 2
                     </button>
@@ -504,7 +558,7 @@ export const SemesterSettings: React.FC = () => {
                     Semester {selectedSemNum}
                   </h4>
                   <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', marginBottom: '1rem' }}>
-                    {selectedYear}
+                    {computedAcademicYear || startYearInput}
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.78rem' }}>

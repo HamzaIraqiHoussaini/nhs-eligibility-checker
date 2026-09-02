@@ -196,7 +196,6 @@ export const AttendanceSheet: React.FC = () => {
         meeting_id: activeMeeting.id,
         user_id: m.id,
         status: attendanceMap[m.id] || 'present',
-        updated_at: new Date().toISOString(),
       }));
 
       const { error } = await supabase

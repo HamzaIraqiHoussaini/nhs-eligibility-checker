@@ -10,7 +10,9 @@ export const ChapterTreasuryLedger: React.FC = () => {
   const { isLeadership, isSupervisor } = useAuth();
   const canManage = isLeadership || isSupervisor;
 
+  const [availableYears, setAvailableYears] = useState<string[]>(ACADEMIC_YEARS);
   const [selectedYear, setSelectedYear] = useState('2025-2026');
+  const [customStartYear, setCustomStartYear] = useState('');
   const [entries, setEntries] = useState<ChapterFundEntry[]>([]);
   const [yearlySummary, setYearlySummary] = useState<ChapterTreasurySummary>({
     id: '2025-2026',
@@ -81,6 +83,22 @@ export const ChapterTreasuryLedger: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchYears = async () => {
+      try {
+        const { data } = await supabase.from('semesters').select('academic_year');
+        if (data) {
+          const list = Array.from(new Set([...ACADEMIC_YEARS, ...data.map((d: any) => d.academic_year).filter(Boolean)]));
+          list.sort();
+          setAvailableYears(list);
+        }
+      } catch (e) {
+        console.error('Error fetching academic years:', e);
+      }
+    };
+    fetchYears();
+  }, []);
 
   useEffect(() => {
     loadTreasuryData(selectedYear);
@@ -257,30 +275,62 @@ export const ChapterTreasuryLedger: React.FC = () => {
         flexWrap: 'wrap',
         gap: '1.25rem',
       }}>
-        {/* Timeline Dropdown */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Academic Year Timeline:
-          </label>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            style={{
-              padding: '0.45rem 0.85rem',
-              fontWeight: 700,
-              fontSize: '0.92rem',
-              color: 'var(--color-navy)',
-              border: '2px solid var(--color-oxford)',
-              backgroundColor: 'var(--color-canvas)',
-              cursor: 'pointer',
-            }}
-          >
-            {ACADEMIC_YEARS.map((yr) => (
-              <option key={yr} value={yr}>
-                Academic Year {yr}
-              </option>
-            ))}
-          </select>
+        {/* Timeline Dropdown & Year Input */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Academic Year:
+            </label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              style={{
+                padding: '0.45rem 0.85rem',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                color: 'var(--color-navy)',
+                border: '2px solid var(--color-oxford)',
+                backgroundColor: 'var(--color-canvas)',
+                cursor: 'pointer',
+              }}
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  Academic Year {yr}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>or type start year:</span>
+            <input
+              type="number"
+              placeholder="e.g. 2026"
+              value={customStartYear}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCustomStartYear(val);
+                const yr = parseInt(val, 10);
+                if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                  const targetYear = `${yr}-${yr + 1}`;
+                  if (!availableYears.includes(targetYear)) {
+                    setAvailableYears((prev) => Array.from(new Set([...prev, targetYear])).sort());
+                  }
+                  setSelectedYear(targetYear);
+                }
+              }}
+              style={{
+                width: '105px',
+                padding: '0.42rem 0.6rem',
+                border: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                color: 'var(--color-navy)',
+              }}
+            />
+          </div>
         </div>
 
         {/* Dynamic Balance Headline */}
