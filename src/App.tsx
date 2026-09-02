@@ -131,6 +131,22 @@ function PortalContent() {
     fetchActiveSemester();
   }, [activeTab]);
 
+  if (activeTab === 'home') {
+    return (
+      <div style={{ minHeight: '100vh', width: '100%' }}>
+        <PublicHomepage
+          onNavigate={(t) => navigateTo(t as ActiveTab)}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          user={user}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="stitch-layout">
       
@@ -145,7 +161,7 @@ function PortalContent() {
           title="Return to Dashboard"
         >
           <img
-            src="/nhs-logo.png"
+            src="/cas-logo.png"
             alt="CAS NHS Crest"
             style={{ width: '38px', height: '38px', objectFit: 'contain' }}
           />
@@ -163,15 +179,6 @@ function PortalContent() {
         <nav className="stitch-sidebar-nav">
           
           <div className="stitch-nav-section-label">General Workspace</div>
-
-          <button
-            type="button"
-            className={`stitch-nav-item ${activeTab === 'home' ? 'active' : ''}`}
-            onClick={() => navigateTo('home')}
-          >
-            <Globe size={16} />
-            <span>Public Homepage</span>
-          </button>
 
           <button
             type="button"
@@ -271,6 +278,19 @@ function PortalContent() {
               )}
             </>
           )}
+
+          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+            <button
+              type="button"
+              className="stitch-nav-item"
+              onClick={() => navigateTo('home')}
+              style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}
+              title="Return to Casablanca American School public homepage"
+            >
+              <Globe size={15} />
+              <span>Public Homepage</span>
+            </button>
+          </div>
         </nav>
 
         {/* Sidebar Footer User Info */}
@@ -363,12 +383,6 @@ function PortalContent() {
 
       {/* Stitch Main Content Area */}
       <main className="stitch-main-content">
-        {activeTab === 'home' && (
-          <PublicHomepage
-            onNavigate={(t) => navigateTo(t as ActiveTab)}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
-          />
-        )}
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
         {activeTab === 'screener' && <ScreenerView />}
