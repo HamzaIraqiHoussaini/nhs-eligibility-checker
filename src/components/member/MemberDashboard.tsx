@@ -129,8 +129,28 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         </p>
       </div>
 
-      {/* DISMISSAL / RESTRICTION CALLOUT BANNER */}
-      {isRestricted ? (
+      {/* GRADUATE HONORS BANNER */}
+      {profile?.role === 'graduate' ? (
+        <div style={{
+          padding: '1.5rem',
+          backgroundColor: '#EDE9FE',
+          border: '2px solid #A78BFA',
+          marginBottom: '2rem',
+          display: 'flex',
+          gap: '1.25rem',
+          alignItems: 'center',
+        }}>
+          <Award size={36} color="#6D28D9" style={{ flexShrink: 0 }} />
+          <div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: '#5B21B6' }}>
+              National Honor Society Graduate • Honors Conferred
+            </div>
+            <p style={{ fontSize: '0.88rem', color: '#6D28D9', margin: '0.4rem 0 0' }}>
+              Congratulations! You have completed your active National Honor Society service requirements and officially graduated with chapter honors.
+            </p>
+          </div>
+        </div>
+      ) : isRestricted ? (
         <div style={{
           padding: '1.5rem',
           backgroundColor: 'var(--color-terracotta-bg)',

@@ -5,9 +5,10 @@ export type UserRole =
   | 'past_leadership'
   | 'past_supervisor'
   | 'past_member'
-  | 'kicked_out';
+  | 'kicked_out'
+  | 'graduate';
 
-export type ProbationReason = 'grades' | 'behavior' | 'attendance' | 'inactivity' | null;
+export type ProbationReason = 'grades' | 'behavior' | 'attendance' | 'inactivity' | 'project_quota' | null;
 
 export interface Profile {
   id: string;

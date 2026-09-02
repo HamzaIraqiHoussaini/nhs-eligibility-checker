@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance, Semester } from '../../types/nhs';
-import { X, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award } from 'lucide-react';
 
 interface MemberProfileDrawerProps {
   member: Profile | null;
   onClose: () => void;
+  onUpdated?: () => void;
 }
 
-export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member, onClose }) => {
+export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member, onClose, onUpdated }) => {
+  const { isLeadership } = useAuth();
+  const [currentGrade, setCurrentGrade] = useState<number>(member?.grade_level || 11);
   const [allProposals, setAllProposals] = useState<ProjectProposal[]>([]);
   const [volunteerHistory, setVolunteerHistory] = useState<ProjectVolunteer[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<MeetingAttendance[]>([]);
@@ -23,6 +27,27 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    if (member) {
+      setCurrentGrade(member.grade_level || 11);
+    }
+  }, [member?.grade_level]);
+
+  const handleUpdateGrade = async (newGrade: number) => {
+    if (!member) return;
+    setCurrentGrade(newGrade);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ grade_level: newGrade })
+        .eq('id', member.id);
+      if (error) throw error;
+      if (onUpdated) onUpdated();
+    } catch (err) {
+      console.error('Failed to update grade:', err);
+    }
+  };
 
   useEffect(() => {
     if (!member) return;
@@ -117,9 +142,34 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             <div className="drawer-meta">
               <span>{member.email}</span>
               <span style={{ margin: '0 0.5rem' }}>•</span>
-              <span>Grade {member.grade_level || 11}</span>
+              {isLeadership && !member.is_restricted && member.role !== 'graduate' ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--color-text-muted)' }}>Grade:</span>
+                  <select
+                    value={currentGrade}
+                    onChange={(e) => handleUpdateGrade(Number(e.target.value))}
+                    style={{
+                      padding: '0.15rem 0.4rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      color: 'var(--color-navy)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '2px',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={11}>11</option>
+                    <option value={12}>12</option>
+                  </select>
+                </span>
+              ) : (
+                <span>Grade {currentGrade}</span>
+              )}
               <span style={{ margin: '0 0.5rem' }}>•</span>
-              <span style={{ textTransform: 'capitalize', fontWeight: 600 }}>{member.role}</span>
+              <span style={{ textTransform: 'capitalize', fontWeight: 600, color: member.role === 'graduate' ? '#6D28D9' : undefined }}>
+                {member.role}
+              </span>
             </div>
           </div>
           <button className="drawer-close-btn" onClick={onClose} aria-label="Close Profile">
@@ -131,7 +181,19 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
         <div className="drawer-body">
           
           {/* Standing Callout */}
-          {member.is_restricted ? (
+          {member.role === 'graduate' ? (
+            <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Award size={24} color="#6D28D9" />
+              <div>
+                <div style={{ fontWeight: 700, color: '#6D28D9', fontSize: '0.92rem' }}>
+                  National Honor Society Graduate
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#5B21B6', marginTop: '0.2rem' }}>
+                  This member has completed their active NHS service and graduated with honors.
+                </div>
+              </div>
+            </div>
+          ) : member.is_restricted ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: 'var(--color-terracotta-bg)', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <ShieldAlert size={24} color="var(--color-terracotta)" />
               <div>

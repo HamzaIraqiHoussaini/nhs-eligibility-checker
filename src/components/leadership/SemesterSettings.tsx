@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
-import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight } from 'lucide-react';
+import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, CheckCircle2, RotateCw } from 'lucide-react';
 
 interface SemesterStats {
   projectsCompleted: number;
@@ -48,6 +48,14 @@ export const SemesterSettings: React.FC = () => {
   // Purge receipts state
   const [purging, setPurging] = useState(false);
   const [purgeSuccess, setPurgeSuccess] = useState(false);
+
+  // Semester Rollover & Transition State
+  const [transitionModalOpen, setTransitionModalOpen] = useState(false);
+  const [transitionConcludingSem, setTransitionConcludingSem] = useState<Semester | null>(null);
+  const [transitionTargetSem, setTransitionTargetSem] = useState<Semester | null>(null);
+  const [transitionPreviewLoading, setTransitionPreviewLoading] = useState(false);
+  const [transitionPreviewData, setTransitionPreviewData] = useState<any | null>(null);
+  const [executingTransition, setExecutingTransition] = useState(false);
 
   const loadSemesters = async () => {
     setLoading(true);
@@ -106,13 +114,87 @@ export const SemesterSettings: React.FC = () => {
     }
   };
 
-  const handleSetActive = async (semesterId: string) => {
+  const handleRequestTransition = async (concludedSem: Semester, targetSem: Semester) => {
+    setTransitionConcludingSem(concludedSem);
+    setTransitionTargetSem(targetSem);
+    setTransitionModalOpen(true);
+    setTransitionPreviewLoading(true);
+    setTransitionPreviewData(null);
     try {
-      await supabase.from('semesters').update({ is_active: false }).neq('id', semesterId);
-      await supabase.from('semesters').update({ is_active: true }).eq('id', semesterId);
+      const { data, error } = await supabase.rpc('preview_semester_rollover', {
+        p_concluded_semester_id: concludedSem.id,
+        p_target_semester_id: targetSem.id,
+      });
+      if (error) throw error;
+      setTransitionPreviewData(data);
+    } catch (err: any) {
+      console.error('Failed to preview rollover:', err);
+      await alert({
+        title: 'Preview Failed',
+        message: err.message || 'Could not load rollover preview.',
+        variant: 'danger',
+      });
+    } finally {
+      setTransitionPreviewLoading(false);
+    }
+  };
+
+  const handleExecuteTransition = async () => {
+    if (!transitionConcludingSem || !transitionTargetSem) return;
+    setExecutingTransition(true);
+    try {
+      const { data, error } = await supabase.rpc('execute_semester_rollover', {
+        p_concluded_semester_id: transitionConcludingSem.id,
+        p_target_semester_id: transitionTargetSem.id,
+      });
+      if (error) throw error;
+
+      setTransitionModalOpen(false);
+      await loadSemesters();
+      await alert({
+        title: 'Semester Transition & Rollover Complete',
+        message: `Successfully concluded ${transitionConcludingSem.name} and activated ${transitionTargetSem.name}!\n\n• ${data.passed || 0} members met participation quotas\n• ${data.probated || 0} placed on probation for quota deficits\n• ${data.dismissed || 0} dismissed for repeat deficits\n• ${data.graduated || 0} Grade 12 seniors graduated with honors`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      console.error('Failed to execute rollover:', err);
+      await alert({
+        title: 'Rollover Execution Failed',
+        message: err.message || 'Failed to complete semester transition.',
+        variant: 'danger',
+      });
+    } finally {
+      setExecutingTransition(false);
+    }
+  };
+
+  const handleDirectSwitchWithoutRollover = async () => {
+    if (!transitionTargetSem) return;
+    try {
+      await supabase.from('semesters').update({ is_active: false }).neq('id', transitionTargetSem.id);
+      await supabase.from('semesters').update({ is_active: true }).eq('id', transitionTargetSem.id);
+      setTransitionModalOpen(false);
       await loadSemesters();
     } catch (err) {
-      console.error('Failed setting active semester:', err);
+      console.error('Failed direct semester switch:', err);
+    }
+  };
+
+  const handleSetActive = async (semesterId: string) => {
+    const targetSem = semesters.find((s) => s.id === semesterId);
+    if (!targetSem) return;
+
+    if (activeSemester && activeSemester.id !== semesterId) {
+      // If an active semester exists, trigger the transition and rollover audit review
+      await handleRequestTransition(activeSemester, targetSem);
+    } else {
+      try {
+        await supabase.from('semesters').update({ is_active: false }).neq('id', semesterId);
+        await supabase.from('semesters').update({ is_active: true }).eq('id', semesterId);
+        await loadSemesters();
+      } catch (err) {
+        console.error('Failed setting active semester:', err);
+      }
     }
   };
 
@@ -285,6 +367,23 @@ export const SemesterSettings: React.FC = () => {
                 <span>View Term Analytics</span>
                 <ArrowRight size={14} />
               </button>
+
+              {pastSemesters.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ width: '100%', marginTop: '0.65rem', justifyContent: 'space-between', fontSize: '0.82rem' }}
+                  onClick={() => {
+                    const nextSem = pastSemesters[0];
+                    if (nextSem) handleRequestTransition(activeSemester, nextSem);
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <RotateCw size={13} /> Conclude Term & Run Rollover
+                  </span>
+                  <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           ) : (
             <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -698,6 +797,178 @@ export const SemesterSettings: React.FC = () => {
               <button className="btn-secondary" onClick={() => setSelectedStatsSemester(null)}>
                 Close Report
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Semester Transition & Rollover Audit Modal */}
+      {transitionModalOpen && transitionConcludingSem && transitionTargetSem && (
+        <div className="drawer-backdrop" onClick={() => !executingTransition && setTransitionModalOpen(false)}>
+          <div
+            className="sharp-card"
+            style={{ width: '100%', maxWidth: '780px', margin: 'auto', backgroundColor: '#FFFFFF', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.2rem' }}>
+                  Chapter Bylaw Enforcement
+                </div>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: 0 }}>
+                  Semester Rollover & Transition Audit
+                </h3>
+                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                  Conclude <strong>{transitionConcludingSem.name}</strong> → Activate <strong>{transitionTargetSem.name}</strong>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="drawer-close-btn"
+                onClick={() => !executingTransition && setTransitionModalOpen(false)}
+                disabled={executingTransition}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Bylaw Rules Explanation Card */}
+            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.15rem', marginBottom: '1.5rem', fontSize: '0.82rem', lineHeight: '1.6' }}>
+              <div style={{ fontWeight: 700, color: 'var(--color-navy)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldAlert size={15} color="var(--color-oxford)" /> Automated Chapter Bylaw Rules:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <li>
+                  <strong>Participation Quotas:</strong> Active members must lead at least 1 project and complete at least 2 confirmed volunteer activities per semester. Any deficit places the student on <strong>Probation</strong> (or <strong>Dismissal</strong> if already on prior probation).
+                </li>
+                <li>
+                  <strong>Grade 12 Senior Graduation:</strong> When Semester 1 concludes for 12th graders, they officially <strong>graduate from active NHS duties</strong> and are recognized as <strong>"graduate"</strong>.
+                </li>
+              </ul>
+            </div>
+
+            {/* Preview Content */}
+            {transitionPreviewLoading ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                Analyzing member participation and graduation eligibility...
+              </div>
+            ) : transitionPreviewData?.members ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                  <div className="kpi-card" style={{ padding: '0.85rem' }}>
+                    <div className="kpi-label">Met Quotas</div>
+                    <div className="kpi-value" style={{ fontSize: '1.4rem', color: 'var(--color-sage-text)' }}>
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'pass' || m.action_type === 'graduate').length}
+                    </div>
+                  </div>
+                  <div className="kpi-card" style={{ padding: '0.85rem' }}>
+                    <div className="kpi-label">Quota Deficits (Probation)</div>
+                    <div className="kpi-value" style={{ fontSize: '1.4rem', color: '#B45309' }}>
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'probation').length}
+                    </div>
+                  </div>
+                  <div className="kpi-card" style={{ padding: '0.85rem' }}>
+                    <div className="kpi-label">Dismissals (2nd Prob)</div>
+                    <div className="kpi-value" style={{ fontSize: '1.4rem', color: 'var(--color-terracotta)' }}>
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'dismissal').length}
+                    </div>
+                  </div>
+                  <div className="kpi-card" style={{ padding: '0.85rem' }}>
+                    <div className="kpi-label">Graduating Seniors</div>
+                    <div className="kpi-value" style={{ fontSize: '1.4rem', color: '#6D28D9' }}>
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'graduate' || m.action_type === 'graduate_with_probation').length}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ border: '1px solid var(--color-border)', maxHeight: '280px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Member</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Grade</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Concluded Term Quotas</th>
+                        <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Automated Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transitionPreviewData.members.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            No active members found to audit.
+                          </td>
+                        </tr>
+                      ) : (
+                        transitionPreviewData.members.map((m: any) => (
+                          <tr key={m.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <td style={{ padding: '0.65rem 0.85rem' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{m.full_name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{m.email}</div>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem' }}>Grade {m.grade_level}</td>
+                            <td style={{ padding: '0.65rem 0.85rem' }}>
+                              {m.led_count} / 1 Led • {m.vol_count} / 2 Vol
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
+                              {m.action_type === 'graduate' || m.action_type === 'graduate_with_probation' ? (
+                                <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE', fontSize: '0.72rem' }}>
+                                  <Award size={11} /> Senior Graduate
+                                </span>
+                              ) : m.action_type === 'pass' ? (
+                                <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                                  <CheckCircle2 size={11} /> Met Quota
+                                </span>
+                              ) : m.action_type === 'dismissal' ? (
+                                <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
+                                  <ShieldAlert size={11} /> Dismissal
+                                </span>
+                              ) : (
+                                <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
+                                  <AlertTriangle size={11} /> Probation
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}
+                disabled={executingTransition}
+                onClick={handleDirectSwitchWithoutRollover}
+                title="Only switches active semester flag without auditing member standings"
+              >
+                Switch Term Only (Skip Audit)
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ fontSize: '0.82rem' }}
+                  disabled={executingTransition}
+                  onClick={() => setTransitionModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  disabled={executingTransition || transitionPreviewLoading}
+                  onClick={handleExecuteTransition}
+                >
+                  {executingTransition ? 'Executing Rollover...' : 'Confirm & Execute Rollover'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

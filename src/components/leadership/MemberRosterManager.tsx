@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2 } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award } from 'lucide-react';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
@@ -14,7 +14,7 @@ export const MemberRosterManager: React.FC = () => {
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'restricted'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'graduates' | 'restricted'>('all');
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [probationTarget, setProbationTarget] = useState<Profile | null>(null);
   const [probationReason, setProbationReason] = useState<ProbationReason>('grades');
@@ -183,6 +183,29 @@ export const MemberRosterManager: React.FC = () => {
     }
   };
 
+  const handleUpdateGrade = async (member: Profile, newGrade: number) => {
+    if (!isLeadership) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ grade_level: newGrade })
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      setMembers((prev) =>
+        prev.map((m) => (m.id === member.id ? { ...m, grade_level: newGrade } : m))
+      );
+    } catch (err: any) {
+      console.error('Failed to update grade:', err);
+      await alert({
+        title: 'Grade Update Failed',
+        message: err.message || 'Could not update grade level.',
+        variant: 'danger',
+      });
+    }
+  };
+
   const handleDeleteMember = async (member: Profile) => {
     if (!isSuperadmin) {
       await alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can delete accounts.');
@@ -220,24 +243,31 @@ export const MemberRosterManager: React.FC = () => {
     }
   };
 
-  const filteredMembers = members.filter(m => {
+  const filteredMembers = members.filter((m) => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       if (!m.full_name.toLowerCase().includes(query) && !m.email.toLowerCase().includes(query)) {
         return false;
       }
     }
-    // Active members only for 'all': exclude dismissed/restricted members
-    if (statusFilter === 'all' && m.is_restricted) return false;
-    if (statusFilter === 'good' && (m.is_on_probation || m.is_restricted)) return false;
-    if (statusFilter === 'probation' && (!m.is_on_probation || m.is_restricted)) return false;
-    if (statusFilter === 'quota_deficit' && (m.is_restricted || participationMap[m.id]?.meetsQuota)) return false;
-    if (statusFilter === 'restricted' && !m.is_restricted) return false;
+    // Dismissed filter: strictly only restricted members
+    if (statusFilter === 'restricted') return m.is_restricted;
+    // Graduates filter: strictly only graduate members
+    if (statusFilter === 'graduates') return m.role === 'graduate';
+
+    // For all other active member filters: exclude dismissed and graduates
+    if (m.is_restricted || m.role === 'graduate') return false;
+
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'good') return !m.is_on_probation;
+    if (statusFilter === 'probation') return m.is_on_probation;
+    if (statusFilter === 'quota_deficit') return !participationMap[m.id]?.meetsQuota;
     return true;
   });
 
-  const activeMembersCount = members.filter(m => !m.is_restricted).length;
-  const deficitCount = members.filter(m => !m.is_restricted && !(participationMap[m.id]?.meetsQuota)).length;
+  const activeMembersCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate').length;
+  const graduatesCount = members.filter((m) => m.role === 'graduate').length;
+  const deficitCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && !(participationMap[m.id]?.meetsQuota)).length;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -269,13 +299,13 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'good' ? 'active' : ''}`}
             onClick={() => setStatusFilter('good')}
           >
-            Good Standing ({members.filter(m => !m.is_on_probation && !m.is_restricted).length})
+            Good Standing ({members.filter((m) => !m.is_on_probation && !m.is_restricted && m.role !== 'graduate').length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'probation' ? 'active' : ''}`}
             onClick={() => setStatusFilter('probation')}
           >
-            On Probation ({members.filter(m => m.is_on_probation && !m.is_restricted).length})
+            On Probation ({members.filter((m) => m.is_on_probation && !m.is_restricted && m.role !== 'graduate').length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'quota_deficit' ? 'active' : ''}`}
@@ -285,10 +315,16 @@ export const MemberRosterManager: React.FC = () => {
             Needs Activity ({deficitCount})
           </button>
           <button
+            className={`filter-chip ${statusFilter === 'graduates' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('graduates')}
+          >
+            Graduates ({graduatesCount})
+          </button>
+          <button
             className={`filter-chip ${statusFilter === 'restricted' ? 'active' : ''}`}
             onClick={() => setStatusFilter('restricted')}
           >
-            Dismissed / Restricted ({members.filter(m => m.is_restricted).length})
+            Dismissed / Restricted ({members.filter((m) => m.is_restricted).length})
           </button>
         </div>
 
@@ -344,20 +380,47 @@ export const MemberRosterManager: React.FC = () => {
                     <div className="student-name-cell">{member.full_name}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{member.email}</div>
                   </td>
-                  <td>Grade {member.grade_level || 11}</td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {isLeadership && !member.is_restricted && member.role !== 'graduate' ? (
+                      <select
+                        value={member.grade_level || 11}
+                        onChange={(e) => handleUpdateGrade(member, Number(e.target.value))}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: 'var(--color-navy)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '2px',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value={10}>Grade 10</option>
+                        <option value={11}>Grade 11</option>
+                        <option value={12}>Grade 12</option>
+                      </select>
+                    ) : (
+                      <span>Grade {member.grade_level || 11}</span>
+                    )}
+                  </td>
                   <td>
-                    <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
+                    <span className="grade-badge" style={{ textTransform: 'capitalize', backgroundColor: member.role === 'graduate' ? '#EDE9FE' : undefined, color: member.role === 'graduate' ? '#6D28D9' : undefined }}>
                       {member.role}
                     </span>
                   </td>
                   <td>
-                    {member.is_restricted ? (
+                    {member.role === 'graduate' ? (
+                      <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
+                        <Award size={12} /> NHS Graduate
+                      </span>
+                    ) : member.is_restricted ? (
                       <span className="status-pill ineligible">
                         <ShieldAlert size={12} /> Dismissed (2 Probations)
                       </span>
                     ) : member.is_on_probation ? (
                       <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
-                        <AlertTriangle size={12} /> Probation #{member.probation_count} ({member.probation_reason})
+                        <AlertTriangle size={12} /> Probation #{member.probation_count} ({member.probation_reason || 'quota'})
                       </span>
                     ) : (
                       <span className="status-pill eligible">
@@ -366,7 +429,9 @@ export const MemberRosterManager: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    {member.is_restricted ? (
+                    {member.role === 'graduate' ? (
+                      <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated</span>
+                    ) : member.is_restricted ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
                     ) : part.meetsQuota ? (
                       <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
@@ -448,6 +513,7 @@ export const MemberRosterManager: React.FC = () => {
       <MemberProfileDrawer
         member={selectedMember}
         onClose={() => setSelectedMember(null)}
+        onUpdated={loadMembers}
       />
 
       {/* Issue Probation Modal (Leadership Only) */}
