@@ -184,8 +184,16 @@ export const AttendanceSheet: React.FC = () => {
     }
   };
 
-  const handleStatusChange = (userId: string, status: AttendanceStatus) => {
-    setAttendanceMap((prev) => ({ ...prev, [userId]: status }));
+  const handleStatusChange = (userId: string, targetStatus: AttendanceStatus) => {
+    setAttendanceMap((prev) => {
+      const next = { ...prev };
+      if (next[userId] === targetStatus) {
+        delete next[userId]; // Toggle back to pending
+      } else {
+        next[userId] = targetStatus;
+      }
+      return next;
+    });
   };
 
   const handleMarkAllPresent = () => {
@@ -206,17 +214,37 @@ export const AttendanceSheet: React.FC = () => {
     setSaveSuccess(false);
 
     try {
-      const recordsToUpsert = members.map((m) => ({
-        meeting_id: activeMeeting.id,
-        user_id: m.id,
-        status: attendanceMap[m.id] || 'present',
-      }));
+      const recordedEntries = members
+        .filter((m) => !!attendanceMap[m.id])
+        .map((m) => ({
+          meeting_id: activeMeeting.id,
+          user_id: m.id,
+          status: attendanceMap[m.id] as AttendanceStatus,
+        }));
 
-      const { error } = await supabase
-        .from('meeting_attendance')
-        .upsert(recordsToUpsert, { onConflict: 'meeting_id,user_id' });
+      const unrecordedUserIds = members
+        .filter((m) => !attendanceMap[m.id])
+        .map((m) => m.id);
 
-      if (error) throw error;
+      // 1. Delete unrecorded / cleared rows for this meeting
+      if (unrecordedUserIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from('meeting_attendance')
+          .delete()
+          .eq('meeting_id', activeMeeting.id)
+          .in('user_id', unrecordedUserIds);
+
+        if (delErr) throw delErr;
+      }
+
+      // 2. Upsert recorded entries
+      if (recordedEntries.length > 0) {
+        const { error: upsertErr } = await supabase
+          .from('meeting_attendance')
+          .upsert(recordedEntries, { onConflict: 'meeting_id,user_id' });
+
+        if (upsertErr) throw upsertErr;
+      }
 
       // Automated probation checks scoped to active semester
       const { data: activeSem } = await supabase
@@ -528,6 +556,7 @@ export const AttendanceSheet: React.FC = () => {
                 <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid var(--color-border)' }}>
                   <th style={{ padding: '0.75rem 1.25rem' }}>Inducted Member</th>
                   <th style={{ padding: '0.75rem 1.25rem' }}>Standing</th>
+                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Check-in Status</th>
                   <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Present</th>
                   <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Absent</th>
                   <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Excused</th>
@@ -536,13 +565,13 @@ export const AttendanceSheet: React.FC = () => {
               <tbody>
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                       No active members found on chapter roll.
                     </td>
                   </tr>
                 ) : (
                   members.map((member) => {
-                    const status = attendanceMap[member.id] || 'present';
+                    const status = attendanceMap[member.id];
                     return (
                       <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <td style={{ padding: '0.75rem 1.25rem' }}>
@@ -562,6 +591,27 @@ export const AttendanceSheet: React.FC = () => {
                           ) : (
                             <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
                               Good Standing
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Check-in Status Indicator */}
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
+                          {status === 'present' ? (
+                            <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
+                              Present
+                            </span>
+                          ) : status === 'absent' ? (
+                            <span className="status-pill ineligible" style={{ fontSize: '0.7rem' }}>
+                              Absent
+                            </span>
+                          ) : status === 'excused' ? (
+                            <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', fontSize: '0.7rem', border: '1px solid #BFDBFE' }}>
+                              Excused
+                            </span>
+                          ) : (
+                            <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.7rem' }}>
+                              Pending
                             </span>
                           )}
                         </td>
