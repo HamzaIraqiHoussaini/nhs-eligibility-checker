@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase, checkEmailAllowlist } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { X, Lock, Mail, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -13,7 +13,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -39,13 +38,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
           return;
         }
 
-        // 2. Perform Supabase Sign-up
+        // 2. Perform Supabase Sign-up (name automatically assigned from allowlist)
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
           password,
           options: {
             data: {
-              full_name: fullName.trim() || allowCheck.fullName || cleanEmail.split('@')[0],
+              full_name: allowCheck.fullName || cleanEmail.split('@')[0],
               role: allowCheck.role || 'member',
             },
           },
@@ -185,28 +184,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {mode === 'signup' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                Full Name
-              </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <User size={16} style={{ position: 'absolute', left: '0.75rem', color: 'var(--color-text-muted)' }} />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Jane Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.55rem 0.75rem 0.55rem 2.2rem',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: '0px',
-                    fontSize: '0.85rem',
-                    outline: 'none',
-                  }}
-                />
-              </div>
+            <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.78rem', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+              Your full name and chapter role are already configured on the CAS NHS allowlist and will link automatically.
             </div>
           )}
 
