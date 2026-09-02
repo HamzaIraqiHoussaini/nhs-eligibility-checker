@@ -1,8 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&display=swap');
-
 :root {
-  --font-serif: 'Newsreader', Georgia, serif;
-  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Libre Caslon Text', Georgia, serif;
+  --font-sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
   
   --color-canvas: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -10,13 +9,13 @@
   --color-border: #E2E8F0;
   --color-border-subtle: #CBD5E1;
   
-  --color-navy: #0F172A;
+  --color-navy: #0A192F;
   --color-navy-light: #1E293B;
-  --color-oxford: #1E3A8A;
-  --color-oxford-light: #3B82F6;
+  --color-oxford: #0D1C32;
+  --color-oxford-light: #1E3A8A;
   --color-gold: #D97706;
   --color-gold-bg: #FEF3C7;
-  --color-gold-text: #92400E;
+  --color-gold-text: #B45309;
   
   --color-sage: #059669;
   --color-sage-bg: #ECFDF5;
@@ -26,12 +25,13 @@
   --color-terracotta-bg: #FEF2F2;
   --color-terracotta-text: #991B1B;
   
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748B;
+  --color-text-primary: #191C1E;
+  --color-text-secondary: #44474D;
+  --color-text-muted: #75777E;
   
   --shadow-subtle: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px 0 rgba(15, 23, 42, 0.04);
   --shadow-card: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+  --shadow-offset: 4px 4px 0 0 rgba(0, 0, 0, 0.05);
   --shadow-drawer: -4px 0 24px 0 rgba(15, 23, 42, 0.12);
 }
 
@@ -59,7 +59,7 @@ body {
   background-size: 24px 24px;
 }
 
-/* Top Institutional Header */
+/* Top Institutional Header (Legacy and Fallback) */
 .top-nav {
   height: 64px;
   background-color: var(--color-surface);
@@ -71,6 +71,112 @@ body {
   position: sticky;
   top: 0;
   z-index: 30;
+}
+
+/* Google Stitch Master Layout Frame */
+.stitch-layout {
+  min-height: 100vh;
+  background-color: var(--color-canvas);
+  display: flex;
+  position: relative;
+}
+
+.stitch-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background-color: #FFFFFF;
+  border-right: 1px solid var(--color-border);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.stitch-sidebar-header {
+  height: 80px;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stitch-sidebar-nav {
+  flex: 1;
+  padding: 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow-y: auto;
+}
+
+.stitch-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  border: 1px solid transparent;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 0px;
+}
+
+.stitch-nav-item:hover {
+  background-color: #F1F5F9;
+  color: var(--color-navy);
+}
+
+.stitch-nav-item.active {
+  background-color: #E2E8F0;
+  color: var(--color-navy);
+  font-weight: 800;
+  border-left: 3px solid var(--color-navy);
+}
+
+.stitch-nav-section-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.stitch-top-header {
+  position: fixed;
+  top: 0;
+  left: 280px;
+  right: 0;
+  height: 80px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid var(--color-border);
+  z-index: 40;
+  padding: 0 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+}
+
+.stitch-main-content {
+  margin-left: 280px;
+  margin-top: 80px;
+  min-height: calc(100vh - 80px);
+  background-color: var(--color-canvas);
+  padding: 2.5rem 3rem 5rem;
+  width: calc(100% - 280px);
 }
 
 .brand-section {

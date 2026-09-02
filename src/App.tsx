@@ -38,10 +38,10 @@ type ActiveTab =
   | 'rules'
   | 'review'
   | 'attendance'
-  | 'roster'
+  | 'treasury'
   | 'semesters'
   | 'allowlist'
-  | 'treasury';
+  | 'roster';
 
 function PortalContent() {
   const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
@@ -50,175 +50,223 @@ function PortalContent() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="stitch-layout">
       
-      {/* Top Institutional Header */}
-      <header className="top-nav">
-        <div className="brand-section">
+      {/* Stitch Fixed Left Sidebar */}
+      <aside className="stitch-sidebar">
+        
+        {/* Brand Header */}
+        <div className="stitch-sidebar-header">
           <img
             src="/nhs-logo.png"
-            alt="National Honor Society Crest"
-            style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
+            alt="CAS NHS Crest"
+            style={{ width: '38px', height: '38px', objectFit: 'contain' }}
           />
           <div>
-            <div className="brand-title">Casablanca American School</div>
-            <div className="brand-subtitle">National Honor Society Chapter Portal</div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
+              CAS NHS Portal
+            </div>
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+              Casablanca American School
+            </div>
           </div>
         </div>
 
-        <div className="nav-actions">
-          {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>
-                  {profile?.full_name || user.email}
-                </div>
-                <div style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
-                  {isRestricted ? (
-                    <span style={{ color: 'var(--color-terracotta)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      <ShieldAlert size={11} /> Dismissed (Restricted)
-                    </span>
-                  ) : profile?.is_on_probation ? (
-                    <span style={{ color: 'var(--color-gold-text)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      <AlertTriangle size={11} /> On Probation
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--color-sage)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      <CheckCircle2 size={11} /> Good Standing
-                    </span>
-                  )}
-                  <span style={{ color: 'var(--color-border)' }}>•</span>
-                  <span style={{ textTransform: 'capitalize', fontWeight: 600, color: isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
-                    {role || 'Member'}
-                  </span>
-                </div>
-              </div>
+        {/* Navigation Items */}
+        <nav className="stitch-sidebar-nav">
+          
+          <div className="stitch-nav-section-label">General Workspace</div>
+
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            <LayoutDashboard size={16} />
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'projects' ? 'active' : ''}`}
+            onClick={() => setActiveTab('projects')}
+          >
+            <FileText size={16} />
+            <span>Project Hub</span>
+          </button>
+
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'screener' ? 'active' : ''}`}
+            onClick={() => setActiveTab('screener')}
+          >
+            <CheckCircle2 size={16} />
+            <span>{isLeadership || isSupervisor ? 'Report Card Auditor' : 'Verify My Report Card'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'rules' ? 'active' : ''}`}
+            onClick={() => setActiveTab('rules')}
+          >
+            <BookOpen size={16} />
+            <span>Chapter Bylaws</span>
+          </button>
+
+          {/* Governance & Councils (Leadership & Supervisors) */}
+          {(isLeadership || isSupervisor) && (
+            <>
+              <div className="stitch-nav-section-label" style={{ marginTop: '0.75rem' }}>Governance Desk</div>
 
               <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
+                onClick={() => setActiveTab('review')}
+              >
+                <ClipboardCheck size={16} />
+                <span>Review Desk</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
+              >
+                <CalendarCheck size={16} />
+                <span>Attendance Calendar</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'treasury' ? 'active' : ''}`}
+                onClick={() => setActiveTab('treasury')}
+              >
+                <Coins size={16} />
+                <span>Chapter Treasury</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'semesters' ? 'active' : ''}`}
+                onClick={() => setActiveTab('semesters')}
+              >
+                <Calendar size={16} />
+                <span>Semester Manager</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
+                onClick={() => setActiveTab('roster')}
+              >
+                <Users size={16} />
+                <span>Member Roster</span>
+              </button>
+
+              {isLeadership && (
+                <button
+                  type="button"
+                  className={`stitch-nav-item ${activeTab === 'allowlist' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('allowlist')}
+                >
+                  <ShieldCheck size={16} />
+                  <span>Access Control</span>
+                </button>
+              )}
+            </>
+          )}
+        </nav>
+
+        {/* Sidebar Footer User Info */}
+        <div style={{ borderTop: '1px solid var(--color-border)', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC' }}>
+          {user ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
+                  {profile?.full_name || 'Member'}
+                </span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
+                  {role || 'Member'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.email}
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+              Guest Session
+            </div>
+          )}
+        </div>
+
+      </aside>
+
+      {/* Stitch Fixed Top Header */}
+      <header className="stitch-top-header">
+        
+        {/* Left: Academic Year Indicator with Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)' }} />
+          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+            Academic Year 2024 — 2025
+          </span>
+        </div>
+
+        {/* Right: Actions & Profile */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              
+              {/* Standing Badge */}
+              {isRestricted ? (
+                <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
+                  <ShieldAlert size={12} /> Restricted
+                </span>
+              ) : profile?.is_on_probation ? (
+                <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
+                  <AlertTriangle size={12} /> Probation
+                </span>
+              ) : (
+                <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                  <CheckCircle2 size={12} /> Good Standing
+                </span>
+              )}
+
+              <button
+                type="button"
                 className="btn-secondary"
-                style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem' }}
-                title="Change your personal access code"
+                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
                 onClick={() => setIsChangePasswordOpen(true)}
+                title="Change your personal passcode"
               >
                 <Key size={13} /> Change Code
               </button>
 
-              <button className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.78rem' }} onClick={signOut}>
-                <LogOut size={14} /> Sign Out
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                onClick={signOut}
+              >
+                <LogOut size={13} /> Sign Out
               </button>
             </div>
           ) : (
-            <button className="btn-primary" onClick={() => setIsAuthModalOpen(true)}>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+              onClick={() => setIsAuthModalOpen(true)}
+            >
               <LogIn size={14} /> Sign In
             </button>
           )}
         </div>
       </header>
 
-      {/* Chapter Secondary Navigation Tabs */}
-      <nav style={{ backgroundColor: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '0 2rem', display: 'flex', gap: '0.25rem', overflowX: 'auto' }}>
-        <button
-          type="button"
-          className={`ingestion-tab ${activeTab === 'dashboard' ? 'active' : ''}`}
-          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          <LayoutDashboard size={14} /> Chapter Home
-        </button>
-
-        <button
-          type="button"
-          className={`ingestion-tab ${activeTab === 'projects' ? 'active' : ''}`}
-          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setActiveTab('projects')}
-        >
-          <FileText size={14} /> Project Proposal Hub
-        </button>
-
-        <button
-          type="button"
-          className={`ingestion-tab ${activeTab === 'screener' ? 'active' : ''}`}
-          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setActiveTab('screener')}
-        >
-          <CheckCircle2 size={14} /> {isLeadership || isSupervisor ? 'Report Card Auditor' : 'Verify My Report Card'}
-        </button>
-
-        <button
-          type="button"
-          className={`ingestion-tab ${activeTab === 'rules' ? 'active' : ''}`}
-          style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-          onClick={() => setActiveTab('rules')}
-        >
-          <BookOpen size={14} /> Official Bylaws
-        </button>
-
-        {/* Leadership & Supervisor Management Tabs */}
-        {(isLeadership || isSupervisor) && (
-          <>
-            <span style={{ margin: '0.5rem 0.25rem', borderLeft: '1px solid var(--color-border)' }} />
-
-            <button
-              type="button"
-              className={`ingestion-tab ${activeTab === 'review' ? 'active' : ''}`}
-              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px', color: isSupervisor ? 'var(--color-oxford)' : undefined }}
-              onClick={() => setActiveTab('review')}
-            >
-              <ClipboardCheck size={14} /> Proposal Review Desk
-            </button>
-
-            <button
-              type="button"
-              className={`ingestion-tab ${activeTab === 'attendance' ? 'active' : ''}`}
-              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setActiveTab('attendance')}
-            >
-              <CalendarCheck size={14} /> Meeting Attendance
-            </button>
-
-            <button
-              type="button"
-              className={`ingestion-tab ${activeTab === 'roster' ? 'active' : ''}`}
-              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setActiveTab('roster')}
-            >
-              <Users size={14} /> Member Profiles & Standing
-            </button>
-
-            <button
-              type="button"
-              className={`ingestion-tab ${activeTab === 'semesters' ? 'active' : ''}`}
-              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setActiveTab('semesters')}
-            >
-              <Calendar size={14} /> Semester Dates
-            </button>
-
-            <button
-              type="button"
-              className={`ingestion-tab ${activeTab === 'treasury' ? 'active' : ''}`}
-              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => setActiveTab('treasury')}
-            >
-              <Coins size={14} /> Treasury & Funding
-            </button>
-
-            {isLeadership && (
-              <button
-                type="button"
-                className={`ingestion-tab ${activeTab === 'allowlist' ? 'active' : ''}`}
-                style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                onClick={() => setActiveTab('allowlist')}
-              >
-                <ShieldCheck size={14} /> Allowlist & Roles
-              </button>
-            )}
-          </>
-        )}
-      </nav>
-
-      {/* Main Viewport Content */}
-      <main className="academic-canvas-bg" style={{ flex: 1, padding: '1.5rem 2rem' }}>
+      {/* Stitch Main Content Area */}
+      <main className="stitch-main-content">
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => setActiveTab(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
         {activeTab === 'screener' && <ScreenerView />}

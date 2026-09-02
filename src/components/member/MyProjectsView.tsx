@@ -258,7 +258,7 @@ export const MyProjectsView: React.FC = () => {
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
             {proposals.map((project) => {
               const hasCosts = projectHasMonetaryCosts(project);
               const isCompleted = project.is_completed || project.status === 'completed';
