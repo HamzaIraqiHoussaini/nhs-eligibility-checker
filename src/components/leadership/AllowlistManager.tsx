@@ -283,6 +283,41 @@ export const AllowlistManager: React.FC = () => {
         </div>
       )}
 
+      {/* Stitch System Status Metric Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
+          <div className="kpi-label">Active Inducted Members</div>
+          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-navy)' }}>
+            {activeEntries.filter((e) => e.role === 'member').length}
+          </div>
+          <div className="kpi-subtext">Good chapter standing</div>
+        </div>
+
+        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
+          <div className="kpi-label">Leadership Core</div>
+          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-oxford)' }}>
+            {activeEntries.filter((e) => e.role === 'leadership').length}
+          </div>
+          <div className="kpi-subtext">Active chapter officers</div>
+        </div>
+
+        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
+          <div className="kpi-label">Faculty Advisors</div>
+          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-gold-text)' }}>
+            {activeEntries.filter((e) => e.role === 'supervisor').length}
+          </div>
+          <div className="kpi-subtext">Council supervisors</div>
+        </div>
+
+        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
+          <div className="kpi-label">Archived Accounts</div>
+          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-text-muted)' }}>
+            {archivedEntries.length}
+          </div>
+          <div className="kpi-subtext">Alumni, past leaders & exits</div>
+        </div>
+      </div>
+
       {/* Provision Form */}
       <div className="sharp-card" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>

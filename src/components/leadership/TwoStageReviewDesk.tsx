@@ -369,11 +369,43 @@ export const TwoStageReviewDesk: React.FC = () => {
             {/* PROOF OF PURCHASE AUDIT SECTION */}
             {(selectedProposal.is_completed || selectedProposal.status === 'completed') && projectHasMonetaryCosts(selectedProposal) && (
               <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                   <Receipt size={16} color="var(--color-gold-text)" />
-                  <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.9rem' }}>
-                    Proof of Purchase (Receipt) Audit
+                  <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+                    Proof of Purchase & Financial Reconciliation Audit
                   </span>
+                </div>
+
+                {/* Stitch Financial Reconciliation Summary Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem', backgroundColor: '#FFFFFF', padding: '0.85rem', border: '1px solid #FDE68A' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Approved Budget</div>
+                    <div style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '1.05rem', color: 'var(--color-navy)' }}>
+                      {((selectedProposal.costs || []).reduce((acc, c) => {
+                        const matches = c.match(/\d+/g);
+                        if (!matches) return acc;
+                        return acc + matches.reduce((sum, n) => sum + parseInt(n, 10), 0);
+                      }, 0)).toLocaleString()} DHS
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Receipt Document</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: selectedProposal.receipt_url ? 'var(--color-sage-text)' : 'var(--color-terracotta)' }}>
+                      {selectedProposal.receipt_url ? '1 File Attached' : 'None Uploaded'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Audit Status</div>
+                    <div>
+                      {selectedProposal.receipt_status === 'approved' ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>Reconciled & Approved</span>
+                      ) : selectedProposal.receipt_status === 'rejected' ? (
+                        <span className="status-pill ineligible" style={{ fontSize: '0.7rem' }}>Revision Needed</span>
+                      ) : (
+                        <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: '#1E3A8A', fontSize: '0.7rem' }}>Pending Audit</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {selectedProposal.receipt_url ? (

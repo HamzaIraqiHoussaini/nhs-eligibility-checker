@@ -8,10 +8,10 @@ import {
   AlertTriangle,
   ShieldAlert,
   Save,
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   CheckCheck,
+  RotateCcw,
 } from 'lucide-react';
 
 function getMondaysInMonth(year: number, month: number): string[] {
@@ -60,7 +60,7 @@ export const AttendanceSheet: React.FC = () => {
   const [members, setMembers] = useState<Profile[]>([]);
   const [attendanceSummaries, setAttendanceSummaries] = useState<Record<string, MeetingSummary>>({});
 
-  // Active Attendance Sheet View
+  // Active Attendance Sheet View (Defaults to first Monday of the month)
   const [selectedMondayDate, setSelectedMondayDate] = useState<string | null>(null);
   const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({});
@@ -122,17 +122,21 @@ export const AttendanceSheet: React.FC = () => {
     loadData();
   }, []);
 
-  // When a Monday date is selected, load or prepare the attendance sheet
+  // Auto-select first Monday if none selected
+  useEffect(() => {
+    if (mondays.length > 0 && (!selectedMondayDate || !mondays.includes(selectedMondayDate))) {
+      handleSelectMonday(mondays[0]);
+    }
+  }, [currentYear, currentMonth, meetings]);
+
   const handleSelectMonday = async (dateStr: string) => {
     setSelectedMondayDate(dateStr);
     setSaveSuccess(false);
 
     try {
-      // Check if meeting exists
       let meeting = meetings.find((m) => m.meeting_date === dateStr);
 
       if (!meeting) {
-        // Automatically create the meeting record for this Monday
         const { fullDate } = formatMondayDisplay(dateStr);
         const { data, error } = await supabase
           .from('meetings')
@@ -151,7 +155,6 @@ export const AttendanceSheet: React.FC = () => {
 
       setActiveMeeting(meeting);
 
-      // Load attendance records for this meeting
       const { data: attData } = await supabase
         .from('meeting_attendance')
         .select('user_id, status')
@@ -179,55 +182,66 @@ export const AttendanceSheet: React.FC = () => {
     setAttendanceMap(map);
   };
 
+  const handleClear = () => {
+    setAttendanceMap({});
+  };
+
   const handleSaveAttendance = async () => {
     if (!activeMeeting) return;
     setSaving(true);
     setSaveSuccess(false);
 
     try {
-      const rows = members.map((m) => ({
+      const recordsToUpsert = members.map((m) => ({
         meeting_id: activeMeeting.id,
         user_id: m.id,
         status: attendanceMap[m.id] || 'present',
+        updated_at: new Date().toISOString(),
       }));
 
       const { error } = await supabase
         .from('meeting_attendance')
-        .upsert(rows, { onConflict: 'meeting_id,user_id' });
+        .upsert(recordsToUpsert, { onConflict: 'meeting_id,user_id' });
 
       if (error) throw error;
 
-      // Automatically evaluate 2-absences rule
-      for (const m of members) {
-        const { count: absences } = await supabase
+      // Automated probation checks
+      for (const member of members) {
+        const { data: memberAtt } = await supabase
           .from('meeting_attendance')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', m.id)
-          .eq('status', 'absent');
+          .select('status')
+          .eq('user_id', member.id);
 
-        if (absences !== null && absences >= 2) {
-          const newProbationCount = m.is_on_probation ? m.probation_count : m.probation_count + 1;
-          const isNowRestricted = newProbationCount >= 2;
+        const unexcusedCount = (memberAtt || []).filter((r) => r.status === 'absent').length;
 
+        if (unexcusedCount >= 2 && !member.is_on_probation && member.probation_count < 2) {
           await supabase
             .from('profiles')
             .update({
               is_on_probation: true,
-              probation_count: newProbationCount,
+              probation_count: member.probation_count + 1,
               probation_reason: 'attendance',
-              probation_notes: `[Auto: Recorded ${absences} unexcused meeting absences]`,
-              is_restricted: isNowRestricted,
-              restricted_reason: isNowRestricted ? 'Dismissed from CAS NHS: Accumulated 2 probations.' : undefined,
+              probation_notes: `Automated bylaw trigger: Accumulated ${unexcusedCount} unexcused meeting absences.`,
+              probation_updated_at: new Date().toISOString(),
             })
-            .eq('id', m.id);
+            .eq('id', member.id);
+        } else if (unexcusedCount >= 4 || (member.is_on_probation && member.probation_count >= 2)) {
+          await supabase
+            .from('profiles')
+            .update({
+              is_restricted: true,
+              restricted_reason: 'Dismissed: Accumulated multiple probations due to unexcused chapter meeting absences.',
+            })
+            .eq('id', member.id);
         }
       }
 
       setSaveSuccess(true);
       await loadData();
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed saving attendance:', err);
+      alert(err.message || 'Failed to save attendance records.');
     } finally {
       setSaving(false);
     }
@@ -256,311 +270,316 @@ export const AttendanceSheet: React.FC = () => {
     year: 'numeric',
   });
 
-  // =========================================================================
-  // VIEW 1: CHAPTER MONDAYS CALENDAR
-  // =========================================================================
-  if (!selectedMondayDate) {
-    return (
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-gold-text)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+  const activeDisplay = selectedMondayDate ? formatMondayDisplay(selectedMondayDate) : null;
+
+  return (
+    <div style={{ maxWidth: '1150px', margin: '0 auto', padding: '1.5rem 0 3.5rem' }}>
+      
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
             <CalendarIcon size={16} /> Chapter Governance
           </div>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-            Monday Meeting Attendance
+            Attendance & Calendar
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-            Select any Monday meeting date to take or update attendance. Rule: <strong>2 Absences → Automatic Probation</strong> • <strong>2 Probations → Dismissal</strong>.
+            Manage chapter meetings, track member attendance, and review historical records. All meetings are held on Mondays.
           </p>
         </div>
+      </div>
 
-        {/* Month Navigation Bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: 'var(--color-surface)',
-          padding: '1rem 1.5rem',
-          border: '1px solid var(--color-border)',
-          marginBottom: '1.5rem',
-        }}>
-          <button
-            className="btn-secondary"
-            style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
-            onClick={handlePrevMonth}
-          >
-            <ChevronLeft size={14} /> Previous Month
-          </button>
-
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: 0 }}>
-              {monthLabel}
-            </h2>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {mondays.length} Chapter Mondays
-            </div>
-          </div>
-
-          <button
-            className="btn-secondary"
-            style={{ fontSize: '0.82rem', padding: '0.4rem 0.85rem' }}
-            onClick={handleNextMonth}
-          >
-            Next Month <ChevronRight size={14} />
-          </button>
-        </div>
-
-        {/* Monday Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          {mondays.map((dateStr) => {
-            const { dayNum, monthShort, fullDate } = formatMondayDisplay(dateStr);
-            const summary = attendanceSummaries[dateStr];
-            const hasRecordedAttendance = summary && summary.total > 0;
-
-            return (
-              <div
-                key={dateStr}
-                className="sharp-card"
-                style={{
-                  padding: '1.5rem',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.15s ease, transform 0.15s ease',
-                  borderLeft: hasRecordedAttendance ? '4px solid var(--color-sage)' : '4px solid var(--color-oxford)',
-                }}
-                onClick={() => handleSelectMonday(dateStr)}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    <div style={{
-                      backgroundColor: 'var(--color-canvas)',
-                      border: '1px solid var(--color-border)',
-                      padding: '0.5rem 0.75rem',
-                      textAlign: 'center',
-                      minWidth: '54px',
-                    }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-oxford)', letterSpacing: '0.05em' }}>
-                        {monthShort}
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1 }}>
-                        {dayNum}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-                        Chapter Meeting
-                      </div>
-                      <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', fontWeight: 600 }}>
-                        {fullDate.split(',')[0]}
-                      </div>
-                    </div>
-                  </div>
-
-                  {hasRecordedAttendance ? (
-                    <span className="status-pill eligible" style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem' }}>
-                      <CheckCircle2 size={11} /> Recorded
-                    </span>
-                  ) : (
-                    <span className="status-pill" style={{ fontSize: '0.72rem', padding: '0.25rem 0.5rem', backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)' }}>
-                      Unrecorded
-                    </span>
-                  )}
-                </div>
-
-                {hasRecordedAttendance ? (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', padding: '0.65rem 0.85rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', marginBottom: '0.85rem' }}>
-                    <strong>{summary.present}</strong> Present • <strong style={{ color: summary.absent > 0 ? 'var(--color-terracotta)' : 'inherit' }}>{summary.absent}</strong> Absent • <strong>{summary.excused}</strong> Excused
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', padding: '0.65rem 0.85rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', marginBottom: '0.85rem' }}>
-                    No attendance has been submitted for this Monday yet.
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.82rem', color: 'var(--color-oxford)', fontWeight: 600 }}>
-                  {hasRecordedAttendance ? 'Review & Edit Attendance →' : 'Take Attendance →'}
-                </div>
-              </div>
-            );
-          })}
+      {/* Stitch Bylaw Reminder Banner */}
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderLeft: '4px solid var(--color-terracotta)',
+        padding: '1rem 1.25rem',
+        marginBottom: '1.75rem',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '0.85rem',
+      }}>
+        <AlertTriangle size={20} color="var(--color-terracotta)" style={{ marginTop: '2px', flexShrink: 0 }} />
+        <div>
+          <strong style={{ color: 'var(--color-navy)', fontSize: '0.9rem', display: 'block', marginBottom: '0.2rem' }}>
+            Chapter Bylaw Reminder (Section 4.2)
+          </strong>
+          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+            Accumulation of two (2) unexcused absences within a single semester constitutes grounds for automatic probationary status. Two probations result in chapter dismissal and account restriction.
+          </span>
         </div>
       </div>
-    );
-  }
 
-  // =========================================================================
-  // VIEW 2: MONDAY ATTENDANCE ROSTER SHEET
-  // =========================================================================
-  const { fullDate } = formatMondayDisplay(selectedMondayDate);
-
-  return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
-      
-      {/* Back Button */}
-      <button
-        type="button"
-        className="btn-secondary"
-        style={{ marginBottom: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}
-        onClick={() => setSelectedMondayDate(null)}
-      >
-        <ArrowLeft size={14} /> Back to Monday Calendar
-      </button>
-
-      {/* Sheet Card */}
-      <div className="sharp-card" style={{ padding: '2rem' }}>
+      {/* Stitch Dual-Pane Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }}>
         
-        {/* Sheet Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.25rem' }}>
-              <CalendarIcon size={14} /> Official Chapter Meeting Attendance
+        {/* LEFT PANE: Monday Month Browser */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Month Controller */}
+          <div className="sharp-card" style={{ padding: '1rem 1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-inspect"
+                onClick={handlePrevMonth}
+                title="Previous Month"
+                style={{ padding: '0.35rem' }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: 0 }}>
+                {monthLabel}
+              </h3>
+              <button
+                type="button"
+                className="btn-inspect"
+                onClick={handleNextMonth}
+                title="Next Month"
+                style={{ padding: '0.35rem' }}
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
-            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
-              {fullDate}
-            </h1>
-            <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
-              Casablanca American School • {members.length} Enrolled NHS Members
+
+            {/* List of Mondays */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {mondays.map((dateStr) => {
+                const { dayNum, monthShort, fullDate } = formatMondayDisplay(dateStr);
+                const summary = attendanceSummaries[dateStr];
+                const hasRecordedAttendance = summary && summary.total > 0;
+                const isSelected = selectedMondayDate === dateStr;
+
+                return (
+                  <div
+                    key={dateStr}
+                    onClick={() => handleSelectMonday(dateStr)}
+                    style={{
+                      padding: '0.85rem 1rem',
+                      border: isSelected ? '2px solid var(--color-navy)' : '1px solid var(--color-border)',
+                      backgroundColor: isSelected ? '#F0F9FF' : '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        backgroundColor: isSelected ? 'var(--color-navy)' : 'var(--color-canvas)',
+                        color: isSelected ? '#FFFFFF' : 'var(--color-navy)',
+                        border: '1px solid var(--color-border)',
+                        padding: '0.25rem 0.5rem',
+                        textAlign: 'center',
+                        minWidth: '42px',
+                      }}>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                          {monthShort}
+                        </div>
+                        <div style={{ fontSize: '1.15rem', fontWeight: 800, lineHeight: 1 }}>
+                          {dayNum}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                          Monday Session
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--color-navy)' }}>
+                          {fullDate.split(',')[0]}, {monthShort} {dayNum}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {hasRecordedAttendance ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.45rem' }}>
+                          Filed
+                        </span>
+                      ) : (
+                        <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.68rem', padding: '0.2rem 0.45rem' }}>
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
-              onClick={handleMarkAllPresent}
-              title="Quickly set all students to Present"
-            >
-              <CheckCheck size={14} /> Mark All Present
-            </button>
-
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={saving}
-              onClick={handleSaveAttendance}
-            >
-              <Save size={14} />
-              {saving ? 'Saving...' : 'Save Attendance'}
-            </button>
           </div>
         </div>
 
-        {saveSuccess && (
-          <div style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--color-sage-bg)', border: '1px solid #A7F3D0', color: 'var(--color-sage-text)', fontSize: '0.85rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CheckCircle2 size={16} />
-            <span>Attendance saved successfully! Chapter absence and probation rules have been evaluated.</span>
-          </div>
-        )}
+        {/* RIGHT PANE: Active Record Sheet */}
+        <div className="sharp-card" style={{ padding: '0', overflow: 'hidden' }}>
+          
+          {/* Pane Header */}
+          <div style={{
+            padding: '1.25rem 1.5rem',
+            backgroundColor: '#F8FAFC',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}>
+            <div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Active Record Sheet
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: '0.15rem 0 0' }}>
+                {activeDisplay?.fullDate || 'Select a Monday'}
+              </h2>
+            </div>
 
-        {/* Members Attendance Table */}
-        <div className="roster-table-wrapper">
-          <table className="roster-table">
-            <thead>
-              <tr>
-                <th>Member Name</th>
-                <th>Grade</th>
-                <th>Chapter Standing</th>
-                <th style={{ width: '280px', textAlign: 'center' }}>Attendance Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                    No enrolled members found on the roster.
-                  </td>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                onClick={handleClear}
+                title="Reset selections"
+              >
+                <RotateCcw size={13} /> Clear
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                onClick={handleMarkAllPresent}
+              >
+                <CheckCheck size={14} /> Mark All Present
+              </button>
+
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                disabled={saving}
+                onClick={handleSaveAttendance}
+              >
+                <Save size={13} /> {saving ? 'Saving...' : 'Commit Attendance'}
+              </button>
+            </div>
+          </div>
+
+          {saveSuccess && (
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--color-sage-bg)', borderBottom: '1px solid #A7F3D0', color: 'var(--color-sage-text)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CheckCircle2 size={14} /> Attendance committed successfully. Chapter probation triggers reconciled.
+            </div>
+          )}
+
+          {/* Roster Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table className="roster-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ padding: '0.75rem 1.25rem' }}>Inducted Member</th>
+                  <th style={{ padding: '0.75rem 1.25rem' }}>Standing</th>
+                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Present</th>
+                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Absent</th>
+                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Excused</th>
                 </tr>
-              ) : (
-                members.map((member) => {
-                  const currentStatus = attendanceMap[member.id] || 'present';
-                  return (
-                    <tr key={member.id}>
-                      <td>
-                        <div className="student-name-cell">{member.full_name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{member.email}</div>
-                      </td>
-                      <td>Grade {member.grade_level || 11}</td>
-                      <td>
-                        {member.is_restricted ? (
-                          <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
-                            <ShieldAlert size={12} /> Dismissed / Restricted
-                          </span>
-                        ) : member.is_on_probation ? (
-                          <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
-                            <AlertTriangle size={12} /> Probation (#{member.probation_count})
-                          </span>
-                        ) : (
-                          <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
-                            <CheckCircle2 size={12} /> Good Standing
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+              </thead>
+              <tbody>
+                {members.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                      No active members found on chapter roll.
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((member) => {
+                    const status = attendanceMap[member.id] || 'present';
+                    return (
+                      <tr key={member.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '0.75rem 1.25rem' }}>
+                          <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{member.full_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{member.email}</div>
+                        </td>
+
+                        <td style={{ padding: '0.75rem 1.25rem' }}>
+                          {member.is_restricted ? (
+                            <span className="status-pill ineligible" style={{ fontSize: '0.7rem' }}>
+                              <ShieldAlert size={11} /> Dismissed
+                            </span>
+                          ) : member.is_on_probation ? (
+                            <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.7rem' }}>
+                              Probation ({member.probation_count})
+                            </span>
+                          ) : (
+                            <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
+                              Good Standing
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Present Radio */}
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
                           <button
                             type="button"
-                            className={`filter-chip ${currentStatus === 'present' ? 'active' : ''}`}
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.3rem 0.65rem',
-                              backgroundColor: currentStatus === 'present' ? 'var(--color-sage)' : undefined,
-                              borderColor: currentStatus === 'present' ? 'var(--color-sage)' : undefined,
-                            }}
                             onClick={() => handleStatusChange(member.id, 'present')}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: status === 'present' ? '2px solid var(--color-sage)' : '1px solid var(--color-border)',
+                              backgroundColor: status === 'present' ? 'var(--color-sage-bg)' : '#FFFFFF',
+                              color: status === 'present' ? 'var(--color-sage-text)' : 'var(--color-text-muted)',
+                            }}
                           >
                             Present
                           </button>
+                        </td>
+
+                        {/* Absent Radio */}
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
                           <button
                             type="button"
-                            className={`filter-chip ${currentStatus === 'absent' ? 'active' : ''}`}
-                            style={{
-                              fontSize: '0.75rem',
-                              padding: '0.3rem 0.65rem',
-                              backgroundColor: currentStatus === 'absent' ? 'var(--color-terracotta)' : undefined,
-                              borderColor: currentStatus === 'absent' ? 'var(--color-terracotta)' : undefined,
-                            }}
                             onClick={() => handleStatusChange(member.id, 'absent')}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: status === 'absent' ? '2px solid var(--color-terracotta)' : '1px solid var(--color-border)',
+                              backgroundColor: status === 'absent' ? 'var(--color-terracotta-bg)' : '#FFFFFF',
+                              color: status === 'absent' ? 'var(--color-terracotta-text)' : 'var(--color-text-muted)',
+                            }}
                           >
                             Absent
                           </button>
+                        </td>
+
+                        {/* Excused Radio */}
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
                           <button
                             type="button"
-                            className={`filter-chip ${currentStatus === 'excused' ? 'active' : ''}`}
-                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
                             onClick={() => handleStatusChange(member.id, 'excused')}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: status === 'excused' ? '2px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                              backgroundColor: status === 'excused' ? '#EFF6FF' : '#FFFFFF',
+                              color: status === 'excused' ? 'var(--color-navy)' : 'var(--color-text-muted)',
+                            }}
                           >
                             Excused
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Bottom Save Bar */}
-        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setSelectedMondayDate(null)}
-          >
-            ← Back to Monday Calendar
-          </button>
-
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={saving}
-            onClick={handleSaveAttendance}
-          >
-            <Save size={14} />
-            {saving ? 'Saving...' : 'Save Attendance'}
-          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>
