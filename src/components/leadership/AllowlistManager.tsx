@@ -69,14 +69,12 @@ export const AllowlistManager: React.FC = () => {
     const memberName = fullName.trim() || cleanEmail.split('@')[0];
 
     try {
-      // Call Supabase Edge Function to provision member in auth.users and allowlist
-      const { data, error } = await supabase.functions.invoke('provision-member', {
-        body: {
-          email: cleanEmail,
-          full_name: memberName,
-          role,
-          password: generatedCode,
-        },
+      // Call Supabase Database RPC to securely provision member in auth.users and allowlist
+      const { data, error } = await supabase.rpc('provision_member', {
+        p_email: cleanEmail,
+        p_full_name: memberName,
+        p_role: role,
+        p_password: generatedCode,
       });
 
       if (error) throw error;
@@ -110,13 +108,11 @@ export const AllowlistManager: React.FC = () => {
     setProvisioning(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('provision-member', {
-        body: {
-          email: entry.email,
-          full_name: entry.full_name || entry.email.split('@')[0],
-          role: entry.role,
-          password: newCode,
-        },
+      const { data, error } = await supabase.rpc('provision_member', {
+        p_email: entry.email,
+        p_full_name: entry.full_name || entry.email.split('@')[0],
+        p_role: entry.role,
+        p_password: newCode,
       });
 
       if (error) throw error;

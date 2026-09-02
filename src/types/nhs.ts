@@ -107,3 +107,23 @@ export interface MeetingAttendance {
   notes?: string;
   created_at: string;
 }
+
+export interface ChapterFundEntry {
+  id: string;
+  transaction_date: string;
+  project_name: string;
+  who: string;
+  reimbursed: 'YES' | 'NO';
+  reason: string;
+  amount_taken_out: number;
+  created_at?: string;
+}
+
+export interface ChapterTreasurySummary {
+  id: string;
+  total_funds: number;
+  total_income: number;
+  as_of_date: string;
+  updated_at?: string;
+}
+

@@ -11,6 +11,7 @@ import { AttendanceSheet } from './components/leadership/AttendanceSheet';
 import { MemberRosterManager } from './components/leadership/MemberRosterManager';
 import { SemesterSettings } from './components/leadership/SemesterSettings';
 import { AllowlistManager } from './components/leadership/AllowlistManager';
+import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
 import {
   LayoutDashboard,
   FileText,
@@ -26,6 +27,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   Key,
+  Coins,
 } from 'lucide-react';
 import './index.css';
 
@@ -38,7 +40,8 @@ type ActiveTab =
   | 'attendance'
   | 'roster'
   | 'semesters'
-  | 'allowlist';
+  | 'allowlist'
+  | 'treasury';
 
 function PortalContent() {
   const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
@@ -191,6 +194,15 @@ function PortalContent() {
               <Calendar size={14} /> Semester Dates
             </button>
 
+            <button
+              type="button"
+              className={`ingestion-tab ${activeTab === 'treasury' ? 'active' : ''}`}
+              style={{ padding: '0.85rem 1.15rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => setActiveTab('treasury')}
+            >
+              <Coins size={14} /> Treasury & Funding
+            </button>
+
             {isLeadership && (
               <button
                 type="button"
@@ -215,6 +227,7 @@ function PortalContent() {
         {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
         {activeTab === 'roster' && (isLeadership || isSupervisor) && <MemberRosterManager />}
         {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
+        {activeTab === 'treasury' && (isLeadership || isSupervisor) && <ChapterTreasuryLedger />}
         {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
       </main>
 
