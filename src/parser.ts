@@ -183,7 +183,7 @@ function extractStudentName(text: string): string {
   return 'Unknown Student';
 }
 
-function extractGradeLevel(text: string): number {
+export function extractGradeLevel(text: string): number {
   const match = text.match(/Grade\s+(\d+)\s+Report\s+Card/i);
   return match ? parseInt(match[1], 10) : 0;
 }

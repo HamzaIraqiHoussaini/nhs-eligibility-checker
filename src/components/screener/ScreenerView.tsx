@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { FileUploader } from '../../FileUploader';
 import { ExecutiveDashboard } from '../../ExecutiveDashboard';
+import { IndividualScreener } from './IndividualScreener';
 import { parseFile, parseBatchFile, type BatchResult, type ParseResult, type StudentResult } from '../../parser';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, User, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const ScreenerView: React.FC = () => {
+  const { isLeadership, isSupervisor } = useAuth();
+  const canAuditBatch = Boolean(isLeadership || isSupervisor);
+
+  const [screenerType, setScreenerType] = useState<'individual' | 'batch'>('individual');
   const [isParsing, setIsParsing] = useState(false);
   const [progress, setProgress] = useState('');
   const [batchResult, setBatchResult] = useState<BatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileSelect = async (file: File) => {
+  const handleBatchFileSelect = async (file: File) => {
     setIsParsing(true);
     setError(null);
     setBatchResult(null);
@@ -69,36 +75,96 @@ export const ScreenerView: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: '3rem' }}>
-      {error && (
-        <div style={{
-          maxWidth: '780px',
-          margin: '1.5rem auto',
-          padding: '1rem 1.5rem',
-          backgroundColor: 'var(--color-terracotta-bg)',
-          border: '1px solid #FECACA',
-          color: 'var(--color-terracotta-text)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          fontSize: '0.88rem'
-        }}>
-          <AlertTriangle size={20} color="var(--color-terracotta)" />
-          <span>{error}</span>
+      
+      {/* Leadership / Supervisor Toggle */}
+      {canAuditBatch && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem', paddingTop: '0.5rem' }}>
+          <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '4px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>
+            <button
+              type="button"
+              onClick={() => { setScreenerType('individual'); setError(null); }}
+              style={{
+                padding: '0.5rem 1.25rem',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                backgroundColor: screenerType === 'individual' ? '#FFFFFF' : 'transparent',
+                color: screenerType === 'individual' ? 'var(--color-navy)' : '#64748B',
+                boxShadow: screenerType === 'individual' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <User size={15} />
+              <span>Individual Screener</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setScreenerType('batch'); setError(null); }}
+              style={{
+                padding: '0.5rem 1.25rem',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '2px',
+                cursor: 'pointer',
+                backgroundColor: screenerType === 'batch' ? '#FFFFFF' : 'transparent',
+                color: screenerType === 'batch' ? 'var(--color-navy)' : '#64748B',
+                boxShadow: screenerType === 'batch' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+              }}
+            >
+              <Users size={15} />
+              <span>Master Batch Auditor (Leadership)</span>
+            </button>
+          </div>
         </div>
       )}
 
-      {!batchResult ? (
-        <FileUploader
-          onFileSelect={handleFileSelect}
-          isParsing={isParsing}
-          progressMessage={progress}
-        />
+      {/* Screen Render */}
+      {screenerType === 'individual' || !canAuditBatch ? (
+        <IndividualScreener />
       ) : (
-        <ExecutiveDashboard
-          result={batchResult}
-          onReset={() => setBatchResult(null)}
-        />
+        <div>
+          {error && (
+            <div style={{
+              maxWidth: '780px',
+              margin: '1.5rem auto',
+              padding: '1rem 1.5rem',
+              backgroundColor: 'var(--color-terracotta-bg)',
+              border: '1px solid #FECACA',
+              color: 'var(--color-terracotta-text)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontSize: '0.88rem'
+            }}>
+              <AlertTriangle size={20} color="var(--color-terracotta)" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {!batchResult ? (
+            <FileUploader
+              onFileSelect={handleBatchFileSelect}
+              isParsing={isParsing}
+              progressMessage={progress}
+            />
+          ) : (
+            <ExecutiveDashboard
+              result={batchResult}
+              onReset={() => setBatchResult(null)}
+            />
+          )}
+        </div>
       )}
+
     </div>
   );
 };
