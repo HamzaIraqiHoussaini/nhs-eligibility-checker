@@ -108,7 +108,7 @@ export const ChapterRules: React.FC = () => {
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <CheckCircle2 size={16} color="var(--color-sage)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Lead $\ge$ 1 Project / Semester</strong>
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Lead at Least 1 Project / Semester</strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
                 All members are required to propose and lead at least <strong>one approved project per semester</strong>.
@@ -118,7 +118,7 @@ export const ChapterRules: React.FC = () => {
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <Users size={16} color="var(--color-oxford)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Volunteer in $\ge$ 2 Projects / Semester</strong>
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Volunteer in at Least 2 Projects / Semester</strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
                 All members are required to volunteer in at least <strong>2 projects a semester</strong> (excluding their yearly project).

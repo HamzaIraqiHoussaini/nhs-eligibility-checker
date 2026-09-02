@@ -559,7 +559,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
           <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Two-stage approval required: Leadership Review $\to$ Supervisor Review
+              Two-stage approval required: Leadership Review → Supervisor Review
             </div>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button type="button" className="btn-secondary" onClick={onClose}>

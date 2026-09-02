@@ -245,7 +245,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
           <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>1. Lead $\ge$ 1 Project / Sem</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>1. Lead at least 1 Project / Sem</div>
               <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterProjectsLed >= 1 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
                 {semesterProjectsLed} / 1 Led
               </div>
@@ -259,7 +259,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
 
           <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer $\ge$ 2 Projects / Sem</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer in at least 2 Projects / Sem</div>
               <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterVolunteered >= 2 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
                 {semesterVolunteered} / 2 Volunteered
               </div>
@@ -274,7 +274,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
 
         {!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) && (
           <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
-            <strong>Chapter Bylaw Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead $\ge 1$ project and volunteer twice) constitutes grounds for Chapter Probation.
+            <strong>Chapter Bylaw Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead at least 1 project and volunteer twice) constitutes grounds for Chapter Probation.
           </div>
         )}
       </div>
@@ -310,7 +310,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
             Max 4 Led / Year
           </div>
-          <div className="kpi-subtext">$\ge$ 1 must be service-based</div>
+          <div className="kpi-subtext">At least 1 must be service-based</div>
         </div>
       </div>
 
