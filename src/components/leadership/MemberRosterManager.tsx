@@ -42,8 +42,9 @@ export const MemberRosterManager: React.FC = () => {
   const handleIssueProbation = async () => {
     if (!probationTarget || !isLeadership) return;
 
-    const newCount = probationTarget.probation_count + 1;
-    const willBeRestricted = newCount >= 2;
+    const isAlreadyOnProbation = Boolean(probationTarget.is_on_probation);
+    const willBeRestricted = isAlreadyOnProbation;
+    const newCount = isAlreadyOnProbation ? 2 : 1;
 
     const confirmPrompt = willBeRestricted
       ? `CHAPTER DISMISSAL CONFIRMATION:\n\nAre you sure you want to issue a 2nd probation to ${probationTarget.full_name} (${probationTarget.email}) and kick them out of CAS NHS?\n\nThis action will immediately restrict their portal account and revoke their chapter membership pursuant to Chapter Bylaw Section 5.1.`
@@ -366,8 +367,8 @@ export const MemberRosterManager: React.FC = () => {
               Issue Official Probation
             </h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1.25rem' }}>
-              Placing <strong>{probationTarget.full_name}</strong> on Chapter Probation #{probationTarget.probation_count + 1}.
-              {probationTarget.probation_count + 1 >= 2 && (
+              Placing <strong>{probationTarget.full_name}</strong> on Chapter Probation #{probationTarget.is_on_probation ? 2 : 1}.
+              {probationTarget.is_on_probation && (
                 <span style={{ display: 'block', color: 'var(--color-terracotta)', fontWeight: 700, marginTop: '4px' }}>
                   Notice: This is the student's 2nd probation. Accumulating 2 probations results in immediate Dismissal and Account Restriction.
                 </span>
@@ -413,13 +414,13 @@ export const MemberRosterManager: React.FC = () => {
               <button
                 className="btn-primary"
                 style={{
-                  backgroundColor: probationTarget.probation_count + 1 >= 2 ? 'var(--color-terracotta)' : 'var(--color-gold)',
-                  borderColor: probationTarget.probation_count + 1 >= 2 ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                  backgroundColor: probationTarget.is_on_probation ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                  borderColor: probationTarget.is_on_probation ? 'var(--color-terracotta)' : 'var(--color-gold)',
                   color: '#FFFFFF',
                 }}
                 onClick={handleIssueProbation}
               >
-                {probationTarget.probation_count + 1 >= 2
+                {probationTarget.is_on_probation
                   ? 'Confirm 2nd Probation (Kick Out & Dismiss)'
                   : 'Confirm Probation #1'}
               </button>

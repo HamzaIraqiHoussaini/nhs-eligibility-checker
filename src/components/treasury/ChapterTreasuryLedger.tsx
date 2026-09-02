@@ -87,8 +87,12 @@ export const ChapterTreasuryLedger: React.FC = () => {
   useEffect(() => {
     const fetchYears = async () => {
       try {
-        const { data } = await supabase.from('semesters').select('academic_year');
+        const { data } = await supabase.from('semesters').select('academic_year, is_active');
         if (data) {
+          const active = data.find((d: any) => d.is_active);
+          if (active?.academic_year) {
+            setSelectedYear(active.academic_year);
+          }
           const list = Array.from(new Set([...ACADEMIC_YEARS, ...data.map((d: any) => d.academic_year).filter(Boolean)]));
           list.sort();
           setAvailableYears(list);

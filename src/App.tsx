@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthModal } from './components/auth/AuthModal';
 import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
@@ -48,6 +49,25 @@ function PortalContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
+
+  useEffect(() => {
+    const fetchActiveSemester = async () => {
+      try {
+        const { data } = await supabase
+          .from('semesters')
+          .select('academic_year, is_active')
+          .eq('is_active', true)
+          .maybeSingle();
+        if (data?.academic_year) {
+          setActiveAcademicYear(data.academic_year);
+        }
+      } catch (err) {
+        console.error('Failed to load active academic year:', err);
+      }
+    };
+    fetchActiveSemester();
+  }, [activeTab]);
 
   return (
     <div className="stitch-layout">
@@ -209,7 +229,7 @@ function PortalContent() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)' }} />
           <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            Academic Year 2024 — 2025
+            Academic Year {activeAcademicYear ? activeAcademicYear.replace('-', ' — ') : '2026 — 2027'}
           </span>
         </div>
 

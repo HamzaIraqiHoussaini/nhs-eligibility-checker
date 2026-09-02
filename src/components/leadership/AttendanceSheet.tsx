@@ -204,32 +204,40 @@ export const AttendanceSheet: React.FC = () => {
 
       if (error) throw error;
 
-      // Automated probation checks
+      // Automated probation checks scoped to active semester
+      const { data: activeSem } = await supabase
+        .from('semesters')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const semesterMeetingIds = meetings
+        .filter((m) => !activeSem || (m.meeting_date >= activeSem.start_date && m.meeting_date <= activeSem.end_date))
+        .map((m) => m.id);
+
       for (const member of members) {
-        const { data: memberAtt } = await supabase
+        let query = supabase
           .from('meeting_attendance')
           .select('status')
           .eq('user_id', member.id);
 
+        if (semesterMeetingIds.length > 0) {
+          query = query.in('meeting_id', semesterMeetingIds);
+        }
+
+        const { data: memberAtt } = await query;
         const unexcusedCount = (memberAtt || []).filter((r) => r.status === 'absent').length;
 
-        if (unexcusedCount >= 2 && !member.is_on_probation && member.probation_count < 2) {
+        // 2 or more unexcused absences in the semester triggers chapter probation (never automatic dismissal)
+        if (unexcusedCount >= 2 && !member.is_on_probation && !member.is_restricted) {
           await supabase
             .from('profiles')
             .update({
               is_on_probation: true,
-              probation_count: member.probation_count + 1,
+              probation_count: Math.max(1, (member.probation_count || 0) + 1),
               probation_reason: 'attendance',
-              probation_notes: `Automated bylaw trigger: Accumulated ${unexcusedCount} unexcused meeting absences.`,
+              probation_notes: `Automated bylaw trigger: Accumulated ${unexcusedCount} unexcused meeting absences in ${activeSem?.name || 'current semester'}.`,
               probation_updated_at: new Date().toISOString(),
-            })
-            .eq('id', member.id);
-        } else if (unexcusedCount >= 4 || (member.is_on_probation && member.probation_count >= 2)) {
-          await supabase
-            .from('profiles')
-            .update({
-              is_restricted: true,
-              restricted_reason: 'Dismissed: Accumulated multiple probations due to unexcused chapter meeting absences.',
             })
             .eq('id', member.id);
         }

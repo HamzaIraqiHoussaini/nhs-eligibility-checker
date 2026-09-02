@@ -31,11 +31,33 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         .eq('user_id', user.id);
       if (vCount !== null) setVolunteerCount(vCount);
 
-      // 3. Attendance count
-      const { data: attData } = await supabase
+      // 3. Attendance count scoped to active semester
+      const { data: activeSem } = await supabase
+        .from('semesters')
+        .select('start_date, end_date')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      let meetingIds: string[] = [];
+      if (activeSem) {
+        const { data: semMeetings } = await supabase
+          .from('meetings')
+          .select('id')
+          .gte('meeting_date', activeSem.start_date)
+          .lte('meeting_date', activeSem.end_date);
+        meetingIds = (semMeetings || []).map((m: any) => m.id);
+      }
+
+      let attQuery = supabase
         .from('meeting_attendance')
         .select('status')
         .eq('user_id', user.id);
+
+      if (meetingIds.length > 0) {
+        attQuery = attQuery.in('meeting_id', meetingIds);
+      }
+
+      const { data: attData } = await attQuery;
       if (attData) {
         const attended = attData.filter(a => a.status === 'present').length;
         const absences = attData.filter(a => a.status === 'absent').length;
@@ -177,7 +199,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="kpi-subtext">
-            {attendanceStats.absences} absences recorded ({attendanceStats.absences >= 2 ? 'Probation Threshold Reached' : `${2 - attendanceStats.absences} left before warning`})
+            {attendanceStats.absences} absences recorded ({attendanceStats.absences >= 2 ? 'Probation Threshold Reached' : `${2 - attendanceStats.absences} left before probation`})
           </div>
         </div>
 
