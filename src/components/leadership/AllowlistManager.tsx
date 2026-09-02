@@ -262,9 +262,7 @@ export const AllowlistManager: React.FC = () => {
       });
 
       if (rpcErr) {
-        // Direct delete fallback
-        await supabase.from('allowlist').delete().eq('email', targetEmail);
-        await supabase.from('profiles').delete().eq('email', targetEmail);
+        throw new Error(rpcErr.message);
       }
 
       await loadAllowlist();

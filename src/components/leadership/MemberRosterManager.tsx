@@ -49,12 +49,13 @@ export const MemberRosterManager: React.FC = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          is_on_probation: true,
+          is_on_probation: !willBeRestricted,
           probation_count: newCount,
           probation_reason: probationReason,
           probation_notes: probationNotes.trim() || undefined,
           probation_updated_at: new Date().toISOString(),
           is_restricted: willBeRestricted,
+          role: willBeRestricted ? 'kicked_out' : probationTarget.role,
           restricted_reason: willBeRestricted
             ? 'Dismissed from CAS NHS: Accumulated 2 probations. Account restricted.'
             : undefined,
@@ -63,21 +64,37 @@ export const MemberRosterManager: React.FC = () => {
 
       if (error) throw error;
 
+      if (willBeRestricted) {
+        await supabase
+          .from('allowlist')
+          .update({ role: 'kicked_out' })
+          .eq('email', probationTarget.email);
+      }
+
       setProbationTarget(null);
       setProbationNotes('');
       await loadMembers();
-    } catch (err) {
+      alert(
+        willBeRestricted
+          ? `${probationTarget.full_name} has received a 2nd probation and has been dismissed from CAS NHS.`
+          : `${probationTarget.full_name} has been placed on Probation #1.`
+      );
+    } catch (err: any) {
       console.error('Failed to issue probation:', err);
+      alert(`Failed to issue probation: ${err.message}`);
     }
   };
 
   const handleClearProbation = async (member: Profile) => {
     if (!isLeadership) return;
+    if (!confirm(`Cancel probation for ${member.full_name} and restore them to Good Standing?`)) return;
+
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
           is_on_probation: false,
+          probation_count: 0,
           probation_reason: null,
           probation_notes: null,
           probation_updated_at: new Date().toISOString(),
@@ -86,8 +103,10 @@ export const MemberRosterManager: React.FC = () => {
 
       if (error) throw error;
       await loadMembers();
-    } catch (err) {
+      alert(`Probation cancelled for ${member.full_name}. Member is in Good Standing.`);
+    } catch (err: any) {
       console.error('Failed to clear probation:', err);
+      alert(`Failed to cancel probation: ${err.message}`);
     }
   };
 
@@ -116,8 +135,7 @@ export const MemberRosterManager: React.FC = () => {
       });
 
       if (rpcErr) {
-        await supabase.from('allowlist').delete().eq('email', member.email);
-        await supabase.from('profiles').delete().eq('id', member.id);
+        throw new Error(rpcErr.message);
       }
 
       await loadMembers();
@@ -266,18 +284,31 @@ export const MemberRosterManager: React.FC = () => {
 
                       {isLeadership && !member.is_restricted && (
                         member.is_on_probation ? (
-                          <button
-                            className="btn-inspect"
-                            style={{ color: 'var(--color-sage)' }}
-                            onClick={() => handleClearProbation(member)}
-                          >
-                            <UserCheck size={12} /> Clear
-                          </button>
+                          <>
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-sage-text)' }}
+                              onClick={() => handleClearProbation(member)}
+                              title="Cancel probation and return member to Good Standing"
+                            >
+                              <UserCheck size={12} /> Cancel Probation
+                            </button>
+
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)' }}
+                              onClick={() => { setProbationTarget(member); setProbationNotes(''); }}
+                              title="Issue 2nd probation and dismiss member from chapter"
+                            >
+                              <UserX size={12} /> 2nd Probation (Kick Out)
+                            </button>
+                          </>
                         ) : (
                           <button
                             className="btn-inspect"
                             style={{ color: 'var(--color-gold-text)' }}
                             onClick={() => { setProbationTarget(member); setProbationNotes(''); }}
+                            title="Place member on Chapter Probation #1"
                           >
                             <UserX size={12} /> Place on Probation
                           </button>
@@ -367,10 +398,16 @@ export const MemberRosterManager: React.FC = () => {
               </button>
               <button
                 className="btn-primary"
-                style={{ backgroundColor: 'var(--color-gold)', borderColor: 'var(--color-gold)' }}
+                style={{
+                  backgroundColor: probationTarget.probation_count + 1 >= 2 ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                  borderColor: probationTarget.probation_count + 1 >= 2 ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                  color: '#FFFFFF',
+                }}
                 onClick={handleIssueProbation}
               >
-                Confirm Probation #{probationTarget.probation_count + 1}
+                {probationTarget.probation_count + 1 >= 2
+                  ? 'Confirm 2nd Probation (Kick Out & Dismiss)'
+                  : 'Confirm Probation #1'}
               </button>
             </div>
           </div>
