@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { ProjectProposal, Semester } from '../../types/nhs';
 import { ProjectProposalForm } from './ProjectProposalForm';
+import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
 import {
   Plus,
   CheckCircle2,
@@ -17,6 +18,10 @@ import {
   FileCheck,
   ExternalLink,
   Receipt,
+  MessageSquare,
+  Edit3,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -32,6 +37,10 @@ export const MyProjectsView: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'my_projects' | 'chapter_projects'>('my_projects');
+
+  // Details drawer & editing state
+  const [selectedProject, setSelectedProject] = useState<ProjectProposal | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectProposal | null>(null);
 
   // Completion modal state
   const [completingProject, setCompletingProject] = useState<ProjectProposal | null>(null);
@@ -105,6 +114,36 @@ export const MyProjectsView: React.FC = () => {
       await loadData();
     } catch (err) {
       console.error('Failed to mark completed:', err);
+    }
+  };
+
+  const handleDeleteProposal = async (project: ProjectProposal, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected)
+    if (project.status === 'approved' || project.status === 'completed') {
+      alert('Approved proposals cannot be deleted as they are finalized chapter projects.');
+      return;
+    }
+
+    if (
+      !confirm(
+        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete proposal "${project.project_title}"?\n\nThis action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await supabase.from('project_volunteers').delete().eq('project_id', project.id);
+      const { error } = await supabase.from('project_proposals').delete().eq('id', project.id);
+      if (error) throw error;
+
+      alert(`Proposal "${project.project_title}" has been permanently deleted.`);
+      if (selectedProject?.id === project.id) setSelectedProject(null);
+      await loadData();
+    } catch (err: any) {
+      alert(`Failed to delete proposal: ${err.message}`);
     }
   };
 
@@ -262,111 +301,144 @@ export const MyProjectsView: React.FC = () => {
             {proposals.map((project) => {
               const hasCosts = projectHasMonetaryCosts(project);
               const isCompleted = project.is_completed || project.status === 'completed';
+              const canModifyOrDelete = project.status !== 'approved' && project.status !== 'completed';
+              const commentCount = project.comments?.length || 0;
 
               return (
-                <div key={project.id} className="sharp-card" style={{ padding: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0 }}>
-                          {project.project_title}
-                        </h3>
-                        {getStatusBadge(project.status)}
-                      </div>
-                      <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
-                        <span><strong>Leaders:</strong> {project.leaders}</span>
-                        <span><strong>Advisor:</strong> {project.advisor_name}</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Calendar size={13} /> {project.event_date}
-                        </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <MapPin size={13} /> {project.location}
-                        </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Users size={13} /> {project.volunteers_needed} volunteers needed
-                        </span>
-                      </div>
-                    </div>
-
-                    {project.status === 'approved' && !isCompleted && (
-                      <button
-                        className="btn-gold"
-                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
-                        onClick={() => setCompletingProject(project)}
-                      >
-                        <Check size={14} /> Mark Project Done
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Feedback notes from leadership or supervisor */}
-                  {(project.leadership_notes || project.supervisor_notes) && (
-                    <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.8rem' }}>
-                      {project.leadership_notes && (
-                        <div style={{ marginBottom: project.supervisor_notes ? '0.35rem' : 0 }}>
-                          <strong>Leadership Review:</strong> {project.leadership_notes}
-                        </div>
-                      )}
-                      {project.supervisor_notes && (
-                        <div>
-                          <strong>Advisor / Supervisor Review:</strong> {project.supervisor_notes}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Completion notes */}
-                  {isCompleted && project.completed_notes && (
-                    <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#F3E8FF', border: '1px solid #E9D5FF', fontSize: '0.78rem', color: '#6B21A8' }}>
-                      <strong>Execution Notes:</strong> {project.completed_notes}
-                    </div>
-                  )}
-
-                  {/* PROOF OF PURCHASE (RECEIPT) SECTION FOR COMPLETED PROJECTS WITH MONETARY COSTS */}
-                  {isCompleted && hasCosts && (
-                    <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderLeft: '4px solid var(--color-gold)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                        <Receipt size={16} color="var(--color-gold-text)" />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
-                          Proof of Purchase (Expense Reimbursement Receipt)
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem' }}>
-                        This project listed financial expenses. Upload an itemized receipt image or PDF for Chapter Leadership reimbursement review.
-                      </p>
-
-                      {project.receipt_url ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                          <a
-                            href={project.receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn-secondary"
-                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <FileCheck size={14} /> View Uploaded Receipt <ExternalLink size={12} />
-                          </a>
-
-                          {project.receipt_status === 'approved' ? (
-                            <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
-                              <CheckCircle2 size={12} /> Receipt Verified & Approved
-                            </span>
-                          ) : project.receipt_status === 'rejected' ? (
-                            <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
-                              <XCircle size={12} /> Resubmission Requested ({project.receipt_notes || 'See leadership'})
-                            </span>
-                          ) : (
-                            <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: '#1E3A8A', fontSize: '0.72rem' }}>
-                              <Clock size={12} /> Pending Leadership Audit
+                <div
+                  key={project.id}
+                  className="sharp-card"
+                  style={{
+                    padding: '1.5rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                  onClick={() => setSelectedProject(project)}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0 }}>
+                            {project.project_title}
+                          </h3>
+                          {getStatusBadge(project.status)}
+                          {commentCount > 0 && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.72rem',
+                                color: 'var(--color-navy)',
+                                backgroundColor: '#EFF6FF',
+                                border: '1px solid #BFDBFE',
+                                padding: '0.15rem 0.45rem',
+                                borderRadius: '2px',
+                                fontWeight: 600,
+                              }}
+                              title={`${commentCount} revision comment${commentCount > 1 ? 's' : ''}`}
+                            >
+                              <MessageSquare size={12} /> {commentCount}
                             </span>
                           )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
+                          <span><strong>Leaders:</strong> {project.leaders}</span>
+                          <span><strong>Advisor:</strong> {project.advisor_name}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Calendar size={13} /> {project.event_date}
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <MapPin size={13} /> {project.location}
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Users size={13} /> {project.volunteers_needed} volunteers needed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                          {project.receipt_status !== 'approved' && (
-                            <label style={{ cursor: 'pointer', fontSize: '0.78rem', color: 'var(--color-oxford)', textDecoration: 'underline' }}>
-                              Upload Replacement Receipt
+                    {/* Feedback notes from leadership or supervisor */}
+                    {(project.leadership_notes || project.supervisor_notes) && (
+                      <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.8rem' }}>
+                        {project.leadership_notes && (
+                          <div style={{ marginBottom: project.supervisor_notes ? '0.35rem' : 0 }}>
+                            <strong>Leadership Review:</strong> {project.leadership_notes}
+                          </div>
+                        )}
+                        {project.supervisor_notes && (
+                          <div>
+                            <strong>Advisor / Supervisor Review:</strong> {project.supervisor_notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Completion notes */}
+                    {isCompleted && project.completed_notes && (
+                      <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#F3E8FF', border: '1px solid #E9D5FF', fontSize: '0.78rem', color: '#6B21A8' }}>
+                        <strong>Execution Notes:</strong> {project.completed_notes}
+                      </div>
+                    )}
+
+                    {/* PROOF OF PURCHASE (RECEIPT) SECTION FOR COMPLETED PROJECTS WITH MONETARY COSTS */}
+                    {isCompleted && hasCosts && (
+                      <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderLeft: '4px solid var(--color-gold)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                          <Receipt size={16} color="var(--color-gold-text)" />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
+                            Proof of Purchase (Expense Reimbursement Receipt)
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem' }}>
+                          This project listed financial expenses. Upload an itemized receipt image or PDF for Chapter Leadership reimbursement review.
+                        </p>
+
+                        {project.receipt_url ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                            <a
+                              href={project.receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-secondary"
+                              style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <FileCheck size={14} /> View Uploaded Receipt <ExternalLink size={12} />
+                            </a>
+
+                            {project.receipt_status === 'approved' ? (
+                              <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                                <CheckCircle2 size={12} /> Receipt Verified & Approved
+                              </span>
+                            ) : project.receipt_status === 'rejected' ? (
+                              <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
+                                <XCircle size={12} /> Resubmission Requested ({project.receipt_notes || 'See leadership'})
+                              </span>
+                            ) : (
+                              <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: '#1E3A8A', fontSize: '0.72rem' }}>
+                                <Clock size={12} /> Pending Leadership Audit
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <label
+                              className="btn-primary"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '0.4rem 0.85rem', cursor: 'pointer' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Upload size={14} />
+                              {uploadingReceiptId === project.id ? 'Uploading Receipt...' : 'Upload Receipt (Proof of Purchase)'}
                               <input
                                 type="file"
                                 accept="image/*,application/pdf"
+                                disabled={uploadingReceiptId === project.id}
                                 style={{ display: 'none' }}
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
@@ -374,31 +446,66 @@ export const MyProjectsView: React.FC = () => {
                                 }}
                               />
                             </label>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <label
-                            className="btn-primary"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '0.4rem 0.85rem', cursor: 'pointer' }}
-                          >
-                            <Upload size={14} />
-                            {uploadingReceiptId === project.id ? 'Uploading Receipt...' : 'Upload Receipt (Proof of Purchase)'}
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              disabled={uploadingReceiptId === project.id}
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleUploadReceipt(project, file);
-                              }}
-                            />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Interactive Card Action Bar */}
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '1.25rem', paddingTop: '0.85rem', borderTop: '1px solid var(--color-border)' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProject(project);
+                      }}
+                    >
+                      <Eye size={13} /> Details & Comments
+                    </button>
+
+                    {canModifyOrDelete && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingProject(project);
+                            setIsFormOpen(true);
+                          }}
+                        >
+                          <Edit3 size={13} /> Modify
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-inspect"
+                          style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={(e) => handleDeleteProposal(project, e)}
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </>
+                    )}
+
+                    {project.status === 'approved' && !isCompleted && (
+                      <button
+                        type="button"
+                        className="btn-gold"
+                        style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCompletingProject(project);
+                        }}
+                      >
+                        <Check size={13} /> Mark Done
+                      </button>
+                    )}
+                  </div>
 
                 </div>
               );
@@ -414,7 +521,12 @@ export const MyProjectsView: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {allApprovedProjects.map((project) => (
-              <div key={project.id} className="sharp-card" style={{ padding: '1.5rem' }}>
+              <div
+                key={project.id}
+                className="sharp-card"
+                style={{ padding: '1.5rem', cursor: 'pointer' }}
+                onClick={() => setSelectedProject(project)}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
@@ -422,6 +534,24 @@ export const MyProjectsView: React.FC = () => {
                         {project.project_title}
                       </h3>
                       {getStatusBadge(project.status)}
+                      {project.comments && project.comments.length > 0 && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontSize: '0.72rem',
+                            color: 'var(--color-navy)',
+                            backgroundColor: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            padding: '0.15rem 0.45rem',
+                            borderRadius: '2px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <MessageSquare size={12} /> {project.comments.length}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem' }}>
                       {project.background}
@@ -433,6 +563,17 @@ export const MyProjectsView: React.FC = () => {
                       <span><strong>Volunteers Needed:</strong> {project.volunteers_needed}</span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProject(project);
+                    }}
+                  >
+                    <Eye size={13} /> View Details
+                  </button>
                 </div>
               </div>
             ))}
@@ -440,16 +581,46 @@ export const MyProjectsView: React.FC = () => {
         )
       )}
 
+      {/* Project Details Drawer with Comments, Edit & Delete */}
+      <ProjectDetailsDrawer
+        project={selectedProject}
+        onClose={() => setSelectedProject(null)}
+        onEdit={(proj) => {
+          setEditingProject(proj);
+          setIsFormOpen(true);
+        }}
+        onDeleted={() => {
+          setSelectedProject(null);
+          loadData();
+        }}
+        onUpdated={async () => {
+          await loadData();
+          if (selectedProject) {
+            const { data } = await supabase
+              .from('project_proposals')
+              .select('*')
+              .eq('id', selectedProject.id)
+              .maybeSingle();
+            if (data) setSelectedProject(data as ProjectProposal);
+          }
+        }}
+      />
+
       {/* Proposal Modal */}
       <ProjectProposalForm
         isOpen={isFormOpen}
         onClose={() => {
           setIsFormOpen(false);
+          setEditingProject(null);
           loadData();
         }}
         activeSemester={activeSemester}
         currentMemberProjectCount={currentSemesterCount}
-        onSubmitted={loadData}
+        initialData={editingProject}
+        onSubmitted={() => {
+          loadData();
+          setEditingProject(null);
+        }}
       />
 
       {/* Complete Project Modal */}

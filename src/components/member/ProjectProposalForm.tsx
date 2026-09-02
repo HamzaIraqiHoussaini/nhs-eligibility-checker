@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import type { Semester } from '../../types/nhs';
+import type { Semester, ProjectProposal } from '../../types/nhs';
 import { X, Plus, Trash2, Send, AlertCircle } from 'lucide-react';
 
 interface ProjectProposalFormProps {
@@ -9,6 +9,7 @@ interface ProjectProposalFormProps {
   onClose: () => void;
   activeSemester: Semester | null;
   currentMemberProjectCount: number;
+  initialData?: ProjectProposal | null;
   onSubmitted: () => void;
 }
 
@@ -17,31 +18,65 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   onClose,
   activeSemester,
   currentMemberProjectCount,
+  initialData,
   onSubmitted,
 }) => {
   const { user, profile } = useAuth();
+  const isEditing = Boolean(initialData);
 
-  const [projectTitle, setProjectTitle] = useState('');
-  const [leaders, setLeaders] = useState(profile?.full_name || '');
-  const [coLeaderEmails, setCoLeaderEmails] = useState('');
-  const [advisorName, setAdvisorName] = useState('Laura Hayes');
-  const [eventDate, setEventDate] = useState('');
-  const [location, setLocation] = useState('');
-  const [awards, setAwards] = useState('');
-  const [background, setBackground] = useState('');
-  const [objectives, setObjectives] = useState<string[]>(['']);
-  const [eventDetails, setEventDetails] = useState<string[]>(['']);
-  const [costs, setCosts] = useState<string[]>(['No costs expected']);
-  const [needsFromSchool, setNeedsFromSchool] = useState<string[]>(['Classroom space and projector']);
-  const [volunteersNeeded, setVolunteersNeeded] = useState(0);
+  const [projectTitle, setProjectTitle] = useState(initialData?.project_title || '');
+  const [leaders, setLeaders] = useState(initialData?.leaders || profile?.full_name || '');
+  const [coLeaderEmails, setCoLeaderEmails] = useState(initialData?.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
+  const [advisorName, setAdvisorName] = useState(initialData?.advisor_name || 'Laura Hayes');
+  const [eventDate, setEventDate] = useState(initialData?.event_date || '');
+  const [location, setLocation] = useState(initialData?.location || '');
+  const [awards, setAwards] = useState(initialData?.awards || '');
+  const [background, setBackground] = useState(initialData?.background || '');
+  const [objectives, setObjectives] = useState<string[]>(initialData?.objectives?.length ? initialData.objectives : ['']);
+  const [eventDetails, setEventDetails] = useState<string[]>(initialData?.event_details?.length ? initialData.event_details : ['']);
+  const [costs, setCosts] = useState<string[]>(initialData?.costs?.length ? initialData.costs : ['No costs expected']);
+  const [needsFromSchool, setNeedsFromSchool] = useState<string[]>(initialData?.needs_from_school?.length ? initialData.needs_from_school : ['Classroom space and projector']);
+  const [volunteersNeeded, setVolunteersNeeded] = useState(initialData?.volunteers_needed || 0);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (initialData) {
+      setProjectTitle(initialData.project_title || '');
+      setLeaders(initialData.leaders || profile?.full_name || '');
+      setCoLeaderEmails(initialData.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
+      setAdvisorName(initialData.advisor_name || 'Laura Hayes');
+      setEventDate(initialData.event_date || '');
+      setLocation(initialData.location || '');
+      setAwards(initialData.awards || '');
+      setBackground(initialData.background || '');
+      setObjectives(initialData.objectives?.length ? initialData.objectives : ['']);
+      setEventDetails(initialData.event_details?.length ? initialData.event_details : ['']);
+      setCosts(initialData.costs?.length ? initialData.costs : ['No costs expected']);
+      setNeedsFromSchool(initialData.needs_from_school?.length ? initialData.needs_from_school : ['Classroom space and projector']);
+      setVolunteersNeeded(initialData.volunteers_needed || 0);
+    } else {
+      setProjectTitle('');
+      setLeaders(profile?.full_name || '');
+      setCoLeaderEmails('');
+      setAdvisorName('Laura Hayes');
+      setEventDate('');
+      setLocation('');
+      setAwards('');
+      setBackground('');
+      setObjectives(['']);
+      setEventDetails(['']);
+      setCosts(['No costs expected']);
+      setNeedsFromSchool(['Classroom space and projector']);
+      setVolunteersNeeded(0);
+    }
+  }, [initialData, isOpen, profile]);
+
   if (!isOpen) return null;
 
-  // Maximum 2 projects per semester rule enforcement
-  const isLimitReached = currentMemberProjectCount >= 2;
+  // Maximum 2 projects per semester rule enforcement (only for new proposals)
+  const isLimitReached = !isEditing && currentMemberProjectCount >= 2;
 
   const handleArrayChange = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => {
     setter(prev => {
@@ -77,28 +112,55 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       .filter(Boolean);
 
     try {
-      const { error } = await supabase.from('project_proposals').insert({
-        semester_id: activeSemester?.id || null,
-        creator_id: user.id,
-        creator_name: profile.full_name,
-        creator_email: user.email,
-        project_title: projectTitle.trim(),
-        leaders: leaders.trim(),
-        co_leader_emails: cleanCoLeaders,
-        advisor_name: advisorName.trim(),
-        event_date: eventDate,
-        location: location.trim(),
-        awards: awards.trim() || null,
-        background: background.trim(),
-        objectives: objectives.map(o => o.trim()).filter(Boolean),
-        event_details: eventDetails.map(d => d.trim()).filter(Boolean),
-        costs: costs.map(c => c.trim()).filter(Boolean),
-        needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
-        volunteers_needed: Number(volunteersNeeded) || 0,
-        status: 'pending_leadership',
-      });
+      if (isEditing && initialData) {
+        const { error } = await supabase
+          .from('project_proposals')
+          .update({
+            project_title: projectTitle.trim(),
+            leaders: leaders.trim(),
+            co_leader_emails: cleanCoLeaders,
+            advisor_name: advisorName.trim(),
+            event_date: eventDate,
+            location: location.trim(),
+            awards: awards.trim() || null,
+            background: background.trim(),
+            objectives: objectives.map(o => o.trim()).filter(Boolean),
+            event_details: eventDetails.map(d => d.trim()).filter(Boolean),
+            costs: costs.map(c => c.trim()).filter(Boolean),
+            needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
+            volunteers_needed: Number(volunteersNeeded) || 0,
+            status: 'pending_leadership',
+            leadership_decision: null,
+            supervisor_decision: null,
+          })
+          .eq('id', initialData.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        alert(`Proposal "${projectTitle}" has been modified and resubmitted for leadership review.`);
+      } else {
+        const { error } = await supabase.from('project_proposals').insert({
+          semester_id: activeSemester?.id || null,
+          creator_id: user.id,
+          creator_name: profile.full_name,
+          creator_email: user.email,
+          project_title: projectTitle.trim(),
+          leaders: leaders.trim(),
+          co_leader_emails: cleanCoLeaders,
+          advisor_name: advisorName.trim(),
+          event_date: eventDate,
+          location: location.trim(),
+          awards: awards.trim() || null,
+          background: background.trim(),
+          objectives: objectives.map(o => o.trim()).filter(Boolean),
+          event_details: eventDetails.map(d => d.trim()).filter(Boolean),
+          costs: costs.map(c => c.trim()).filter(Boolean),
+          needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
+          volunteers_needed: Number(volunteersNeeded) || 0,
+          status: 'pending_leadership',
+        });
+
+        if (error) throw error;
+      }
 
       onSubmitted();
       onClose();
@@ -139,10 +201,12 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             <span>[{projectTitle.toUpperCase() || 'PROJECT PROPOSAL'}]</span>
           </div>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0.5rem 0 0' }}>
-            National Honor Society Project Proposal
+            {isEditing ? 'Modify Project Proposal' : 'National Honor Society Project Proposal'}
           </h2>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
-            Proposed to: NHS Leadership & Laura Hayes (NHS Advisor)
+            {isEditing
+              ? 'Update your proposal details. Saving changes will resubmit the proposal for leadership review.'
+              : 'Proposed to: NHS Leadership & Laura Hayes (NHS Advisor)'}
           </div>
         </div>
 
@@ -507,7 +571,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 disabled={loading || isLimitReached}
               >
                 <Send size={14} />
-                {loading ? 'Submitting...' : 'Submit Proposal for Review'}
+                {loading ? (isEditing ? 'Saving Updates...' : 'Submitting...') : (isEditing ? 'Save & Resubmit Proposal' : 'Submit Proposal for Review')}
               </button>
             </div>
           </div>

@@ -89,6 +89,17 @@ export interface ProjectProposal {
   receipt_uploaded_at?: string;
   receipt_reviewed_by?: string;
   receipt_reviewed_at?: string;
+  comments?: ProjectComment[];
+  created_at: string;
+}
+
+export interface ProjectComment {
+  id: string;
+  author_id?: string;
+  author_name: string;
+  author_email: string;
+  author_role: UserRole;
+  content: string;
   created_at: string;
 }
 

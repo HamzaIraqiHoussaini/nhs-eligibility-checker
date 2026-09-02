@@ -1,8 +1,20 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import type { ProjectProposal } from '../../types/nhs';
-import { CheckCircle2, XCircle, Clock, Eye, X, FileCheck, ExternalLink, Receipt } from 'lucide-react';
+import type { ProjectProposal, ProjectComment } from '../../types/nhs';
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Eye,
+  X,
+  FileCheck,
+  ExternalLink,
+  Receipt,
+  MessageSquare,
+  Send,
+  Trash2,
+} from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
   if (!project.costs || project.costs.length === 0) return false;
@@ -15,6 +27,10 @@ export const TwoStageReviewDesk: React.FC = () => {
   const [selectedProposal, setSelectedProposal] = useState<ProjectProposal | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Review & revision comment state
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   // Receipt review notes
   const [receiptFeedback, setReceiptFeedback] = useState('');
@@ -100,6 +116,60 @@ export const TwoStageReviewDesk: React.FC = () => {
       alert(err.message || 'Failed updating receipt status.');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || !user || !selectedProposal) return;
+
+    setSubmittingComment(true);
+    const newComment: ProjectComment = {
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      author_id: user.id,
+      author_name: profile?.full_name || (isLeadership ? 'Leadership Reviewer' : 'Supervisor'),
+      author_email: user.email || '',
+      author_role: (profile?.role || (isLeadership ? 'leadership' : 'supervisor')) as any,
+      content: commentText.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedComments = [...(selectedProposal.comments || []), newComment];
+
+    try {
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', selectedProposal.id);
+
+      if (error) throw error;
+      setCommentText('');
+      setSelectedProposal({ ...selectedProposal, comments: updatedComments });
+      await loadProposals();
+    } catch (err: any) {
+      alert(`Failed to add comment: ${err.message}`);
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteProposal = async (proposal: ProjectProposal) => {
+    if (proposal.status === 'approved' || proposal.status === 'completed') {
+      alert('Approved proposals cannot be deleted as they are finalized chapter projects.');
+      return;
+    }
+    if (!confirm(`Are you sure you want to permanently delete proposal "${proposal.project_title}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await supabase.from('project_volunteers').delete().eq('project_id', proposal.id);
+      const { error } = await supabase.from('project_proposals').delete().eq('id', proposal.id);
+      if (error) throw error;
+      alert(`Proposal "${proposal.project_title}" has been deleted.`);
+      setSelectedProposal(null);
+      await loadProposals();
+    } catch (err: any) {
+      alert(`Failed to delete proposal: ${err.message}`);
     }
   };
 
@@ -466,6 +536,73 @@ export const TwoStageReviewDesk: React.FC = () => {
               </div>
             )}
 
+            {/* Revision Feedback & Discussion Thread */}
+            <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <MessageSquare size={16} color="var(--color-oxford)" />
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
+                  Revision Feedback & Comments ({selectedProposal.comments?.length || 0})
+                </h3>
+              </div>
+
+              {/* Comments list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                {(!selectedProposal.comments || selectedProposal.comments.length === 0) ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', backgroundColor: '#F8FAFC', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                    No feedback comments posted yet. Add instructions or required modifications below.
+                  </div>
+                ) : (
+                  selectedProposal.comments.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid var(--color-border)',
+                        borderLeft: c.author_role === 'leadership' || c.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name}</strong>
+                          <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.65rem' }}>
+                            {c.author_role}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                          {new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p style={{ margin: '0', fontSize: '0.82rem', lineHeight: '1.5', color: 'var(--color-text-primary)' }}>
+                        {c.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add comment input */}
+              <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <textarea
+                  rows={2}
+                  placeholder="Post comment or revision instruction for student..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.82rem' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="submit"
+                    className="btn-secondary"
+                    disabled={submittingComment || !commentText.trim()}
+                    style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Send size={12} /> {submittingComment ? 'Posting...' : 'Post Comment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
             {/* Decision Controls (if active reviewer) */}
             {((isLeadership && selectedProposal.status === 'pending_leadership') ||
               (isSupervisor && selectedProposal.status === 'pending_supervisor')) && (
@@ -501,7 +638,22 @@ export const TwoStageReviewDesk: React.FC = () => {
               </div>
             )}
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+              {selectedProposal.status !== 'approved' && selectedProposal.status !== 'completed' ? (
+                <button
+                  type="button"
+                  className="btn-inspect"
+                  style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => handleDeleteProposal(selectedProposal)}
+                >
+                  <Trash2 size={13} /> Delete Proposal
+                </button>
+              ) : (
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                  Approved proposals cannot be deleted.
+                </div>
+              )}
+
               <button className="btn-secondary" onClick={() => setSelectedProposal(null)}>
                 Close
               </button>
