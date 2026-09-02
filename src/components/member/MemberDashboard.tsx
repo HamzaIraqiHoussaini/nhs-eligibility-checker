@@ -79,22 +79,23 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         setSemesterVolunteered(vols.length);
       }
 
-      let meetingIds: string[] = [];
+      let attQuery = supabase
+        .from('meeting_attendance')
+        .select('status')
+        .eq('user_id', user.id);
+
       if (activeSem) {
         const { data: semMeetings } = await supabase
           .from('meetings')
           .select('id')
           .gte('meeting_date', activeSem.start_date)
           .lte('meeting_date', activeSem.end_date);
-        meetingIds = (semMeetings || []).map((m: any) => m.id);
-      }
+        const meetingIds = (semMeetings || []).map((m: any) => m.id);
 
-      let attQuery = supabase
-        .from('meeting_attendance')
-        .select('status')
-        .eq('user_id', user.id);
-
-      if (meetingIds.length > 0) {
+        if (meetingIds.length === 0) {
+          setAttendanceStats({ attended: 0, total: 0, absences: 0 });
+          return;
+        }
         attQuery = attQuery.in('meeting_id', meetingIds);
       }
 

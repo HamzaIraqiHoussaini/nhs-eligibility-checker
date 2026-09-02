@@ -70,12 +70,23 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           setSemesterVolCount(vols.length);
         }
 
-        // 3. Fetch attendance
+        // 3. Fetch attendance (scoped to active semester if present)
         const { data: aData } = await supabase
           .from('meeting_attendance')
           .select('*')
           .eq('user_id', member.id);
-        setAttendanceRecords((aData as MeetingAttendance[]) || []);
+        
+        let validAtt = (aData as MeetingAttendance[]) || [];
+        if (activeSem && validAtt.length > 0) {
+          const { data: semMeetings } = await supabase
+            .from('meetings')
+            .select('id')
+            .gte('meeting_date', activeSem.start_date)
+            .lte('meeting_date', activeSem.end_date);
+          const semMeetingIds = new Set((semMeetings || []).map((m: any) => m.id));
+          validAtt = validAtt.filter((a: any) => semMeetingIds.has(a.meeting_id));
+        }
+        setAttendanceRecords(validAtt);
       } catch (err) {
         console.error('Error fetching member profile history:', err);
       } finally {

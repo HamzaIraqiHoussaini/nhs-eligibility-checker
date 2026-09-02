@@ -136,23 +136,35 @@ export const AttendanceSheet: React.FC = () => {
     setSaveSuccess(false);
 
     try {
-      let meeting = meetings.find((m) => m.meeting_date === dateStr);
+      const { fullDate } = formatMondayDisplay(dateStr);
+      let { data: meeting, error: mErr } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('meeting_date', dateStr)
+        .maybeSingle();
+
+      if (mErr) throw mErr;
 
       if (!meeting) {
-        const { fullDate } = formatMondayDisplay(dateStr);
-        const { data, error } = await supabase
+        const { data: newMeeting, error: insErr } = await supabase
           .from('meetings')
-          .insert({
-            title: fullDate,
-            meeting_date: dateStr,
-            created_by: user?.id,
-          })
+          .upsert(
+            {
+              title: fullDate,
+              meeting_date: dateStr,
+              created_by: user?.id,
+            },
+            { onConflict: 'meeting_date' }
+          )
           .select()
           .single();
 
-        if (error) throw error;
-        meeting = data as Meeting;
-        setMeetings((prev) => [meeting!, ...prev]);
+        if (insErr) throw insErr;
+        meeting = newMeeting;
+        setMeetings((prev) => {
+          const rest = prev.filter((m) => m.meeting_date !== dateStr);
+          return [meeting!, ...rest];
+        });
       }
 
       setActiveMeeting(meeting);
@@ -230,7 +242,7 @@ export const AttendanceSheet: React.FC = () => {
         const { data: memberAtt } = await query;
         const unexcusedCount = (memberAtt || []).filter((r) => r.status === 'absent').length;
 
-        // 2 or more unexcused absences in the semester triggers chapter probation (never automatic dismissal)
+        // 2 or more unexcused absences in the semester triggers chapter probation
         if (unexcusedCount >= 2 && !member.is_on_probation && !member.is_restricted) {
           await supabase
             .from('profiles')
@@ -242,8 +254,32 @@ export const AttendanceSheet: React.FC = () => {
               probation_updated_at: new Date().toISOString(),
             })
             .eq('id', member.id);
+        } else if (unexcusedCount < 2 && member.is_on_probation && member.probation_reason === 'attendance') {
+          // If absences dropped below 2 and member was on probation due to attendance, restore to Good Standing!
+          await supabase
+            .from('profiles')
+            .update({
+              is_on_probation: false,
+              probation_count: Math.max(0, (member.probation_count || 1) - 1),
+              probation_reason: null,
+              probation_notes: null,
+              probation_updated_at: new Date().toISOString(),
+            })
+            .eq('id', member.id);
         }
       }
+
+      // Re-fetch attendanceMap for active meeting to guarantee state is in sync
+      const { data: refreshedAtt } = await supabase
+        .from('meeting_attendance')
+        .select('user_id, status')
+        .eq('meeting_id', activeMeeting.id);
+
+      const refreshedMap: Record<string, AttendanceStatus> = {};
+      refreshedAtt?.forEach((a: any) => {
+        refreshedMap[a.user_id] = a.status as AttendanceStatus;
+      });
+      setAttendanceMap(refreshedMap);
 
       setSaveSuccess(true);
       await loadData();
