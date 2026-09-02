@@ -103,6 +103,8 @@ export interface ProjectComment {
   created_at: string;
 }
 
+export type VolunteerApplicationStatus = 'applied' | 'accepted' | 'declined' | 'confirmed';
+
 export interface ProjectVolunteer {
   id: string;
   project_id: string;
@@ -110,7 +112,9 @@ export interface ProjectVolunteer {
   student_name: string;
   student_email: string;
   role_description?: string;
+  status?: VolunteerApplicationStatus;
   attended: boolean;
+  confirmed_at?: string;
   created_at: string;
 }
 

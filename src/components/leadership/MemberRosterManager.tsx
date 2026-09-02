@@ -60,9 +60,9 @@ export const MemberRosterManager: React.FC = () => {
       if (semProposalIds.length > 0) {
         const { data: vData } = await supabase
           .from('project_volunteers')
-          .select('id, user_id, project_id')
+          .select('id, user_id, project_id, attended, status')
           .in('project_id', semProposalIds);
-        semVolunteers = vData || [];
+        semVolunteers = (vData || []).filter((v: any) => v.attended === true || v.status === 'confirmed');
       }
 
       const map: Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }> = {};

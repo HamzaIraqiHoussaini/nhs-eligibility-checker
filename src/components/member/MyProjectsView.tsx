@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import type { ProjectProposal, Semester } from '../../types/nhs';
+import type { ProjectProposal, Semester, ProjectVolunteer } from '../../types/nhs';
 import { ProjectProposalForm } from './ProjectProposalForm';
 import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
 import {
@@ -23,6 +23,8 @@ import {
   Edit3,
   Trash2,
   Eye,
+  UserPlus,
+  UserCheck,
 } from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -35,6 +37,8 @@ export const MyProjectsView: React.FC = () => {
   const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [allApprovedProjects, setAllApprovedProjects] = useState<ProjectProposal[]>([]);
+  const [allVolunteers, setAllVolunteers] = useState<ProjectVolunteer[]>([]);
+  const [myVolunteers, setMyVolunteers] = useState<ProjectVolunteer[]>([]);
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,18 @@ export const MyProjectsView: React.FC = () => {
         .in('status', ['approved', 'completed'])
         .order('event_date', { ascending: true });
       if (approvedData) setAllApprovedProjects(approvedData as ProjectProposal[]);
+
+      // 4. Fetch volunteers for chapter projects
+      const { data: vData } = await supabase
+        .from('project_volunteers')
+        .select('*');
+      if (vData) {
+        const vols = vData as ProjectVolunteer[];
+        setAllVolunteers(vols);
+        if (user) {
+          setMyVolunteers(vols.filter((v) => v.user_id === user.id || (user.email && v.student_email?.toLowerCase() === user.email.toLowerCase())));
+        }
+      }
     } catch (err) {
       console.error('Error loading project proposals:', err);
     } finally {
@@ -550,63 +566,111 @@ export const MyProjectsView: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {allApprovedProjects.map((project) => (
-              <div
-                key={project.id}
-                className="sharp-card"
-                style={{ padding: '1.5rem', cursor: 'pointer' }}
-                onClick={() => setSelectedProject(project)}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem' }}>
-                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', margin: 0 }}>
-                        {project.project_title}
-                      </h3>
-                      {getStatusBadge(project.status)}
-                      {project.comments && project.comments.length > 0 && (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            fontSize: '0.72rem',
-                            color: 'var(--color-navy)',
-                            backgroundColor: '#EFF6FF',
-                            border: '1px solid #BFDBFE',
-                            padding: '0.15rem 0.45rem',
-                            borderRadius: '2px',
-                            fontWeight: 600,
+            {allApprovedProjects.map((project) => {
+              const isLeading = project.creator_id === user?.id || (user?.email && (project.creator_email?.toLowerCase() === user.email.toLowerCase() || (Array.isArray(project.co_leader_emails) && project.co_leader_emails.some((e: string) => e.toLowerCase() === user.email?.toLowerCase()))));
+              const acceptedCount = allVolunteers.filter((v) => v.project_id === project.id && (v.status === 'accepted' || v.status === 'confirmed')).length;
+              const myVolRecord = myVolunteers.find((v) => v.project_id === project.id);
+
+              return (
+                <div
+                  key={project.id}
+                  className="sharp-card"
+                  style={{ padding: '1.5rem', cursor: 'pointer' }}
+                  onClick={() => setSelectedProject(project)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ flex: 1, minWidth: '280px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', margin: 0 }}>
+                          {project.project_title}
+                        </h3>
+                        {getStatusBadge(project.status)}
+                        {isLeading ? (
+                          <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', border: '1px solid #BFDBFE', fontSize: '0.72rem' }}>
+                            Leading Project
+                          </span>
+                        ) : myVolRecord ? (
+                          myVolRecord.attended || myVolRecord.status === 'confirmed' ? (
+                            <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                              <CheckCircle2 size={11} /> Volunteered
+                            </span>
+                          ) : myVolRecord.status === 'accepted' ? (
+                            <span className="status-pill" style={{ backgroundColor: '#DBEAFE', color: '#1E40AF', fontSize: '0.72rem' }}>
+                              <UserCheck size={11} /> Accepted Volunteer
+                            </span>
+                          ) : myVolRecord.status === 'declined' ? (
+                            <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: '#64748B', fontSize: '0.72rem' }}>
+                              Declined
+                            </span>
+                          ) : (
+                            <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
+                              <Clock size={11} /> Application Pending
+                            </span>
+                          )
+                        ) : project.status === 'approved' ? (
+                          <span className="status-pill" style={{ backgroundColor: '#F8FAFC', color: 'var(--color-oxford)', border: '1px dashed var(--color-oxford)', fontSize: '0.72rem' }}>
+                            <UserPlus size={11} /> Accepting Volunteers
+                          </span>
+                        ) : null}
+                        {project.comments && project.comments.length > 0 && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '0.72rem',
+                              color: 'var(--color-navy)',
+                              backgroundColor: '#EFF6FF',
+                              border: '1px solid #BFDBFE',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '2px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <MessageSquare size={12} /> {project.comments.length}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem' }}>
+                        {project.background}
+                      </div>
+                      <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
+                        <span><strong>Leaders:</strong> {project.leaders}</span>
+                        <span><strong>Date:</strong> {project.event_date}</span>
+                        <span><strong>Location:</strong> {project.location}</span>
+                        <span><strong>Volunteers:</strong> {acceptedCount} / {project.volunteers_needed || 0} accepted</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {!isLeading && !myVolRecord && project.status === 'approved' && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProject(project);
                           }}
                         >
-                          <MessageSquare size={12} /> {project.comments.length}
-                        </span>
+                          <UserPlus size={13} /> Apply to Volunteer
+                        </button>
                       )}
-                    </div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem' }}>
-                      {project.background}
-                    </div>
-                    <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
-                      <span><strong>Leaders:</strong> {project.leaders}</span>
-                      <span><strong>Date:</strong> {project.event_date}</span>
-                      <span><strong>Location:</strong> {project.location}</span>
-                      <span><strong>Volunteers Needed:</strong> {project.volunteers_needed}</span>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProject(project);
+                        }}
+                      >
+                        <Eye size={13} /> View Details
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedProject(project);
-                    }}
-                  >
-                    <Eye size={13} /> View Details
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       )}

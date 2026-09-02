@@ -54,17 +54,17 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         setSemesterProjectsLed(approvedProjects.length);
       }
 
-      // 2. Volunteer count (overall and active semester)
+      // 2. Volunteer count (overall and active semester) - only confirmed attendance
       const { data: allVols } = await supabase
         .from('project_volunteers')
-        .select('id, project_id')
+        .select('id, project_id, attended, status')
         .eq('user_id', user.id);
       
-      const vols = allVols || [];
-      setVolunteerCount(vols.length);
+      const confirmedVols = (allVols || []).filter((v: any) => v.attended === true || v.status === 'confirmed');
+      setVolunteerCount(confirmedVols.length);
 
-      if (activeSem && vols.length > 0) {
-        const volProjIds = vols.map((v: any) => v.project_id);
+      if (activeSem && confirmedVols.length > 0) {
+        const volProjIds = confirmedVols.map((v: any) => v.project_id);
         const { data: semProjs } = await supabase
           .from('project_proposals')
           .select('id, semester_id, event_date')
@@ -76,7 +76,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         ).length;
         setSemesterVolunteered(semVolCount);
       } else {
-        setSemesterVolunteered(vols.length);
+        setSemesterVolunteered(activeSem ? 0 : confirmedVols.length);
       }
 
       let attQuery = supabase

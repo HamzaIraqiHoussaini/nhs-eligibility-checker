@@ -54,8 +54,9 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
         const vols = (vData as ProjectVolunteer[]) || [];
         setVolunteerHistory(vols);
 
-        if (activeSem && vols.length > 0) {
-          const volProjIds = vols.map((v: any) => v.project_id);
+        const confirmedVols = vols.filter((v: any) => v.attended === true || v.status === 'confirmed');
+        if (activeSem && confirmedVols.length > 0) {
+          const volProjIds = confirmedVols.map((v: any) => v.project_id);
           const { data: semProjs } = await supabase
             .from('project_proposals')
             .select('id, semester_id, event_date')
@@ -67,7 +68,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           ).length;
           setSemesterVolCount(count);
         } else {
-          setSemesterVolCount(vols.length);
+          setSemesterVolCount(activeSem ? 0 : confirmedVols.length);
         }
 
         // 3. Fetch attendance (scoped to active semester if present)
@@ -289,10 +290,10 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             </section>
           )}
 
-          {/* Section 2: Volunteer History */}
+          {/* Section: Volunteer History */}
           <section>
             <div className="drawer-section-title">
-              Volunteer History ({volunteerHistory.length} Times Volunteered)
+              Volunteer History ({volunteerHistory.filter((v) => v.attended || v.status === 'confirmed').length} Confirmed Volunteered)
             </div>
             {volunteerHistory.length === 0 ? (
               <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', padding: '0.75rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
@@ -300,10 +301,31 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {volunteerHistory.map(v => (
-                  <div key={v.id} style={{ padding: '0.65rem 0.85rem', border: '1px solid var(--color-border)', fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{v.role_description || 'Chapter Volunteer'}</span>
-                    <span style={{ color: 'var(--color-sage)', fontWeight: 600 }}>Attended & Verified</span>
+                {volunteerHistory.map((v) => (
+                  <div key={v.id} style={{ padding: '0.65rem 0.85rem', border: '1px solid var(--color-border)', fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{v.role_description || 'Chapter Volunteer'}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                        Applied: {v.created_at ? new Date(v.created_at).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    {v.attended || v.status === 'confirmed' ? (
+                      <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                        Confirmed Volunteered
+                      </span>
+                    ) : v.status === 'accepted' ? (
+                      <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', fontSize: '0.72rem', border: '1px solid #BFDBFE' }}>
+                        Accepted (Project in Progress)
+                      </span>
+                    ) : v.status === 'declined' ? (
+                      <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>
+                        Declined
+                      </span>
+                    ) : (
+                      <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
+                        Pending Review
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
