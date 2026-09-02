@@ -9,7 +9,7 @@ interface MemberProfileDrawerProps {
 }
 
 export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member, onClose }) => {
-  const [ledProjects, setLedProjects] = useState<ProjectProposal[]>([]);
+  const [allProposals, setAllProposals] = useState<ProjectProposal[]>([]);
   const [volunteerHistory, setVolunteerHistory] = useState<ProjectVolunteer[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<MeetingAttendance[]>([]);
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
@@ -38,13 +38,13 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           .maybeSingle();
         setActiveSemester(activeSem as Semester);
 
-        // 1. Fetch led / co-led projects
+        // 1. Fetch all proposed projects (including pending/rejected)
         const { data: pData } = await supabase
           .from('project_proposals')
           .select('*')
           .or(`creator_id.eq.${member.id},co_leader_emails.cs.{${member.email}}`);
         const projects = (pData as ProjectProposal[]) || [];
-        setLedProjects(projects);
+        setAllProposals(projects);
 
         // 2. Fetch volunteer participation
         const { data: vData } = await supabase
@@ -87,6 +87,10 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   }, [member]);
 
   if (!member) return null;
+
+  // Differentiate: Led (approved/completed) vs Pending vs Total Proposed
+  const ledProjects = allProposals.filter(p => p.status === 'approved' || p.status === 'completed');
+  const pendingProposals = allProposals.filter(p => p.status !== 'approved' && p.status !== 'completed');
 
   const attendedCount = attendanceRecords.filter(a => a.status === 'present').length;
   const absenceCount = attendanceRecords.filter(a => a.status === 'absent').length;
@@ -184,39 +188,52 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           })()}
 
           {/* Quick Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
-            <div style={{ padding: '0.75rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-              <div className="kpi-label">Projects Led</div>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-navy)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.65rem' }}>
+            <div style={{ padding: '0.75rem 0.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <div className="kpi-label" style={{ fontSize: '0.68rem' }}>Projects Led</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-navy)' }}>
                 {ledProjects.length}
               </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--color-sage-text)', fontWeight: 600 }}>Approved</div>
             </div>
 
-            <div style={{ padding: '0.75rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-              <div className="kpi-label">Times Volunteered</div>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-sage)' }}>
+            <div style={{ padding: '0.75rem 0.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <div className="kpi-label" style={{ fontSize: '0.68rem' }}>Proposed</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-oxford)' }}>
+                {allProposals.length}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Total Submitted</div>
+            </div>
+
+            <div style={{ padding: '0.75rem 0.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <div className="kpi-label" style={{ fontSize: '0.68rem' }}>Volunteered</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-sage)' }}>
                 {volunteerHistory.length}
               </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Verified</div>
             </div>
 
-            <div style={{ padding: '0.75rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-              <div className="kpi-label">Meeting Absences</div>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: absenceCount >= 2 ? 'var(--color-terracotta)' : 'var(--color-navy)' }}>
+            <div style={{ padding: '0.75rem 0.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', textAlign: 'center' }}>
+              <div className="kpi-label" style={{ fontSize: '0.68rem' }}>Absences</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: absenceCount >= 2 ? 'var(--color-terracotta)' : 'var(--color-navy)' }}>
                 {absenceCount}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: absenceCount >= 2 ? 'var(--color-terracotta)' : 'var(--color-text-muted)' }}>
+                {absenceCount >= 2 ? 'Probation' : 'Semester'}
               </div>
             </div>
           </div>
 
-          {/* Section 1: Led Projects */}
+          {/* Section 1: Approved Projects Led */}
           <section>
             <div className="drawer-section-title">
-              Projects Led or Co-Led ({ledProjects.length})
+              Approved Projects Led or Co-Led ({ledProjects.length})
             </div>
             {loading ? (
               <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>Loading projects...</div>
             ) : ledProjects.length === 0 ? (
               <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', padding: '0.75rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
-                No projects proposed by this member.
+                No approved projects led yet this year.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -224,7 +241,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   <div key={p.id} style={{ padding: '0.75rem 1rem', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ fontSize: '0.9rem', color: 'var(--color-navy)' }}>{p.project_title}</strong>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize', color: p.status === 'approved' ? 'var(--color-sage)' : p.status === 'completed' ? '#6B21A8' : 'var(--color-text-muted)' }}>
+                      <span className="grade-badge" style={{ backgroundColor: p.status === 'completed' ? '#F3E8FF' : 'var(--color-sage-bg)', color: p.status === 'completed' ? '#6B21A8' : 'var(--color-sage-text)', textTransform: 'capitalize' }}>
                         {p.status.replace('_', ' ')}
                       </span>
                     </div>
@@ -236,6 +253,30 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
               </div>
             )}
           </section>
+
+          {/* Section 2: Pending or Draft Proposals */}
+          {pendingProposals.length > 0 && (
+            <section>
+              <div className="drawer-section-title">
+                Proposals Under Review or Pending ({pendingProposals.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {pendingProposals.map(p => (
+                  <div key={p.id} style={{ padding: '0.75rem 1rem', border: '1px solid #FDE68A', backgroundColor: '#FFFBEB' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '0.9rem', color: 'var(--color-navy)' }}>{p.project_title}</strong>
+                      <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E', textTransform: 'capitalize' }}>
+                        {p.status === 'pending_supervisor' ? 'Pending Supervisor' : p.status === 'pending_leadership' ? 'Pending Leadership' : p.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#78350F', marginTop: '0.2rem' }}>
+                      Proposed on: {p.created_at ? new Date(p.created_at).toLocaleDateString() : 'N/A'} • Note: Proposals under review do not count towards the semester quota until approved.
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Section 2: Volunteer History */}
           <section>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { AllowlistEntry, UserRole } from '../../types/nhs';
 import {
   UserPlus,
@@ -39,6 +40,7 @@ const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
 export const AllowlistManager: React.FC = () => {
   const { user, refreshProfile } = useAuth();
+  const { confirm, alert } = useConfirm();
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
 
   const [entries, setEntries] = useState<AllowlistEntry[]>([]);
@@ -82,7 +84,11 @@ export const AllowlistManager: React.FC = () => {
     if (!cleanEmail) return;
 
     if (role === 'leadership' && !isSuperadmin) {
-      alert('Only the Superadmin can authorize new Leadership accounts directly. You can promote existing members to leadership.');
+      await alert({
+        title: 'Action Restricted',
+        message: 'Only the Superadmin can authorize new Leadership accounts directly. You can promote existing members to leadership.',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -125,11 +131,21 @@ export const AllowlistManager: React.FC = () => {
 
   const handleResetCode = async (entry: AllowlistEntry) => {
     if (entry.role === 'leadership' && !isSuperadmin) {
-      alert('Leadership policy: Only the Chapter Superadmin can reset Leadership access codes.');
+      await alert({
+        title: 'Action Restricted',
+        message: 'Leadership policy: Only the Chapter Superadmin can reset Leadership access codes.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (!confirm(`Generate a new access code for ${entry.email}? Their old code will be invalidated.`)) return;
+    const confirmed = await confirm({
+      title: 'Reset Access Code',
+      message: `Generate a new access code for ${entry.email}? Their old code will be invalidated immediately.`,
+      confirmText: 'Reset Code',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     const newCode = generateAccessCode();
     setProvisioning(true);
@@ -153,7 +169,11 @@ export const AllowlistManager: React.FC = () => {
         isReset: true,
       });
     } catch (err: any) {
-      alert(`Failed to reset access code: ${err.message}`);
+      await alert({
+        title: 'Reset Failed',
+        message: `Failed to reset access code: ${err.message}`,
+        variant: 'danger',
+      });
     } finally {
       setProvisioning(false);
     }
@@ -161,15 +181,30 @@ export const AllowlistManager: React.FC = () => {
 
   // Promote Member to Leadership
   const handlePromoteToLeadership = async (entry: AllowlistEntry) => {
-    if (!confirm(`Promote ${entry.full_name || entry.email} to Chapter Leadership?`)) return;
+    const confirmed = await confirm({
+      title: 'Promote to Chapter Leadership',
+      message: `Are you sure you want to promote ${entry.full_name || entry.email} to Chapter Leadership?`,
+      details: 'This grants officer privileges, project review abilities, and treasury access.',
+      confirmText: 'Promote Member',
+      variant: 'info',
+    });
+    if (!confirmed) return;
 
     try {
       await supabase.from('allowlist').update({ role: 'leadership' }).eq('email', entry.email);
       await supabase.from('profiles').update({ role: 'leadership' }).eq('email', entry.email);
       await loadAllowlist();
-      alert(`${entry.full_name || entry.email} has been promoted to Leadership.`);
+      await alert({
+        title: 'Promotion Successful',
+        message: `${entry.full_name || entry.email} has been promoted to Leadership.`,
+        variant: 'success',
+      });
     } catch (err: any) {
-      alert(`Failed to promote member: ${err.message}`);
+      await alert({
+        title: 'Promotion Failed',
+        message: `Failed to promote member: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 
@@ -177,33 +212,60 @@ export const AllowlistManager: React.FC = () => {
   const handleSelfDemote = async () => {
     if (!user?.email) return;
     if (isSuperadmin) {
-      alert('The primary Superadmin cannot demote themselves.');
+      await alert({
+        title: 'Action Prohibited',
+        message: 'The primary Superadmin cannot demote themselves.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (!confirm('Are you sure you want to step down from Leadership and become a "Past Leader"? You will transition to past officer standing.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Step Down from Leadership',
+      message: 'Are you sure you want to step down from Leadership and become a "Past Leader"?',
+      details: 'You will transition to past officer standing and release administrative privileges.',
+      confirmText: 'Step Down',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     try {
       await supabase.from('allowlist').update({ role: 'past_leadership' }).eq('email', user.email);
       await supabase.from('profiles').update({ role: 'past_leadership' }).eq('id', user.id);
       await refreshProfile();
       await loadAllowlist();
-      alert('You have stepped down to Past Leader status.');
+      await alert({
+        title: 'Standing Updated',
+        message: 'You have stepped down to Past Leader status.',
+        variant: 'info',
+      });
     } catch (err: any) {
-      alert(`Failed to step down: ${err.message}`);
+      await alert({
+        title: 'Action Failed',
+        message: `Failed to step down: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 
   // Archive Account (e.g. past_member, kicked_out, etc.)
   const handleArchiveAccount = async (targetEmail: string, archiveRole: UserRole) => {
     if (targetEmail.toLowerCase() === SUPERADMIN_EMAIL) {
-      alert('The primary Superadmin cannot be archived.');
+      await alert({
+        title: 'Action Prohibited',
+        message: 'The primary Superadmin cannot be archived.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (!confirm(`Move ${targetEmail} to status: ${archiveRole}?`)) return;
+    const confirmed = await confirm({
+      title: 'Archive Chapter Account',
+      message: `Move ${targetEmail} to status: ${archiveRole}?`,
+      confirmText: 'Archive Account',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     try {
       await supabase.from('allowlist').update({ role: archiveRole }).eq('email', targetEmail);
@@ -214,13 +276,23 @@ export const AllowlistManager: React.FC = () => {
       }).eq('email', targetEmail);
       await loadAllowlist();
     } catch (err: any) {
-      alert(`Failed to archive account: ${err.message}`);
+      await alert({
+        title: 'Archive Failed',
+        message: `Failed to archive account: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 
   // Restore Account from Archive to Active Member
   const handleRestoreAccount = async (targetEmail: string) => {
-    if (!confirm(`Restore ${targetEmail} back to active Member standing?`)) return;
+    const confirmed = await confirm({
+      title: 'Restore Chapter Member',
+      message: `Restore ${targetEmail} back to active Member standing?`,
+      confirmText: 'Restore Member',
+      variant: 'success',
+    });
+    if (!confirmed) return;
 
     try {
       await supabase.from('allowlist').update({ role: 'member' }).eq('email', targetEmail);
@@ -230,31 +302,48 @@ export const AllowlistManager: React.FC = () => {
         restricted_reason: null,
       }).eq('email', targetEmail);
       await loadAllowlist();
-      alert(`${targetEmail} has been restored to active Member standing.`);
+      await alert({
+        title: 'Account Restored',
+        message: `${targetEmail} has been restored to active Member standing.`,
+        variant: 'success',
+      });
     } catch (err: any) {
-      alert(`Failed to restore account: ${err.message}`);
+      await alert({
+        title: 'Restore Failed',
+        message: `Failed to restore account: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 
   // Permanent Account Deletion (Superadmin only)
   const handlePermanentlyDeleteAccount = async (targetEmail: string) => {
     if (!isSuperadmin) {
-      alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can permanently delete accounts.');
+      await alert({
+        title: 'Permission Denied',
+        message: 'Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can permanently delete accounts.',
+        variant: 'danger',
+      });
       return;
     }
 
     if (targetEmail.toLowerCase() === SUPERADMIN_EMAIL) {
-      alert('The primary Superadmin account cannot be deleted.');
+      await alert({
+        title: 'Action Prohibited',
+        message: 'The primary Superadmin account cannot be deleted.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (
-      !confirm(
-        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete ${targetEmail}?\n\nThis will completely erase the user credentials, profile, and allowlist records from the CAS NHS system. This action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Permanently Delete Member Account',
+      message: `Are you sure you want to permanently delete ${targetEmail}?`,
+      details: 'This will completely erase credentials, profile, and allowlist records from the CAS NHS system. This action cannot be undone.',
+      confirmText: 'Permanently Delete',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       const { error: rpcErr } = await supabase.rpc('delete_member_account', {
@@ -266,9 +355,17 @@ export const AllowlistManager: React.FC = () => {
       }
 
       await loadAllowlist();
-      alert(`Account ${targetEmail} has been permanently deleted from CAS NHS.`);
+      await alert({
+        title: 'Account Deleted',
+        message: `Account ${targetEmail} has been permanently deleted from CAS NHS.`,
+        variant: 'success',
+      });
     } catch (err: any) {
-      alert(`Failed to delete account: ${err.message}`);
+      await alert({
+        title: 'Delete Failed',
+        message: `Failed to delete account: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 

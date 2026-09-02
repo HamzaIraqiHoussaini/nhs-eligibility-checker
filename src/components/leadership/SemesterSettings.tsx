@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
 import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight } from 'lucide-react';
 
@@ -21,6 +22,7 @@ function calculateDays(start: string, end: string): number {
 }
 
 export const SemesterSettings: React.FC = () => {
+  const { confirm, alert } = useConfirm();
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +98,11 @@ export const SemesterSettings: React.FC = () => {
       setShowModal(false);
       await loadSemesters();
     } catch (err: any) {
-      alert(err.message || 'Failed to create semester.');
+      await alert({
+        title: 'Failed to Create Semester',
+        message: err.message || 'An error occurred while creating the semester.',
+        variant: 'danger',
+      });
     }
   };
 
@@ -147,9 +153,15 @@ export const SemesterSettings: React.FC = () => {
   };
 
   const handlePurgeYearReceipts = async () => {
-    if (!confirm('Are you sure you want to purge all stored project receipt images from cloud disk for the annual transition (Semester 2 Year N → Semester 1 Year N+1)? This cannot be undone.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Purge Cloud Receipts for Annual Transition',
+      message: 'Are you sure you want to purge all stored project receipt images from cloud storage for the annual rollover?',
+      details: 'This is performed at the end of Semester 2 before the new academic year begins. Receipt image files in cloud storage will be permanently wiped. This cannot be undone.',
+      confirmText: 'Purge Cloud Receipts',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     setPurging(true);
     setPurgeSuccess(false);
@@ -172,7 +184,11 @@ export const SemesterSettings: React.FC = () => {
       setPurgeSuccess(true);
       setTimeout(() => setPurgeSuccess(false), 3500);
     } catch (err: any) {
-      alert(err.message || 'Failed to purge cloud receipts.');
+      await alert({
+        title: 'Purge Failed',
+        message: err.message || 'Failed to purge cloud receipts.',
+        variant: 'danger',
+      });
     } finally {
       setPurging(false);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
 import { X, Plus, Trash2, Send, AlertCircle } from 'lucide-react';
 
@@ -22,6 +23,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   onSubmitted,
 }) => {
   const { user, profile } = useAuth();
+  const { alert } = useConfirm();
   const isEditing = Boolean(initialData);
 
   const [projectTitle, setProjectTitle] = useState(initialData?.project_title || '');
@@ -99,7 +101,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     if (!user || !profile) return;
 
     if (isLimitReached) {
-      setErrorMsg('Semester Project Limit Reached: Members are permitted a maximum of 2 projects per semester.');
+      setErrorMsg('Semester Project Limit Reached: Members are permitted a maximum of 2 projects per semester (4 projects per year).');
       return;
     }
 
@@ -136,7 +138,11 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           .eq('id', initialData.id);
 
         if (error) throw error;
-        alert(`Proposal "${projectTitle}" has been modified and resubmitted for leadership review.`);
+        await alert({
+          title: 'Proposal Resubmitted',
+          message: `Proposal "${projectTitle}" has been modified and resubmitted for leadership review.`,
+          variant: 'success',
+        });
       } else {
         const { error } = await supabase.from('project_proposals').insert({
           semester_id: activeSemester?.id || null,
@@ -230,16 +236,18 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         </div>
 
         {isLimitReached && (
-          <div style={{
-            padding: '1rem',
-            backgroundColor: 'var(--color-terracotta-bg)',
-            border: '1px solid #FECACA',
-            color: 'var(--color-terracotta-text)',
-            fontSize: '0.85rem',
-            marginBottom: '1.5rem',
-          }}>
+          <div
+            style={{
+              padding: '1rem',
+              backgroundColor: 'var(--color-terracotta-bg)',
+              border: '1px solid #FECACA',
+              color: 'var(--color-terracotta-text)',
+              fontSize: '0.85rem',
+              marginBottom: '1.5rem',
+            }}
+          >
             <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-            <strong>Proposal Limit Exceeded:</strong> Chapter bylaws limit each member to a maximum of 2 project proposals per semester. You cannot submit additional proposals for this term.
+            <strong>Proposal Limit Exceeded:</strong> Chapter bylaws limit each member to a maximum of 2 projects per semester (4 projects per year). You cannot submit additional proposals for this term.
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
 import {
   X,
@@ -31,11 +32,12 @@ interface ProjectDetailsDrawerProps {
 export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   project,
   onClose,
-  onEdit,
   onDeleted,
   onUpdated,
+  onEdit,
 }) => {
   const { user, profile, isLeadership, isSupervisor } = useAuth();
+  const { confirm, alert } = useConfirm();
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -81,7 +83,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       setCommentText('');
       onUpdated();
     } catch (err: any) {
-      alert(`Failed to add comment: ${err.message}`);
+      await alert({
+        title: 'Failed to Post Comment',
+        message: err.message,
+        variant: 'danger',
+      });
     } finally {
       setSubmittingComment(false);
     }
@@ -89,32 +95,49 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
 
   const handleDeleteProposal = async () => {
     if (!canDelete) {
-      alert('This proposal cannot be deleted because it has already been approved.');
+      await alert({
+        title: 'Action Restricted',
+        message: 'This proposal cannot be deleted because it has already been approved.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (
-      !confirm(
-        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete the proposal "${project.project_title}"?\n\nThis action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete Project Proposal',
+      message: `Are you sure you want to permanently delete the proposal "${project.project_title}"?`,
+      details: 'This will completely remove this proposal from chapter records. This action cannot be undone.',
+      confirmText: 'Delete Proposal',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     setDeleting(true);
     try {
-      // 1. Delete associated volunteers if any
-      await supabase.from('project_volunteers').delete().eq('project_id', project.id);
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_project_proposal', {
+        p_id: project.id,
+      });
 
-      // 2. Delete proposal
-      const { error } = await supabase.from('project_proposals').delete().eq('id', project.id);
-      if (error) throw error;
+      if (rpcErr || (rpcRes && !rpcRes.success)) {
+        await supabase.from('project_volunteers').delete().eq('project_id', project.id);
+        const { error } = await supabase.from('project_proposals').delete().eq('id', project.id);
+        if (error) throw error;
+      }
 
-      alert(`Proposal "${project.project_title}" has been deleted.`);
+      await alert({
+        title: 'Proposal Deleted',
+        message: `Proposal "${project.project_title}" has been deleted.`,
+        variant: 'success',
+      });
       onDeleted();
       onClose();
     } catch (err: any) {
-      alert(`Failed to delete proposal: ${err.message}`);
+      await alert({
+        title: 'Delete Failed',
+        message: `Failed to delete proposal: ${err.message}`,
+        variant: 'danger',
+      });
     } finally {
       setDeleting(false);
     }

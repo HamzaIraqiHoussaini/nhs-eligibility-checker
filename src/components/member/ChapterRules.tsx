@@ -128,10 +128,10 @@ export const ChapterRules: React.FC = () => {
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', gridColumn: '1 / -1' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <Clock size={16} color="var(--color-gold)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Annual Cap: Maximum 4 Projects Led per Year</strong>
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Project Cap: Max 2 Projects / Semester (4 Projects / Year)</strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                A member may lead a maximum of <strong>4 projects a year</strong>. At least one of them <strong>has to be service-based</strong> (including yearly projects).
+                A member may lead a maximum of <strong>2 projects per semester</strong>, totaling a maximum cap of <strong>4 projects per year</strong>. At least one of them <strong>has to be service-based</strong> (including yearly projects).
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { AuthModal } from './components/auth/AuthModal';
 import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
 import { MemberDashboard } from './components/member/MemberDashboard';
@@ -121,7 +122,7 @@ function PortalContent() {
             onClick={() => setActiveTab('screener')}
           >
             <CheckCircle2 size={16} />
-            <span>{isLeadership || isSupervisor ? 'Report Card Auditor' : 'Verify My Report Card'}</span>
+            <span>{isLeadership || isSupervisor ? 'Academic Eligibility' : 'Check My Eligibility'}</span>
           </button>
 
           <button
@@ -144,7 +145,7 @@ function PortalContent() {
                 onClick={() => setActiveTab('review')}
               >
                 <ClipboardCheck size={16} />
-                <span>Review Desk</span>
+                <span>Project Reviews</span>
               </button>
 
               <button
@@ -180,7 +181,7 @@ function PortalContent() {
                 onClick={() => setActiveTab('roster')}
               >
                 <Users size={16} />
-                <span>Member Roster</span>
+                <span>Chapter Members</span>
               </button>
 
               {isLeadership && (
@@ -318,7 +319,9 @@ function PortalContent() {
 export function App() {
   return (
     <AuthProvider>
-      <PortalContent />
+      <ConfirmProvider>
+        <PortalContent />
+      </ConfirmProvider>
     </AuthProvider>
   );
 }

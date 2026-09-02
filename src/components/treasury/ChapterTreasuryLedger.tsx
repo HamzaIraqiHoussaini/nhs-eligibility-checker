@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { ChapterFundEntry, ChapterTreasurySummary } from '../../types/nhs';
 import { Coins, Trash2, X, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -8,6 +9,7 @@ const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '202
 
 export const ChapterTreasuryLedger: React.FC = () => {
   const { isLeadership, isSupervisor } = useAuth();
+  const { confirm, alert } = useConfirm();
   const canManage = isLeadership || isSupervisor;
 
   const [availableYears, setAvailableYears] = useState<string[]>(ACADEMIC_YEARS);
@@ -159,7 +161,11 @@ export const ChapterTreasuryLedger: React.FC = () => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
-      alert('Please enter a valid positive numeric amount.');
+      await alert({
+        title: 'Invalid Amount',
+        message: 'Please enter a valid positive numeric amount.',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -182,20 +188,34 @@ export const ChapterTreasuryLedger: React.FC = () => {
       await loadTreasuryData(selectedYear);
     } catch (err: any) {
       console.error('Failed saving entry:', err);
-      alert(err.message || 'Failed to save record.');
+      await alert({
+        title: 'Save Failed',
+        message: err.message || 'Failed to save record.',
+        variant: 'danger',
+      });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteEntry = async (id: string, name: string) => {
-    if (!confirm(`Delete funding line for ${name}?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Funding Line',
+      message: `Are you sure you want to delete the financial line for "${name}"?`,
+      confirmText: 'Delete Line',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       const { error } = await supabase.from('chapter_funds').delete().eq('id', id);
       if (error) throw error;
       await loadTreasuryData(selectedYear);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete record.');
+      await alert({
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete record.',
+        variant: 'danger',
+      });
     }
   };
 
@@ -213,7 +233,11 @@ export const ChapterTreasuryLedger: React.FC = () => {
       setIsBaselineOpen(false);
       await loadTreasuryData(selectedYear);
     } catch (err: any) {
-      alert(err.message || 'Failed to update treasury baseline.');
+      await alert({
+        title: 'Baseline Update Failed',
+        message: err.message || 'Failed to update treasury baseline.',
+        variant: 'danger',
+      });
     } finally {
       setSaving(false);
     }

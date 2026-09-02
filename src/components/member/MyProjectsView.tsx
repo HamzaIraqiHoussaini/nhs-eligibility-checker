@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, Semester } from '../../types/nhs';
 import { ProjectProposalForm } from './ProjectProposalForm';
 import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
@@ -31,6 +32,7 @@ function projectHasMonetaryCosts(project: ProjectProposal): boolean {
 
 export const MyProjectsView: React.FC = () => {
   const { user, isRestricted } = useAuth();
+  const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [allApprovedProjects, setAllApprovedProjects] = useState<ProjectProposal[]>([]);
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
@@ -122,28 +124,48 @@ export const MyProjectsView: React.FC = () => {
 
     // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected)
     if (project.status === 'approved' || project.status === 'completed') {
-      alert('Approved proposals cannot be deleted as they are finalized chapter projects.');
+      await alert({
+        title: 'Action Restricted',
+        message: 'Approved proposals cannot be deleted as they are finalized chapter projects.',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (
-      !confirm(
-        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete proposal "${project.project_title}"?\n\nThis action cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete Project Proposal',
+      message: `Are you sure you want to permanently delete proposal "${project.project_title}"?`,
+      details: 'This will remove the proposal and any associated signups. This action cannot be undone.',
+      confirmText: 'Delete Proposal',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
-      await supabase.from('project_volunteers').delete().eq('project_id', project.id);
-      const { error } = await supabase.from('project_proposals').delete().eq('id', project.id);
-      if (error) throw error;
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_project_proposal', {
+        p_id: project.id,
+      });
 
-      alert(`Proposal "${project.project_title}" has been permanently deleted.`);
+      if (rpcErr || (rpcRes && !rpcRes.success)) {
+        await supabase.from('project_volunteers').delete().eq('project_id', project.id);
+        const { error: delErr } = await supabase.from('project_proposals').delete().eq('id', project.id);
+        if (delErr) throw delErr;
+      }
+
+      await alert({
+        title: 'Proposal Deleted',
+        message: `Proposal "${project.project_title}" has been deleted.`,
+        variant: 'success',
+      });
       if (selectedProject?.id === project.id) setSelectedProject(null);
       await loadData();
     } catch (err: any) {
-      alert(`Failed to delete proposal: ${err.message}`);
+      await alert({
+        title: 'Delete Failed',
+        message: `Failed to delete proposal: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 
@@ -175,9 +197,17 @@ export const MyProjectsView: React.FC = () => {
       if (updateError) throw updateError;
 
       await loadData();
-      alert('Proof of purchase (receipt) uploaded successfully. Chapter Leadership will review it.');
+      await alert({
+        title: 'Receipt Submitted',
+        message: 'Proof of purchase (receipt) uploaded successfully. Chapter Leadership will review it.',
+        variant: 'success',
+      });
     } catch (err: any) {
-      alert(err.message || 'Failed to upload receipt.');
+      await alert({
+        title: 'Upload Failed',
+        message: err.message || 'Failed to upload receipt.',
+        variant: 'danger',
+      });
     } finally {
       setUploadingReceiptId(null);
     }

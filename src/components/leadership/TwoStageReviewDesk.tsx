@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
 import {
   CheckCircle2,
@@ -23,6 +24,7 @@ function projectHasMonetaryCosts(project: ProjectProposal): boolean {
 
 export const TwoStageReviewDesk: React.FC = () => {
   const { user, profile, isLeadership, isSupervisor } = useAuth();
+  const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProjectProposal | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
@@ -107,13 +109,21 @@ export const TwoStageReviewDesk: React.FC = () => {
 
       if (error) throw error;
 
-      alert(`Proof of purchase receipt has been marked as ${status}.`);
+      await alert({
+        title: 'Receipt Status Updated',
+        message: `Proof of purchase receipt has been marked as ${status}.`,
+        variant: 'success',
+      });
       setReceiptFeedback('');
       await loadProposals();
       // Update selected
       setSelectedProposal((prev) => (prev ? { ...prev, receipt_status: status, receipt_notes: receiptFeedback.trim() } : null));
     } catch (err: any) {
-      alert(err.message || 'Failed updating receipt status.');
+      await alert({
+        title: 'Action Failed',
+        message: err.message || 'Failed updating receipt status.',
+        variant: 'danger',
+      });
     } finally {
       setActionLoading(false);
     }
@@ -147,7 +157,11 @@ export const TwoStageReviewDesk: React.FC = () => {
       setSelectedProposal({ ...selectedProposal, comments: updatedComments });
       await loadProposals();
     } catch (err: any) {
-      alert(`Failed to add comment: ${err.message}`);
+      await alert({
+        title: 'Comment Failed',
+        message: `Failed to add comment: ${err.message}`,
+        variant: 'danger',
+      });
     } finally {
       setSubmittingComment(false);
     }
@@ -155,21 +169,46 @@ export const TwoStageReviewDesk: React.FC = () => {
 
   const handleDeleteProposal = async (proposal: ProjectProposal) => {
     if (proposal.status === 'approved' || proposal.status === 'completed') {
-      alert('Approved proposals cannot be deleted as they are finalized chapter projects.');
+      await alert({
+        title: 'Action Restricted',
+        message: 'Approved proposals cannot be deleted as they are finalized chapter projects.',
+        variant: 'warning',
+      });
       return;
     }
-    if (!confirm(`Are you sure you want to permanently delete proposal "${proposal.project_title}"? This cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete Proposal',
+      message: `Are you sure you want to permanently delete proposal "${proposal.project_title}"?`,
+      details: 'This will completely remove the proposal and cannot be undone.',
+      confirmText: 'Delete Proposal',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
     try {
-      await supabase.from('project_volunteers').delete().eq('project_id', proposal.id);
-      const { error } = await supabase.from('project_proposals').delete().eq('id', proposal.id);
-      if (error) throw error;
-      alert(`Proposal "${proposal.project_title}" has been deleted.`);
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_project_proposal', {
+        p_id: proposal.id,
+      });
+
+      if (rpcErr || (rpcRes && !rpcRes.success)) {
+        await supabase.from('project_volunteers').delete().eq('project_id', proposal.id);
+        const { error } = await supabase.from('project_proposals').delete().eq('id', proposal.id);
+        if (error) throw error;
+      }
+
+      await alert({
+        title: 'Proposal Deleted',
+        message: `Proposal "${proposal.project_title}" has been deleted.`,
+        variant: 'success',
+      });
       setSelectedProposal(null);
       await loadProposals();
     } catch (err: any) {
-      alert(`Failed to delete proposal: ${err.message}`);
+      await alert({
+        title: 'Delete Failed',
+        message: `Failed to delete proposal: ${err.message}`,
+        variant: 'danger',
+      });
     }
   };
 

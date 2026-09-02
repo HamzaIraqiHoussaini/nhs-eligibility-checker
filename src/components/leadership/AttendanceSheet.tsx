@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { Meeting, Profile, AttendanceStatus } from '../../types/nhs';
 import {
   Calendar as CalendarIcon,
@@ -52,6 +53,7 @@ interface MeetingSummary {
 
 export const AttendanceSheet: React.FC = () => {
   const { user } = useAuth();
+  const { alert } = useConfirm();
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -248,7 +250,11 @@ export const AttendanceSheet: React.FC = () => {
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
       console.error('Failed saving attendance:', err);
-      alert(err.message || 'Failed to save attendance records.');
+      await alert({
+        title: 'Save Error',
+        message: err.message || 'Failed to save attendance records.',
+        variant: 'danger',
+      });
     } finally {
       setSaving(false);
     }

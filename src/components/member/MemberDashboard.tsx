@@ -31,23 +31,27 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         setActiveSemesterName(activeSem.name);
       }
 
-      // 1. Project count (overall and active semester)
+      // 1. Project count (overall proposed and active semester led)
       const { data: userProposals } = await supabase
         .from('project_proposals')
-        .select('id, semester_id, event_date')
+        .select('id, semester_id, event_date, status')
         .or(`creator_id.eq.${user.id},co_leader_emails.cs.{${user.email}}`);
       
-      const allLed = userProposals || [];
-      setProjectCount(allLed.length);
+      const allProposals = userProposals || [];
+      setProjectCount(allProposals.length);
+
+      const approvedProjects = allProposals.filter((p: any) =>
+        p.status === 'approved' || p.status === 'completed'
+      );
 
       if (activeSem) {
-        const semLed = allLed.filter((p: any) =>
+        const semLed = approvedProjects.filter((p: any) =>
           p.semester_id === activeSem.id ||
           (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
         );
         setSemesterProjectsLed(semLed.length);
       } else {
-        setSemesterProjectsLed(allLed.length);
+        setSemesterProjectsLed(approvedProjects.length);
       }
 
       // 2. Volunteer count (overall and active semester)
@@ -283,8 +287,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Projects Led</div>
-          <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} total)</span></div>
-          <div className="kpi-subtext">Min 1 / sem • Max 4 / year</div>
+          <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} proposed)</span></div>
+          <div className="kpi-subtext">Approved & led this sem • Max 2 / sem</div>
         </div>
 
         <div className="kpi-card">
@@ -306,9 +310,9 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-label">Annual Project Cap</div>
+          <div className="kpi-label">Chapter Project Cap</div>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
-            Max 4 Led / Year
+            Max 2 / Sem • 4 / Yr
           </div>
           <div className="kpi-subtext">At least 1 must be service-based</div>
         </div>

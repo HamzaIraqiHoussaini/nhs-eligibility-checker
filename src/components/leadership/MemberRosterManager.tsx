@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
 import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2 } from 'lucide-react';
@@ -9,6 +10,7 @@ const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
 export const MemberRosterManager: React.FC = () => {
   const { user, isLeadership } = useAuth();
+  const { confirm, alert } = useConfirm();
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,10 +44,15 @@ export const MemberRosterManager: React.FC = () => {
 
       const { data: allProposals } = await supabase
         .from('project_proposals')
-        .select('id, creator_id, co_leader_emails, semester_id, event_date');
+        .select('id, creator_id, co_leader_emails, semester_id, event_date, status');
       
       const semProposals = (allProposals || []).filter((p: any) =>
         !activeSem || p.semester_id === activeSem.id || (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+      );
+
+      // Only approved or completed proposals count towards 'Led' quota
+      const semApprovedLedProposals = semProposals.filter((p: any) =>
+        p.status === 'approved' || p.status === 'completed'
       );
       const semProposalIds = semProposals.map((p: any) => p.id);
 
@@ -60,7 +67,7 @@ export const MemberRosterManager: React.FC = () => {
 
       const map: Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }> = {};
       for (const m of mems) {
-        const ledCount = semProposals.filter((p: any) =>
+        const ledCount = semApprovedLedProposals.filter((p: any) =>
           p.creator_id === m.id || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.includes(m.email))
         ).length;
         const volCount = semVolunteers.filter((v: any) => v.user_id === m.id).length;
@@ -89,13 +96,19 @@ export const MemberRosterManager: React.FC = () => {
     const willBeRestricted = isAlreadyOnProbation;
     const newCount = isAlreadyOnProbation ? 2 : 1;
 
-    const confirmPrompt = willBeRestricted
-      ? `CHAPTER DISMISSAL CONFIRMATION:\n\nAre you sure you want to issue a 2nd probation to ${probationTarget.full_name} (${probationTarget.email}) and kick them out of CAS NHS?\n\nThis action will immediately restrict their portal account and revoke their chapter membership pursuant to Chapter Bylaw Section 5.1.`
-      : `PROBATION CONFIRMATION:\n\nAre you sure you want to place ${probationTarget.full_name} (${probationTarget.email}) on Chapter Probation #1?\n\nCategory: ${(probationReason || 'grades').toUpperCase()}`;
+    const confirmed = await confirm({
+      title: willBeRestricted ? 'Chapter Dismissal Confirmation' : 'Issue Chapter Probation',
+      message: willBeRestricted
+        ? `Are you sure you want to issue a 2nd probation to ${probationTarget.full_name} (${probationTarget.email}) and dismiss them from CAS NHS?`
+        : `Are you sure you want to place ${probationTarget.full_name} (${probationTarget.email}) on Chapter Probation #1?`,
+      details: willBeRestricted
+        ? 'This action will immediately restrict their portal account and revoke their chapter membership pursuant to Chapter Bylaw Section 4.'
+        : `Category: ${(probationReason || 'grades').toUpperCase()}`,
+      confirmText: willBeRestricted ? 'Dismiss & Restrict' : 'Issue Probation',
+      variant: willBeRestricted ? 'danger' : 'warning',
+    });
 
-    if (!confirm(confirmPrompt)) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -126,26 +139,28 @@ export const MemberRosterManager: React.FC = () => {
       setProbationTarget(null);
       setProbationNotes('');
       await loadMembers();
-      alert(
+      await alert(
         willBeRestricted
           ? `${probationTarget.full_name} has received a 2nd probation and has been dismissed from CAS NHS.`
           : `${probationTarget.full_name} has been placed on Probation #1.`
       );
     } catch (err: any) {
       console.error('Failed to issue probation:', err);
-      alert(`Failed to issue probation: ${err.message}`);
+      await alert(`Failed to issue probation: ${err.message}`);
     }
   };
 
   const handleClearProbation = async (member: Profile) => {
     if (!isLeadership) return;
-    if (
-      !confirm(
-        `RESTORE GOOD STANDING CONFIRMATION:\n\nAre you sure you want to remove the probation from ${member.full_name} (${member.email}) and restore them to Good Standing?\n\nThis will clear their probation status and reset their probation record.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Restore Good Standing',
+      message: `Are you sure you want to remove the probation from ${member.full_name} (${member.email}) and restore them to Good Standing?`,
+      details: 'This will clear their probation status and reset their probation count.',
+      confirmText: 'Restore Good Standing',
+      variant: 'success',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -161,31 +176,33 @@ export const MemberRosterManager: React.FC = () => {
 
       if (error) throw error;
       await loadMembers();
-      alert(`Probation cancelled for ${member.full_name}. Member is in Good Standing.`);
+      await alert(`Probation cancelled for ${member.full_name}. Member is in Good Standing.`);
     } catch (err: any) {
       console.error('Failed to clear probation:', err);
-      alert(`Failed to cancel probation: ${err.message}`);
+      await alert(`Failed to cancel probation: ${err.message}`);
     }
   };
 
   const handleDeleteMember = async (member: Profile) => {
     if (!isSuperadmin) {
-      alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can delete accounts.');
+      await alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can delete accounts.');
       return;
     }
 
     if (member.email.toLowerCase() === SUPERADMIN_EMAIL) {
-      alert('Cannot delete the primary Chapter Superadmin account.');
+      await alert('Cannot delete the primary Chapter Superadmin account.');
       return;
     }
 
-    if (
-      !confirm(
-        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete ${member.full_name} (${member.email})?\n\nThis will completely purge their credentials, profile, and attendance records. This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Permanently Delete Member Account',
+      message: `Are you sure you want to permanently delete ${member.full_name} (${member.email})?`,
+      details: 'This will completely purge their credentials, profile, and attendance records from CAS NHS. This action cannot be undone.',
+      confirmText: 'Permanently Delete',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error: rpcErr } = await supabase.rpc('delete_member_account', {
@@ -197,9 +214,9 @@ export const MemberRosterManager: React.FC = () => {
       }
 
       await loadMembers();
-      alert(`Account ${member.email} has been permanently deleted.`);
+      await alert(`Account ${member.email} has been permanently deleted.`);
     } catch (err: any) {
-      alert(`Failed to delete account: ${err.message}`);
+      await alert(`Failed to delete account: ${err.message}`);
     }
   };
 
@@ -210,6 +227,8 @@ export const MemberRosterManager: React.FC = () => {
         return false;
       }
     }
+    // Active members only for 'all': exclude dismissed/restricted members
+    if (statusFilter === 'all' && m.is_restricted) return false;
     if (statusFilter === 'good' && (m.is_on_probation || m.is_restricted)) return false;
     if (statusFilter === 'probation' && (!m.is_on_probation || m.is_restricted)) return false;
     if (statusFilter === 'quota_deficit' && (m.is_restricted || participationMap[m.id]?.meetsQuota)) return false;
@@ -217,6 +236,7 @@ export const MemberRosterManager: React.FC = () => {
     return true;
   });
 
+  const activeMembersCount = members.filter(m => !m.is_restricted).length;
   const deficitCount = members.filter(m => !m.is_restricted && !(participationMap[m.id]?.meetsQuota)).length;
 
   return (
@@ -225,14 +245,14 @@ export const MemberRosterManager: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          Chapter Roster & Accountability
+          CAS NHS Chapter
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-          Member Roster & Standing Manager
+          Chapter Members & Standing
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-          Click any member to inspect their volunteering count and led projects.
-          {!isLeadership && ' (Note: Probation decisions are restricted to Leadership accounts)'}
+          Review active chapter members, standing, semester participation quotas, and account status.
+          {!isLeadership && ' (Note: Standing modifications are restricted to Leadership accounts)'}
         </p>
       </div>
 
@@ -243,7 +263,7 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter('all')}
           >
-            All Members ({members.length})
+            All Active Members ({activeMembersCount})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'good' ? 'active' : ''}`}
