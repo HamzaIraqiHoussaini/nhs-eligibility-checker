@@ -181,7 +181,19 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
         <div className="drawer-body">
           
           {/* Standing Callout */}
-          {member.role === 'graduate' ? (
+          {member.role === 'past_leadership' ? (
+            <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Award size={24} color="#6D28D9" />
+              <div>
+                <div style={{ fontWeight: 700, color: '#6D28D9', fontSize: '0.92rem' }}>
+                  National Honor Society Past Leadership
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#5B21B6', marginTop: '0.2rem' }}>
+                  This officer has completed their executive leadership service and graduated with chapter honors.
+                </div>
+              </div>
+            </div>
+          ) : member.role === 'graduate' ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Award size={24} color="#6D28D9" />
               <div>
@@ -233,6 +245,18 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
 
           {/* Semester Participation Audit Banner */}
           {(() => {
+            const isOfficer = member.role === 'leadership' || member.role === 'supervisor';
+            if (isOfficer) {
+              return (
+                <div style={{ padding: '0.85rem 1rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.82rem', color: 'var(--color-oxford)' }}>
+                  <strong>Chapter Officer:</strong> Exempt from semester project leadership and volunteering quotas per Chapter Rules.
+                </div>
+              );
+            }
+            if (member.role === 'graduate' || member.role === 'past_leadership') {
+              return null;
+            }
+
             const semLed = activeSemester
               ? ledProjects.filter(p => p.semester_id === activeSemester.id || (p.event_date >= activeSemester.start_date && p.event_date <= activeSemester.end_date)).length
               : ledProjects.length;

@@ -252,22 +252,22 @@ export const MemberRosterManager: React.FC = () => {
     }
     // Dismissed filter: strictly only restricted members
     if (statusFilter === 'restricted') return m.is_restricted;
-    // Graduates filter: strictly only graduate members
-    if (statusFilter === 'graduates') return m.role === 'graduate';
+    // Graduates filter: graduate members and past leadership
+    if (statusFilter === 'graduates') return m.role === 'graduate' || m.role === 'past_leadership';
 
     // For all other active member filters: exclude dismissed and graduates
-    if (m.is_restricted || m.role === 'graduate') return false;
+    if (m.is_restricted || m.role === 'graduate' || m.role === 'past_leadership') return false;
 
     if (statusFilter === 'all') return true;
     if (statusFilter === 'good') return !m.is_on_probation;
     if (statusFilter === 'probation') return m.is_on_probation;
-    if (statusFilter === 'quota_deficit') return !participationMap[m.id]?.meetsQuota;
+    if (statusFilter === 'quota_deficit') return m.role !== 'leadership' && m.role !== 'supervisor' && !participationMap[m.id]?.meetsQuota;
     return true;
   });
 
-  const activeMembersCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate').length;
-  const graduatesCount = members.filter((m) => m.role === 'graduate').length;
-  const deficitCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && !(participationMap[m.id]?.meetsQuota)).length;
+  const activeMembersCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length;
+  const graduatesCount = members.filter((m) => m.role === 'graduate' || m.role === 'past_leadership').length;
+  const deficitCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership' && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -299,13 +299,13 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'good' ? 'active' : ''}`}
             onClick={() => setStatusFilter('good')}
           >
-            Good Standing ({members.filter((m) => !m.is_on_probation && !m.is_restricted && m.role !== 'graduate').length})
+            Good Standing ({members.filter((m) => !m.is_on_probation && !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'probation' ? 'active' : ''}`}
             onClick={() => setStatusFilter('probation')}
           >
-            On Probation ({members.filter((m) => m.is_on_probation && !m.is_restricted && m.role !== 'graduate').length})
+            On Probation ({members.filter((m) => m.is_on_probation && !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'quota_deficit' ? 'active' : ''}`}
@@ -318,7 +318,7 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'graduates' ? 'active' : ''}`}
             onClick={() => setStatusFilter('graduates')}
           >
-            Graduates ({graduatesCount})
+            Alumni & Graduates ({graduatesCount})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'restricted' ? 'active' : ''}`}
@@ -328,49 +328,49 @@ export const MemberRosterManager: React.FC = () => {
           </button>
         </div>
 
-        <div className="search-input-wrapper">
+        <div className="search-box">
           <Search size={16} />
           <input
             type="text"
-            className="search-input"
-            placeholder="Search by student name or email..."
+            placeholder="Search member by name or email..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
       {/* Roster Table */}
-      <div className="roster-table-wrapper">
-        <table className="roster-table">
-          <thead>
-            <tr>
-              <th>Member Name</th>
-              <th>Grade</th>
-              <th>Chapter Role</th>
-              <th>Standing & Probations</th>
-              <th>Semester Quota ({activeSemester?.name || 'Active'})</th>
-              <th style={{ textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <div className="sharp-card" style={{ overflow: 'hidden' }}>
+        <div className="table-responsive">
+          <table className="roster-table">
+            <thead>
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  Loading member roster...
-                </td>
+                <th>Member</th>
+                <th>Grade Level</th>
+                <th>Role</th>
+                <th>Chapter Standing</th>
+                <th>Semester Participation</th>
+                <th>Actions</th>
               </tr>
-            ) : filteredMembers.length === 0 ? (
-              <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  No members matched the filter.
-                </td>
-              </tr>
-            ) : (
-              filteredMembers.map(member => {
-                const part = participationMap[member.id] || { ledCount: 0, volCount: 0, meetsQuota: false };
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    Loading member roster...
+                  </td>
+                </tr>
+              ) : filteredMembers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    No members matched the filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredMembers.map(member => {
+                  const part = participationMap[member.id] || { ledCount: 0, volCount: 0, meetsQuota: false };
 
-                return (
+                  return (
                 <tr
                   key={member.id}
                   style={{ cursor: 'pointer' }}
@@ -381,7 +381,7 @@ export const MemberRosterManager: React.FC = () => {
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{member.email}</div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {isLeadership && !member.is_restricted && member.role !== 'graduate' ? (
+                    {isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
                       <select
                         value={member.grade_level || 11}
                         onChange={(e) => handleUpdateGrade(member, Number(e.target.value))}
@@ -405,12 +405,16 @@ export const MemberRosterManager: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    <span className="grade-badge" style={{ textTransform: 'capitalize', backgroundColor: member.role === 'graduate' ? '#EDE9FE' : undefined, color: member.role === 'graduate' ? '#6D28D9' : undefined }}>
-                      {member.role}
+                    <span className="grade-badge" style={{ textTransform: 'capitalize', backgroundColor: (member.role === 'graduate' || member.role === 'past_leadership') ? '#EDE9FE' : undefined, color: (member.role === 'graduate' || member.role === 'past_leadership') ? '#6D28D9' : undefined }}>
+                      {member.role === 'past_leadership' ? 'Past Leadership' : member.role}
                     </span>
                   </td>
                   <td>
-                    {member.role === 'graduate' ? (
+                    {member.role === 'past_leadership' ? (
+                      <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
+                        <Award size={12} /> Past Leadership
+                      </span>
+                    ) : member.role === 'graduate' ? (
                       <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
                         <Award size={12} /> NHS Graduate
                       </span>
@@ -429,8 +433,10 @@ export const MemberRosterManager: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    {member.role === 'graduate' ? (
+                    {member.role === 'graduate' || member.role === 'past_leadership' ? (
                       <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated</span>
+                    ) : member.role === 'leadership' || member.role === 'supervisor' ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Officer)</span>
                     ) : member.is_restricted ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
                     ) : part.meetsQuota ? (
@@ -507,6 +513,7 @@ export const MemberRosterManager: React.FC = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Member Profile Drawer */}

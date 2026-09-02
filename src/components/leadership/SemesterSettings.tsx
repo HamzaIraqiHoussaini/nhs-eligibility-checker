@@ -876,7 +876,7 @@ export const SemesterSettings: React.FC = () => {
                   <div className="kpi-card" style={{ padding: '0.85rem' }}>
                     <div className="kpi-label">Graduating Seniors</div>
                     <div className="kpi-value" style={{ fontSize: '1.4rem', color: '#6D28D9' }}>
-                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'graduate' || m.action_type === 'graduate_with_probation').length}
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'graduate' || m.action_type === 'graduate_with_probation' || m.action_type === 'graduate_past_leadership').length}
                     </div>
                   </div>
                 </div>
@@ -912,7 +912,11 @@ export const SemesterSettings: React.FC = () => {
                                 : `${m.led_count} / 1 Led • ${m.vol_count} / 2 Vol`}
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
-                              {m.action_type === 'exempt' ? (
+                              {m.action_type === 'graduate_past_leadership' ? (
+                                <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE', fontSize: '0.72rem' }}>
+                                  <Award size={11} /> Past Leadership
+                                </span>
+                              ) : m.action_type === 'exempt' ? (
                                 <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', border: '1px solid #BFDBFE', fontSize: '0.72rem' }}>
                                   <ShieldCheck size={11} /> Officer (Exempt)
                                 </span>
