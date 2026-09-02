@@ -236,6 +236,44 @@ export const AllowlistManager: React.FC = () => {
     }
   };
 
+  // Permanent Account Deletion (Superadmin only)
+  const handlePermanentlyDeleteAccount = async (targetEmail: string) => {
+    if (!isSuperadmin) {
+      alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can permanently delete accounts.');
+      return;
+    }
+
+    if (targetEmail.toLowerCase() === SUPERADMIN_EMAIL) {
+      alert('The primary Superadmin account cannot be deleted.');
+      return;
+    }
+
+    if (
+      !confirm(
+        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete ${targetEmail}?\n\nThis will completely erase the user credentials, profile, and allowlist records from the CAS NHS system. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_member_account', {
+        target_email: targetEmail,
+      });
+
+      if (rpcErr) {
+        // Direct delete fallback
+        await supabase.from('allowlist').delete().eq('email', targetEmail);
+        await supabase.from('profiles').delete().eq('email', targetEmail);
+      }
+
+      await loadAllowlist();
+      alert(`Account ${targetEmail} has been permanently deleted from CAS NHS.`);
+    } catch (err: any) {
+      alert(`Failed to delete account: ${err.message}`);
+    }
+  };
+
   const handleCopyCode = () => {
     if (!revealData) return;
     navigator.clipboard.writeText(revealData.code);
@@ -474,7 +512,19 @@ export const AllowlistManager: React.FC = () => {
                               style={{ color: 'var(--color-terracotta)' }}
                               onClick={() => handleArchiveAccount(item.email, item.role === 'leadership' ? 'past_leadership' : 'kicked_out')}
                             >
-                              <Trash2 size={12} /> {item.role === 'leadership' ? 'Demote to Past Leader' : 'Dismiss / Kick Out'}
+                              {item.role === 'leadership' ? 'Demote to Past Leader' : 'Dismiss / Kick Out'}
+                            </button>
+                          )}
+
+                          {/* Permanent Delete for Superadmin */}
+                          {isSuperadmin && item.email.toLowerCase() !== SUPERADMIN_EMAIL && (
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', fontWeight: 700 }}
+                              title="Permanently erase account from system (Superadmin exclusive)"
+                              onClick={() => handlePermanentlyDeleteAccount(item.email)}
+                            >
+                              <Trash2 size={12} /> Delete Account
                             </button>
                           )}
                         </div>
@@ -504,14 +554,27 @@ export const AllowlistManager: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="btn-inspect"
-                        style={{ color: 'var(--color-sage-text)' }}
-                        onClick={() => handleRestoreAccount(item.email)}
-                        title="Restore account back to active member standing"
-                      >
-                        <RotateCcw size={12} /> Restore Account
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <button
+                          className="btn-inspect"
+                          style={{ color: 'var(--color-sage-text)' }}
+                          onClick={() => handleRestoreAccount(item.email)}
+                          title="Restore account back to active member standing"
+                        >
+                          <RotateCcw size={12} /> Restore Account
+                        </button>
+
+                        {isSuperadmin && item.email.toLowerCase() !== SUPERADMIN_EMAIL && (
+                          <button
+                            className="btn-inspect"
+                            style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', fontWeight: 700 }}
+                            onClick={() => handlePermanentlyDeleteAccount(item.email)}
+                            title="Permanently purge archived account from database (Superadmin exclusive)"
+                          >
+                            <Trash2 size={12} /> Delete Permanently
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

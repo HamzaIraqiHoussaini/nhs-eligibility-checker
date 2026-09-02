@@ -3,10 +3,13 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { Profile, ProbationReason } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2 } from 'lucide-react';
+
+const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
 export const MemberRosterManager: React.FC = () => {
-  const { isLeadership } = useAuth();
+  const { user, isLeadership } = useAuth();
+  const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'restricted'>('all');
@@ -85,6 +88,42 @@ export const MemberRosterManager: React.FC = () => {
       await loadMembers();
     } catch (err) {
       console.error('Failed to clear probation:', err);
+    }
+  };
+
+  const handleDeleteMember = async (member: Profile) => {
+    if (!isSuperadmin) {
+      alert('Permission denied: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can delete accounts.');
+      return;
+    }
+
+    if (member.email.toLowerCase() === SUPERADMIN_EMAIL) {
+      alert('Cannot delete the primary Chapter Superadmin account.');
+      return;
+    }
+
+    if (
+      !confirm(
+        `PERMANENT DELETION WARNING:\n\nAre you sure you want to permanently delete ${member.full_name} (${member.email})?\n\nThis will completely purge their credentials, profile, and attendance records. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error: rpcErr } = await supabase.rpc('delete_member_account', {
+        target_email: member.email,
+      });
+
+      if (rpcErr) {
+        await supabase.from('allowlist').delete().eq('email', member.email);
+        await supabase.from('profiles').delete().eq('id', member.id);
+      }
+
+      await loadMembers();
+      alert(`Account ${member.email} has been permanently deleted.`);
+    } catch (err: any) {
+      alert(`Failed to delete account: ${err.message}`);
     }
   };
 
@@ -243,6 +282,17 @@ export const MemberRosterManager: React.FC = () => {
                             <UserX size={12} /> Place on Probation
                           </button>
                         )
+                      )}
+
+                      {isSuperadmin && member.email.toLowerCase() !== SUPERADMIN_EMAIL && (
+                        <button
+                          className="btn-inspect"
+                          style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', fontWeight: 700 }}
+                          title="Permanently delete this account (Superadmin exclusive)"
+                          onClick={() => handleDeleteMember(member)}
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
                       )}
                     </div>
                   </td>
