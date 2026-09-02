@@ -45,6 +45,14 @@ export const MemberRosterManager: React.FC = () => {
     const newCount = probationTarget.probation_count + 1;
     const willBeRestricted = newCount >= 2;
 
+    const confirmPrompt = willBeRestricted
+      ? `CHAPTER DISMISSAL CONFIRMATION:\n\nAre you sure you want to issue a 2nd probation to ${probationTarget.full_name} (${probationTarget.email}) and kick them out of CAS NHS?\n\nThis action will immediately restrict their portal account and revoke their chapter membership pursuant to Chapter Bylaw Section 5.1.`
+      : `PROBATION CONFIRMATION:\n\nAre you sure you want to place ${probationTarget.full_name} (${probationTarget.email}) on Chapter Probation #1?\n\nCategory: ${(probationReason || 'grades').toUpperCase()}`;
+
+    if (!confirm(confirmPrompt)) {
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('profiles')
@@ -87,7 +95,13 @@ export const MemberRosterManager: React.FC = () => {
 
   const handleClearProbation = async (member: Profile) => {
     if (!isLeadership) return;
-    if (!confirm(`Cancel probation for ${member.full_name} and restore them to Good Standing?`)) return;
+    if (
+      !confirm(
+        `RESTORE GOOD STANDING CONFIRMATION:\n\nAre you sure you want to remove the probation from ${member.full_name} (${member.email}) and restore them to Good Standing?\n\nThis will clear their probation status and reset their probation record.`
+      )
+    ) {
+      return;
+    }
 
     try {
       const { error } = await supabase
