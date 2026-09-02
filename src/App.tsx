@@ -31,7 +31,6 @@ import {
   ShieldAlert,
   Key,
   Coins,
-  Globe,
 } from 'lucide-react';
 import './index.css';
 
@@ -396,19 +395,6 @@ function PortalContent() {
               )}
             </>
           )}
-
-          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-            <button
-              type="button"
-              className="stitch-nav-item"
-              onClick={() => navigateTo('home')}
-              style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}
-              title="Return to Casablanca American School public homepage"
-            >
-              <Globe size={15} />
-              <span>Public Homepage</span>
-            </button>
-          </div>
         </nav>
 
         {/* Sidebar Footer User Info */}
