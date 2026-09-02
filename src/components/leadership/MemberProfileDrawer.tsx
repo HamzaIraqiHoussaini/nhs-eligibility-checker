@@ -254,7 +254,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                 </div>
                 {!meetsQuota && (
                   <div style={{ fontSize: '0.72rem', color: '#92400E', marginTop: '0.4rem', fontStyle: 'italic' }}>
-                    *Bylaw: Members failing to lead at least 1 project and volunteer twice in a semester trigger Chapter Probation.
+                    *Rule: Members failing to lead at least 1 project and volunteer twice in a semester trigger Chapter Probation.
                   </div>
                 )}
               </div>

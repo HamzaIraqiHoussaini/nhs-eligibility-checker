@@ -169,7 +169,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               {profile?.restricted_reason || 'You have accumulated two probations, which violates official CAS NHS Chapter rules. Membership privileges and project proposal submissions are now locked.'}
             </p>
             <div style={{ fontSize: '0.78rem', color: '#7F1D1D' }}>
-              Please schedule a meeting with Ms. Laura Hayes (Chapter Advisor) or Chapter Leadership regarding your status.
+              Please schedule a meeting with the Chapter Faculty Advisor or Chapter Leadership regarding your status.
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
           <div>
             <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Bylaw Mandate • {activeSemesterName} Participation
+              Chapter Rules • {activeSemesterName} Participation
             </div>
             <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
               Semester Project & Volunteering Quota
@@ -299,7 +299,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
 
         {!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) && (
           <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
-            <strong>Chapter Bylaw Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead at least 1 project and volunteer twice) constitutes grounds for Chapter Probation.
+            <strong>Chapter Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead at least 1 project and volunteer twice) constitutes grounds for Chapter Probation.
           </div>
         )}
       </div>

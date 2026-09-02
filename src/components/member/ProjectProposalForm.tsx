@@ -29,7 +29,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   const [projectTitle, setProjectTitle] = useState(initialData?.project_title || '');
   const [leaders, setLeaders] = useState(initialData?.leaders || profile?.full_name || '');
   const [coLeaderEmails, setCoLeaderEmails] = useState(initialData?.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
-  const [advisorName, setAdvisorName] = useState(initialData?.advisor_name || 'Laura Hayes');
+  const [advisorName, setAdvisorName] = useState(initialData?.advisor_name || '');
   const [eventDate, setEventDate] = useState(initialData?.event_date || '');
   const [location, setLocation] = useState(initialData?.location || '');
   const [awards, setAwards] = useState(initialData?.awards || '');
@@ -48,7 +48,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setProjectTitle(initialData.project_title || '');
       setLeaders(initialData.leaders || profile?.full_name || '');
       setCoLeaderEmails(initialData.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
-      setAdvisorName(initialData.advisor_name || 'Laura Hayes');
+      setAdvisorName(initialData.advisor_name || '');
       setEventDate(initialData.event_date || '');
       setLocation(initialData.location || '');
       setAwards(initialData.awards || '');
@@ -62,7 +62,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setProjectTitle('');
       setLeaders(profile?.full_name || '');
       setCoLeaderEmails('');
-      setAdvisorName('Laura Hayes');
+      setAdvisorName('');
       setEventDate('');
       setLocation('');
       setAwards('');
@@ -212,7 +212,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
             {isEditing
               ? 'Update your proposal details. Saving changes will resubmit the proposal for leadership review.'
-              : 'Proposed to: NHS Leadership & Laura Hayes (NHS Advisor)'}
+              : 'Proposed to: NHS Leadership & Faculty Advisor'}
           </div>
         </div>
 
@@ -323,7 +323,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 type="text"
                 required
                 disabled={isLimitReached}
-                placeholder="e.g. Laura Hayes / Faculty Advisor"
+                placeholder="e.g. Faculty Advisor Name"
                 value={advisorName}
                 onChange={e => setAdvisorName(e.target.value)}
                 style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none' }}

@@ -102,7 +102,7 @@ export const MemberRosterManager: React.FC = () => {
         ? `Are you sure you want to issue a 2nd probation to ${probationTarget.full_name} (${probationTarget.email}) and dismiss them from CAS NHS?`
         : `Are you sure you want to place ${probationTarget.full_name} (${probationTarget.email}) on Chapter Probation #1?`,
       details: willBeRestricted
-        ? 'This action will immediately restrict their portal account and revoke their chapter membership pursuant to Chapter Bylaw Section 4.'
+        ? 'This action will immediately restrict their portal account and revoke their chapter membership pursuant to chapter rules.'
         : `Category: ${(probationReason || 'grades').toUpperCase()}`,
       confirmText: willBeRestricted ? 'Dismiss & Restrict' : 'Issue Probation',
       variant: willBeRestricted ? 'danger' : 'warning',

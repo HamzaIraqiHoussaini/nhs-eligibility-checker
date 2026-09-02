@@ -557,7 +557,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                 Designated Advisor
               </span>
               <strong style={{ fontSize: '0.92rem', color: 'var(--color-navy)' }}>
-                {project.advisor_name || 'Laura Hayes'}
+                {project.advisor_name || 'Faculty Advisor'}
               </strong>
             </div>
           </div>

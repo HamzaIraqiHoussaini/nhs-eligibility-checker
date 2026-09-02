@@ -127,13 +127,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               onClick={() => scrollToSection('requirements')}
               style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
             >
-              Requirements
-            </button>
-            <button
-              onClick={() => scrollToSection('projects')}
-              style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
-            >
-              Projects
+              Academic Requirements
             </button>
             <button
               onClick={() => scrollToSection('rules')}
@@ -225,8 +219,8 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   marginBottom: '2rem',
                 }}
               >
-                The Casablanca American School National Honor Society chapter recognizes students
-                who demonstrate excellence in academics, leadership, service, and character.
+                The Casablanca American School chapter of the National Honor Society recognizes students
+                who demonstrate distinction in academic achievement, leadership, community service, and character.
               </p>
 
               {/* Action Buttons */}
@@ -316,7 +310,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
             The Four Pillars of NHS
           </h2>
           <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
-            The principles that guide all Casablanca American School NHS members.
+            The four criteria required for induction and active membership.
           </p>
         </div>
 
@@ -334,7 +328,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 Scholarship
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Maintaining a 5.80+ GPA in Grade 10 and IB diploma courses (5.60+ for students taking 4 IB Higher Level courses).
+                Maintaining a minimum 5.80 GPA on the 7.00 scale (5.60 for students taking 4 IB Higher Level courses).
               </p>
             </div>
             <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-oxford)' }}>
@@ -355,7 +349,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 Leadership
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Taking initiative by proposing and leading community service projects each semester.
+                Taking initiative by proposing and leading community service projects during the semester.
               </p>
             </div>
             <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: '#B45309' }}>
@@ -376,7 +370,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 Service
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Actively participating and volunteering in peer projects and school community activities.
+                Volunteering in projects organized by other members throughout the school year.
               </p>
             </div>
             <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-sage-text)' }}>
@@ -397,7 +391,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 Character
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Exemplifying honesty, academic integrity, and positive conduct inside and outside the classroom.
+                Upholding school conduct standards, academic honesty, and positive citizenship.
               </p>
             </div>
             <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: '#6D28D9' }}>
@@ -412,13 +406,13 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
           <div style={{ marginBottom: '2.5rem' }}>
             <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-              Standards
+              Academic Standing
             </div>
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
               Academic Requirements
             </h2>
             <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
-              Grade requirements to be eligible for NHS and to maintain membership in good standing.
+              Official grade requirements from the chapter rules.
             </p>
           </div>
 
@@ -430,7 +424,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', textAlign: 'left' }}>
                     <th style={{ padding: '0.85rem' }}>Grade Level</th>
                     <th style={{ padding: '0.85rem' }}>GPA Requirement</th>
-                    <th style={{ padding: '0.85rem' }}>Details</th>
+                    <th style={{ padding: '0.85rem' }}>Rules</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -438,28 +432,28 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                     <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Grade 10</td>
                     <td style={{ padding: '0.85rem', fontWeight: 700 }}>5.80 / 7.00</td>
                     <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      Core academic subjects (PE & Design excluded). No AE or BE marks.
+                      Core academic courses only (PE & Design excluded). No AE or BE marks.
                     </td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
                     <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Grades 11 & 12 (IB)</td>
                     <td style={{ padding: '0.85rem', fontWeight: 700 }}>5.80 / 7.00</td>
                     <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      Calculated across 6 IB courses. Reduced to <strong>5.60</strong> if taking 4 IB Higher Level subjects.
+                      Calculated across 6 IB courses. Reduced to <strong>5.60</strong> if taking 4 IB Higher Level courses.
                     </td>
                   </tr>
                   <tr>
                     <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Conduct</td>
                     <td style={{ padding: '0.85rem', fontWeight: 700, color: 'var(--color-sage-text)' }}>Good Standing</td>
                     <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      No school disciplinary actions or academic dishonesty infractions.
+                      No school disciplinary actions or academic dishonesty.
                     </td>
                   </tr>
                 </tbody>
               </table>
 
               <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0', fontSize: '0.78rem', color: '#64748B' }}>
-                Grades are audited at the end of every semester report card period.
+                Academic standing is verified at each semester report card period.
               </div>
             </div>
 
@@ -478,18 +472,18 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               <div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.75rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '20px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-gold)', marginBottom: '1.25rem' }}>
                   <CheckCircle2 size={13} />
-                  <span>Eligibility Screener</span>
+                  <span>Academic Eligibility Screener</span>
                 </div>
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: '#FFFFFF', margin: '0 0 0.75rem' }}>
-                  Check Your Academic Eligibility
+                  Check Your Eligibility
                 </h3>
                 <p style={{ fontSize: '0.9rem', color: '#CBD5E1', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-                  Sign in with your CAS account to upload your report card or enter your semester marks into our automated screener.
+                  Sign in with your CAS account to access the screener tool. Upload your report card PDF or enter your marks to check your GPA against chapter rules.
                 </p>
                 <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0 1.5rem' }}>
-                  <li>Automatic grade calculation and course exclusions</li>
-                  <li>4 IB HL subject adjustments</li>
-                  <li>Instant eligibility check</li>
+                  <li>Calculates Grade 10 vs. IB Grade 11/12 scale</li>
+                  <li>Applies 4 IB Higher Level adjustment (5.60 threshold)</li>
+                  <li>Filters excluded courses (PE and Design)</li>
                 </ul>
               </div>
               <button
@@ -507,7 +501,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 onClick={() => handleAction('screener')}
               >
                 {!user && <Lock size={15} />}
-                <span>{user ? 'Launch Eligibility Screener' : 'Sign In to Check Eligibility'}</span>
+                <span>{user ? 'Open Eligibility Screener' : 'Sign In to Check Eligibility'}</span>
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -515,194 +509,100 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
         </div>
       </section>
 
-      {/* Projects */}
-      <section id="projects" style={{ padding: '4.5rem 1.5rem', maxWidth: '1280px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem', marginBottom: '2.5rem' }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-              Student Projects
-            </div>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
-              Recent Chapter Projects
-            </h2>
-          </div>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => handleAction('projects')}
-            style={{ fontSize: '0.85rem' }}
-          >
-            {!user && <Lock size={13} style={{ marginRight: '3px' }} />}
-            <span>View Project Hub</span>
-            <ArrowRight size={14} />
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {/* Project 1 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Peer Academic Tutoring
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.55 }}>
-                Regular study sessions providing support in IB Mathematics, Sciences, and Languages for fellow high school students.
-              </p>
-            </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0', fontSize: '0.8rem', color: '#64748B' }}>
-              Academic Year 2026–2027
-            </div>
-          </div>
-
-          {/* Project 2 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Coastal Clean-Up Initiative
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.55 }}>
-                Environmental service initiative focusing on shoreline waste removal and conservation along the Casablanca coast.
-              </p>
-            </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0', fontSize: '0.8rem', color: '#64748B' }}>
-              Environmental Service
-            </div>
-          </div>
-
-          {/* Project 3 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                School Supply & Book Drive
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.55 }}>
-                Collecting and distributing books, stationery, and learning materials to community schools.
-              </p>
-            </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0', fontSize: '0.8rem', color: '#64748B' }}>
-              Community Outreach
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Rules Section */}
-      <section id="rules" style={{ padding: '4.5rem 1.5rem', backgroundColor: '#FFFFFF', borderTop: '1px solid #E2E8F0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '2.5rem' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-              Chapter Guidelines
-            </div>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
-              Rules
-            </h2>
-            <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
-              Summary of key rules to maintain active membership in good standing.
+      <section id="rules" style={{ padding: '4.5rem 1.5rem', maxWidth: '1280px', margin: '0 auto' }}>
+        <div style={{ marginBottom: '2.5rem' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+            Chapter Rules
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
+            Rules to Maintain Membership
+          </h2>
+          <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
+            The official rules required to remain in good standing in the chapter.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              1. Academic Standing
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Maintain a minimum 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Levels).
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                1. Academic Standing
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Maintain a minimum 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Levels).
-              </p>
-            </div>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              2. Project Leadership
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Lead at least 1 approved project per semester, with a maximum cap of 2 projects per semester (4 per year).
+            </p>
+          </div>
 
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                2. Project Leadership
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Lead at least 1 approved project per semester, with a cap of max 2 projects per semester (4 per year).
-              </p>
-            </div>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              3. Volunteering
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Volunteer in at least 2 other members' projects each semester.
+            </p>
+          </div>
 
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                3. Volunteering
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Volunteer in at least 2 other members' projects each semester.
-              </p>
-            </div>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              4. Meeting Attendance
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Attend all general chapter meetings. More than 1 unexcused absence in a semester results in probation.
+            </p>
+          </div>
 
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                4. Meeting Attendance
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Attend all general chapter meetings. More than 1 unexcused absence results in probation.
-              </p>
-            </div>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              5. Probation & Dismissal
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Failing to meet academic or project requirements results in probation. Incurring 2 probations results in chapter dismissal.
+            </p>
+          </div>
 
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                5. Probation & Dismissal
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Failing to meet academic or project requirements results in probation. Incurring two probations results in dismissal.
-              </p>
-            </div>
-
-            <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#F8FAFC' }}>
-              <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-                6. Senior Graduation
-              </strong>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-                Grade 12 members who meet requirements through Semester 1 graduate in good standing.
-              </p>
-            </div>
+          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
+              6. Senior Graduation
+            </strong>
+            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+              Grade 12 members who meet requirements through Semester 1 graduate in good standing as NHS Graduates.
+            </p>
           </div>
         </div>
       </section>
 
       {/* Institutional Footer */}
-      <footer style={{ backgroundColor: 'var(--color-navy)', color: '#94A3B8', padding: '3.5rem 1.5rem 2rem' }}>
+      <footer style={{ backgroundColor: 'var(--color-navy)', color: '#94A3B8', padding: '3rem 1.5rem 2rem' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '2.5rem', marginBottom: '2.5rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                <img src="/cas-logo.png" alt="CAS" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
-                <div>
-                  <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1.05rem', fontFamily: 'var(--font-serif)' }}>
-                    Casablanca American School
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--color-gold)' }}>
-                    National Honor Society
-                  </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <img src="/cas-logo.png" alt="CAS" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
+              <div>
+                <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1.05rem', fontFamily: 'var(--font-serif)' }}>
+                  Casablanca American School
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--color-gold)' }}>
+                  National Honor Society Chapter
                 </div>
               </div>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.6, color: '#94A3B8', margin: 0 }}>
-                Casablanca American School chapter of the National Honor Society.
-              </p>
             </div>
 
-            <div>
-              <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-                Campus
-              </div>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.6, margin: 0 }}>
-                Route de la Mecque, Lotissement Oulad Bouzid<br />
-                Casablanca 20180, Morocco
-              </p>
-            </div>
-
-            <div>
-              <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-                Faculty Advisorship
-              </div>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.6, margin: 0 }}>
-                Chapter Advisor: <strong>Ms. Laura Hayes</strong><br />
-                Casablanca American School
-              </p>
+            <div style={{ fontSize: '0.85rem', color: '#94A3B8' }}>
+              Casablanca, Morocco
             </div>
           </div>
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.78rem' }}>
-            <span>© 2026 Casablanca American School National Honor Society</span>
+            <span>© Casablanca American School National Honor Society</span>
             <span>Academic Year 2026–2027</span>
           </div>
         </div>

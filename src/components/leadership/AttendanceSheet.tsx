@@ -278,7 +278,7 @@ export const AttendanceSheet: React.FC = () => {
               is_on_probation: true,
               probation_count: Math.max(1, (member.probation_count || 0) + 1),
               probation_reason: 'attendance',
-              probation_notes: `Automated bylaw trigger: Accumulated ${unexcusedCount} unexcused meeting absences in ${activeSem?.name || 'current semester'}.`,
+              probation_notes: `Automated rule trigger: Accumulated ${unexcusedCount} unexcused meeting absences in ${activeSem?.name || 'current semester'}.`,
               probation_updated_at: new Date().toISOString(),
             })
             .eq('id', member.id);
@@ -367,7 +367,7 @@ export const AttendanceSheet: React.FC = () => {
         </div>
       </div>
 
-      {/* Stitch Bylaw Reminder Banner */}
+      {/* Chapter Rules Reminder Banner */}
       <div style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
@@ -381,7 +381,7 @@ export const AttendanceSheet: React.FC = () => {
         <AlertTriangle size={20} color="var(--color-terracotta)" style={{ marginTop: '2px', flexShrink: 0 }} />
         <div>
           <strong style={{ color: 'var(--color-navy)', fontSize: '0.9rem', display: 'block', marginBottom: '0.2rem' }}>
-            Chapter Bylaw Reminder (Section 4.2)
+            Chapter Rules Reminder
           </strong>
           <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
             Accumulation of two (2) unexcused absences within a single semester constitutes grounds for automatic probationary status. <strong>Being 5 minutes late to a meeting constitutes an absence.</strong> Accumulating two probations results in chapter dismissal and account restriction.
