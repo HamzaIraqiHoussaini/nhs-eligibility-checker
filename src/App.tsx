@@ -45,12 +45,73 @@ type ActiveTab =
   | 'allowlist'
   | 'roster';
 
+const TAB_ROUTES: Record<ActiveTab, string> = {
+  dashboard: '/dashboard',
+  projects: '/project_hub',
+  screener: '/screener',
+  rules: '/bylaws',
+  review: '/review_desk',
+  attendance: '/attendance',
+  treasury: '/treasury',
+  semesters: '/semesters',
+  roster: '/members',
+  allowlist: '/access_control',
+};
+
+const PATH_TO_TAB: Record<string, ActiveTab> = {
+  '/dashboard': 'dashboard',
+  '/': 'dashboard',
+  '/project_hub': 'projects',
+  '/projects': 'projects',
+  '/screener': 'screener',
+  '/eligibility': 'screener',
+  '/rules': 'rules',
+  '/bylaws': 'rules',
+  '/review': 'review',
+  '/review_desk': 'review',
+  '/attendance': 'attendance',
+  '/treasury': 'treasury',
+  '/semesters': 'semesters',
+  '/members': 'roster',
+  '/roster': 'roster',
+  '/access_control': 'allowlist',
+  '/allowlist': 'allowlist',
+};
+
+function getTabFromPath(path: string): ActiveTab {
+  const normalized = path.replace(/\/$/, '') || '/';
+  return PATH_TO_TAB[normalized] || 'dashboard';
+}
+
 function PortalContent() {
   const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => getTabFromPath(window.location.pathname));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
+
+  const navigateTo = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    const path = TAB_ROUTES[tab] || `/${tab}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({ tab }, '', path);
+    }
+  };
+
+  useEffect(() => {
+    // If on root, set URL to /dashboard without reloading
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+      window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+    }
+
+    const handlePopState = () => {
+      const tab = getTabFromPath(window.location.pathname);
+      setActiveTab(tab);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     const fetchActiveSemester = async () => {
@@ -77,7 +138,12 @@ function PortalContent() {
       <aside className="stitch-sidebar">
         
         {/* Brand Header */}
-        <div className="stitch-sidebar-header">
+        <div
+          className="stitch-sidebar-header"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigateTo('dashboard')}
+          title="Return to Dashboard"
+        >
           <img
             src="/nhs-logo.png"
             alt="CAS NHS Crest"
@@ -101,7 +167,7 @@ function PortalContent() {
           <button
             type="button"
             className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => navigateTo('dashboard')}
           >
             <LayoutDashboard size={16} />
             <span>Dashboard</span>
@@ -110,7 +176,7 @@ function PortalContent() {
           <button
             type="button"
             className={`stitch-nav-item ${activeTab === 'projects' ? 'active' : ''}`}
-            onClick={() => setActiveTab('projects')}
+            onClick={() => navigateTo('projects')}
           >
             <FileText size={16} />
             <span>Project Hub</span>
@@ -119,7 +185,7 @@ function PortalContent() {
           <button
             type="button"
             className={`stitch-nav-item ${activeTab === 'screener' ? 'active' : ''}`}
-            onClick={() => setActiveTab('screener')}
+            onClick={() => navigateTo('screener')}
           >
             <CheckCircle2 size={16} />
             <span>{isLeadership || isSupervisor ? 'Academic Eligibility' : 'Check My Eligibility'}</span>
@@ -128,7 +194,7 @@ function PortalContent() {
           <button
             type="button"
             className={`stitch-nav-item ${activeTab === 'rules' ? 'active' : ''}`}
-            onClick={() => setActiveTab('rules')}
+            onClick={() => navigateTo('rules')}
           >
             <BookOpen size={16} />
             <span>Chapter Bylaws</span>
@@ -142,7 +208,7 @@ function PortalContent() {
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
-                onClick={() => setActiveTab('review')}
+                onClick={() => navigateTo('review')}
               >
                 <ClipboardCheck size={16} />
                 <span>Project Reviews</span>
@@ -151,7 +217,7 @@ function PortalContent() {
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
+                onClick={() => navigateTo('attendance')}
               >
                 <CalendarCheck size={16} />
                 <span>Attendance Calendar</span>
@@ -160,7 +226,7 @@ function PortalContent() {
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'treasury' ? 'active' : ''}`}
-                onClick={() => setActiveTab('treasury')}
+                onClick={() => navigateTo('treasury')}
               >
                 <Coins size={16} />
                 <span>Chapter Treasury</span>
@@ -169,7 +235,7 @@ function PortalContent() {
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'semesters' ? 'active' : ''}`}
-                onClick={() => setActiveTab('semesters')}
+                onClick={() => navigateTo('semesters')}
               >
                 <Calendar size={16} />
                 <span>Semester Manager</span>
@@ -178,7 +244,7 @@ function PortalContent() {
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
-                onClick={() => setActiveTab('roster')}
+                onClick={() => navigateTo('roster')}
               >
                 <Users size={16} />
                 <span>Chapter Members</span>
@@ -188,7 +254,7 @@ function PortalContent() {
                 <button
                   type="button"
                   className={`stitch-nav-item ${activeTab === 'allowlist' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('allowlist')}
+                  onClick={() => navigateTo('allowlist')}
                 >
                   <ShieldCheck size={16} />
                   <span>Access Control</span>
@@ -288,7 +354,7 @@ function PortalContent() {
 
       {/* Stitch Main Content Area */}
       <main className="stitch-main-content">
-        {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => setActiveTab(t as ActiveTab)} />}
+        {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
         {activeTab === 'screener' && <ScreenerView />}
         {activeTab === 'rules' && <ChapterRules />}

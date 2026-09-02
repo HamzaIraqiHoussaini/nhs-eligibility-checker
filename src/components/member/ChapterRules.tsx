@@ -18,28 +18,28 @@ export const ChapterRules: React.FC = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* Section 1: Eligibility Prerequisites */}
+        {/* Section 1: Academic Standing Required to Maintain Membership */}
         <div className="sharp-card" style={{ padding: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
             <GraduationCap size={22} color="var(--color-oxford)" />
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: 0 }}>
-              1. Eligibility to Apply to NHS
+              1. Academic Standing Required to Maintain Membership
             </h2>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
             <div style={{ padding: '0.75rem 1rem', backgroundColor: '#EFF6FF', borderLeft: '3px solid var(--color-oxford)' }}>
-              <strong>Eligible Grade Levels:</strong> Must be currently enrolled in <strong>Grade 10, 11, or 12</strong>.
+              <strong>Continuous Chapter Academic Standards:</strong> Inducted members across <strong>Grades 10, 11, and 12</strong> must continuously maintain these academic standing thresholds on every semester report card audit to remain in Good Standing.
               <br />
               <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                *Note: Semester 2 of Grade 11 is the final opportunity for initial student eligibility and induction consideration.
+                *Failure to maintain these thresholds on any semester audit results in immediate chapter probation.
               </span>
             </div>
 
             {/* Grade 10 Criteria */}
             <div style={{ border: '1px solid var(--color-border)', padding: '1.25rem' }}>
               <div style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '1rem', marginBottom: '0.5rem' }}>
-                Grade 10 Applicant Standard
+                Grade 10 Academic Standard to Stay in NHS
               </div>
               <ul style={{ paddingLeft: '1.25rem', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <li>
@@ -58,7 +58,7 @@ export const ChapterRules: React.FC = () => {
             {/* Grade 11 & 12 Criteria */}
             <div style={{ border: '1px solid var(--color-border)', padding: '1.25rem' }}>
               <div style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '1rem', marginBottom: '0.5rem' }}>
-                Grade 11 & 12 Applicant Standard
+                Grade 11 & 12 Academic Standard to Stay in NHS
               </div>
               <ul style={{ paddingLeft: '1.25rem', lineHeight: '1.6', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <li>
