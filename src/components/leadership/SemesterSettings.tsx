@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
-import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, CheckCircle2, RotateCw } from 'lucide-react';
+import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, ShieldCheck, CheckCircle2, RotateCw } from 'lucide-react';
 
 interface SemesterStats {
   projectsCompleted: number;
@@ -856,9 +856,9 @@ export const SemesterSettings: React.FC = () => {
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <div className="kpi-card" style={{ padding: '0.85rem' }}>
-                    <div className="kpi-label">Met Quotas</div>
+                    <div className="kpi-label">Met Quotas / Exempt</div>
                     <div className="kpi-value" style={{ fontSize: '1.4rem', color: 'var(--color-sage-text)' }}>
-                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'pass' || m.action_type === 'graduate').length}
+                      {transitionPreviewData.members.filter((m: any) => m.action_type === 'pass' || m.action_type === 'graduate' || m.action_type === 'exempt').length}
                     </div>
                   </div>
                   <div className="kpi-card" style={{ padding: '0.85rem' }}>
@@ -907,10 +907,16 @@ export const SemesterSettings: React.FC = () => {
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem' }}>Grade {m.grade_level}</td>
                             <td style={{ padding: '0.65rem 0.85rem' }}>
-                              {m.led_count} / 1 Led • {m.vol_count} / 2 Vol
+                              {m.action_type === 'exempt'
+                                ? 'Exempt (Officer)'
+                                : `${m.led_count} / 1 Led • ${m.vol_count} / 2 Vol`}
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
-                              {m.action_type === 'graduate' || m.action_type === 'graduate_with_probation' ? (
+                              {m.action_type === 'exempt' ? (
+                                <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', border: '1px solid #BFDBFE', fontSize: '0.72rem' }}>
+                                  <ShieldCheck size={11} /> Officer (Exempt)
+                                </span>
+                              ) : m.action_type === 'graduate' || m.action_type === 'graduate_with_probation' ? (
                                 <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE', fontSize: '0.72rem' }}>
                                   <Award size={11} /> Senior Graduate
                                 </span>

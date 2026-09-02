@@ -112,6 +112,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
 
   const isRestricted = profile?.is_restricted;
   const isOnProbation = profile?.is_on_probation;
+  const isLeadership = profile?.role === 'leadership';
+  const isSupervisor = profile?.role === 'supervisor';
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -240,82 +242,115 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       )}
 
       {/* SEMESTER PARTICIPATION STANDING BANNER */}
-      <div
-        className="sharp-card"
-        style={{
-          padding: '1.25rem 1.5rem',
-          marginBottom: '2rem',
-          borderLeft: (semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? '4px solid var(--color-sage)' : '4px solid var(--color-gold)',
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-              Chapter Rules • {activeSemesterName} Participation
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
-              Semester Project & Volunteering Quota
-            </h3>
-          </div>
-          <span
-            className={`status-pill ${semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'eligible' : ''}`}
-            style={!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? { backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.75rem' } : { fontSize: '0.75rem' }}
-          >
-            {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-            {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'Semester Quota Satisfied' : 'Action Required This Semester'}
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
-          <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {!isLeadership && !isSupervisor ? (
+        <div
+          className="sharp-card"
+          style={{
+            padding: '1.25rem 1.5rem',
+            marginBottom: '2rem',
+            borderLeft: (semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? '4px solid var(--color-sage)' : '4px solid var(--color-gold)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>1. Lead at least 1 Project / Sem</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterProjectsLed >= 1 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
-                {semesterProjectsLed} / 1 Led
+              <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                Chapter Rules • {activeSemesterName} Participation
               </div>
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
+                Semester Project & Volunteering Quota
+              </h3>
             </div>
-            {semesterProjectsLed >= 1 ? (
-              <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
-            ) : (
-              <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
-            )}
+            <span
+              className={`status-pill ${semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'eligible' : ''}`}
+              style={!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? { backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.75rem' } : { fontSize: '0.75rem' }}
+            >
+              {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+              {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'Semester Quota Satisfied' : 'Action Required This Semester'}
+            </span>
           </div>
 
-          <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer in at least 2 Projects / Sem</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterVolunteered >= 2 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
-                {semesterVolunteered} / 2 Volunteered
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+            <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>1. Lead at least 1 Project / Sem</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterProjectsLed >= 1 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                  {semesterProjectsLed} / 1 Led
+                </div>
               </div>
+              {semesterProjectsLed >= 1 ? (
+                <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
+              ) : (
+                <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
+              )}
             </div>
-            {semesterVolunteered >= 2 ? (
-              <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
-            ) : (
-              <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
-            )}
+
+            <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer in at least 2 Projects / Sem</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterVolunteered >= 2 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                  {semesterVolunteered} / 2 Volunteered
+                </div>
+              </div>
+              {semesterVolunteered >= 2 ? (
+                <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
+              ) : (
+                <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
+              )}
+            </div>
+          </div>
+
+          {!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) && (
+            <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+              <strong>Chapter Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead at least 1 project and volunteer twice) constitutes grounds for Chapter Probation.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          className="sharp-card"
+          style={{
+            padding: '1.25rem 1.5rem',
+            marginBottom: '2rem',
+            borderLeft: '4px solid var(--color-navy)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                Chapter Governance • {activeSemesterName}
+              </div>
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
+                Executive Leadership Core
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: '0.35rem 0 0' }}>
+                Officers oversee chapter administration and governance. Chapter leadership is not required to lead or volunteer in projects and is exempt from project participation quotas.
+              </p>
+            </div>
+            <span
+              className="status-pill eligible"
+              style={{ fontSize: '0.75rem', backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', border: '1px solid #BFDBFE' }}
+            >
+              <CheckCircle2 size={13} />
+              <span>Exempt from Project Quotas</span>
+            </span>
           </div>
         </div>
-
-        {!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) && (
-          <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
-            <strong>Chapter Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead at least 1 project and volunteer twice) constitutes grounds for Chapter Probation.
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Statistics Grid */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Projects Led</div>
           <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} proposed)</span></div>
-          <div className="kpi-subtext">Approved & led this sem • Max 2 / sem</div>
+          <div className="kpi-subtext">{isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-label">Times Volunteered</div>
           <div className="kpi-value">{semesterVolunteered} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({volunteerCount} total)</span></div>
-          <div className="kpi-subtext">Min 2 / sem (excluding own)</div>
+          <div className="kpi-subtext">{isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
         </div>
 
         <div className="kpi-card">
