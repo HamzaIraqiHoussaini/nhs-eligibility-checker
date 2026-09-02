@@ -52,6 +52,8 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   useEffect(() => {
     if (!member) return;
 
+    let cancelled = false; // Abort flag — prevents stale fetch from overwriting fresh state
+
     const loadMemberData = async () => {
       setLoading(true);
       try {
@@ -61,14 +63,21 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           .select('*')
           .eq('is_active', true)
           .maybeSingle();
+        if (cancelled) return;
         setActiveSemester(activeSem as Semester);
 
-        // 1. Fetch all proposed projects (including pending/rejected)
-        const { data: pData } = await supabase
-          .from('project_proposals')
-          .select('*')
-          .or(`creator_id.eq.${member.id},co_leader_emails.cs.{${member.email}}`);
-        const projects = (pData as ProjectProposal[]) || [];
+        // 1. Fetch all proposed projects — two safe parameterized queries instead of
+        // string-interpolating member.email into a PostgREST filter (injection risk)
+        const [{ data: byCreator }, { data: byCoLeader }] = await Promise.all([
+          supabase.from('project_proposals').select('*').eq('creator_id', member.id),
+          supabase.from('project_proposals').select('*').contains('co_leader_emails', [member.email]),
+        ]);
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const projects: ProjectProposal[] = [];
+        for (const row of [...(byCreator || []), ...(byCoLeader || [])]) {
+          if (!seen.has(row.id)) { seen.add(row.id); projects.push(row as ProjectProposal); }
+        }
         setAllProposals(projects);
 
         // 2. Fetch volunteer participation
@@ -76,6 +85,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           .from('project_volunteers')
           .select('*')
           .eq('user_id', member.id);
+        if (cancelled) return;
         const vols = (vData as ProjectVolunteer[]) || [];
         setVolunteerHistory(vols);
 
@@ -86,7 +96,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             .from('project_proposals')
             .select('id, semester_id, event_date')
             .in('id', volProjIds);
-          
+          if (cancelled) return;
           const count = (semProjs || []).filter((p: any) =>
             p.semester_id === activeSem.id ||
             (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
@@ -101,7 +111,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           .from('meeting_attendance')
           .select('*')
           .eq('user_id', member.id);
-        
+        if (cancelled) return;
         let validAtt = (aData as MeetingAttendance[]) || [];
         if (activeSem && validAtt.length > 0) {
           const { data: semMeetings } = await supabase
@@ -109,18 +119,20 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             .select('id')
             .gte('meeting_date', activeSem.start_date)
             .lte('meeting_date', activeSem.end_date);
+          if (cancelled) return;
           const semMeetingIds = new Set((semMeetings || []).map((m: any) => m.id));
           validAtt = validAtt.filter((a: any) => semMeetingIds.has(a.meeting_id));
         }
         setAttendanceRecords(validAtt);
       } catch (err) {
-        console.error('Error fetching member profile history:', err);
+        if (!cancelled) console.error('Error fetching member profile history:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadMemberData();
+    return () => { cancelled = true; }; // Cleanup: mark as stale on member change or unmount
   }, [member]);
 
   if (!member) return null;

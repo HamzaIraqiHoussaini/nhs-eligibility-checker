@@ -191,8 +191,12 @@ export const AllowlistManager: React.FC = () => {
     if (!confirmed) return;
 
     try {
-      await supabase.from('allowlist').update({ role: 'leadership' }).eq('email', entry.email);
-      await supabase.from('profiles').update({ role: 'leadership' }).eq('email', entry.email);
+      const [allowlistRes, profileRes] = await Promise.all([
+        supabase.from('allowlist').update({ role: 'leadership' }).eq('email', entry.email),
+        supabase.from('profiles').update({ role: 'leadership' }).eq('email', entry.email),
+      ]);
+      if (allowlistRes.error) throw allowlistRes.error;
+      if (profileRes.error) throw profileRes.error;
       await loadAllowlist();
       await alert({
         title: 'Promotion Successful',

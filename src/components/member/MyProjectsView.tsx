@@ -67,13 +67,28 @@ export const MyProjectsView: React.FC = () => {
       if (semData) setActiveSemester(semData as Semester);
 
       if (user) {
-        // 2. Fetch my proposals
-        const { data: myData } = await supabase
-          .from('project_proposals')
-          .select('*')
-          .or(`creator_id.eq.${user.id},co_leader_emails.cs.{${user.email}}`)
-          .order('created_at', { ascending: false });
-        if (myData) setProposals(myData as ProjectProposal[]);
+        // 2. Fetch my proposals — two safe parameterized queries merged client-side
+        // to avoid PostgREST filter injection via string-interpolated user.email
+        const [{ data: byCreator }, { data: byCoLeader }] = await Promise.all([
+          supabase
+            .from('project_proposals')
+            .select('*')
+            .eq('creator_id', user.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('project_proposals')
+            .select('*')
+            .contains('co_leader_emails', [user.email])
+            .order('created_at', { ascending: false }),
+        ]);
+        // Merge and deduplicate by id
+        const seen = new Set<string>();
+        const merged: ProjectProposal[] = [];
+        for (const row of [...(byCreator || []), ...(byCoLeader || [])]) {
+          if (!seen.has(row.id)) { seen.add(row.id); merged.push(row as ProjectProposal); }
+        }
+        merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setProposals(merged);
       }
 
       // 3. Fetch all approved chapter projects
@@ -130,8 +145,13 @@ export const MyProjectsView: React.FC = () => {
       setCompletingProject(null);
       setCompleteNotes('');
       await loadData();
-    } catch (err) {
-      console.error('Failed to mark completed:', err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to mark project as completed.';
+      await alert({
+        title: 'Action Failed',
+        message,
+        variant: 'danger',
+      });
     }
   };
 

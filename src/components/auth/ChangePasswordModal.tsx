@@ -21,8 +21,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (newPassword.length < 8) {
-      setErrorMsg('Access code / password must be at least 8 characters.');
+    if (newPassword.length < 12) {
+      setErrorMsg('Access code must be at least 12 characters.');
       return;
     }
 
@@ -82,7 +82,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             Change Access Code
           </h2>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-            Set a new custom password or code (20-30 characters recommended).
+            Set a new custom password or code (12+ characters, 20–30 recommended).
           </p>
         </div>
 

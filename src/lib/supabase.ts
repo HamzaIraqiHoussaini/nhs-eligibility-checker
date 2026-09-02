@@ -4,6 +4,10 @@ import type { Profile, UserRole } from '../types/nhs';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ipnbekxtachtodskthqg.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_jTVmMOPOcHz6roXB-pz3vA_zg2RBKND';
 
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn('[CAS NHS] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not set in environment — using hardcoded fallbacks.');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
@@ -30,12 +34,11 @@ export async function checkEmailAllowlist(email: string): Promise<{
       .maybeSingle();
 
     if (error) {
-      console.warn('Allowlist query warning:', error.message);
-      // If table doesn't exist yet, permit if @cas.ac.ma for initial setup
-      if (cleanEmail.endsWith('@cas.ac.ma')) {
-        return { allowed: true, role: 'member' };
-      }
-      return { allowed: false, error: 'Could not verify email authorization. Please check with leadership.' };
+      // SECURITY: Fail closed — a DB error must NEVER grant access.
+      // Previously the code permitted all @cas.ac.ma emails on DB error (fail-open).
+      // That was an unintended bypass — now we always deny on error.
+      console.error('Allowlist query error (access denied for safety):', error.message);
+      return { allowed: false, error: 'Could not verify authorization — please try again or contact leadership.' };
     }
 
     if (!data) {
@@ -46,8 +49,9 @@ export async function checkEmailAllowlist(email: string): Promise<{
     }
 
     return { allowed: true, role: data.role as UserRole, fullName: data.full_name || undefined };
-  } catch (err: any) {
-    return { allowed: false, error: err?.message || 'Network error verifying allowlist.' };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Network error verifying allowlist.';
+    return { allowed: false, error: message };
   }
 }
 

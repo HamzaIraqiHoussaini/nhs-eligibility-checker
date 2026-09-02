@@ -85,8 +85,13 @@ export const TwoStageReviewDesk: React.FC = () => {
       setSelectedProposal(null);
       setDecisionNotes('');
       await loadProposals();
-    } catch (err) {
-      console.error('Failed to submit review decision:', err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to submit review decision.';
+      await alert({
+        title: 'Review Action Failed',
+        message,
+        variant: 'danger',
+      });
     } finally {
       setActionLoading(false);
     }

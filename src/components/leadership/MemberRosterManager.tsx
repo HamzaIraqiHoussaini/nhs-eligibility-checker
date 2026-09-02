@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -243,7 +243,7 @@ export const MemberRosterManager: React.FC = () => {
     }
   };
 
-  const filteredMembers = members.filter((m) => {
+  const filteredMembers = useMemo(() => members.filter((m) => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       if (!m.full_name.toLowerCase().includes(query) && !m.email.toLowerCase().includes(query)) {
@@ -263,11 +263,11 @@ export const MemberRosterManager: React.FC = () => {
     if (statusFilter === 'probation') return m.is_on_probation;
     if (statusFilter === 'quota_deficit') return m.role !== 'leadership' && m.role !== 'supervisor' && !participationMap[m.id]?.meetsQuota;
     return true;
-  });
+  }), [members, searchQuery, statusFilter, participationMap]);
 
-  const activeMembersCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length;
-  const graduatesCount = members.filter((m) => m.role === 'graduate' || m.role === 'past_leadership').length;
-  const deficitCount = members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership' && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length;
+  const activeMembersCount = useMemo(() => members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length, [members]);
+  const graduatesCount = useMemo(() => members.filter((m) => m.role === 'graduate' || m.role === 'past_leadership').length, [members]);
+  const deficitCount = useMemo(() => members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership' && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length, [members, participationMap]);
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>

@@ -73,7 +73,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setNeedsFromSchool(['Classroom space and projector']);
       setVolunteersNeeded(0);
     }
-  }, [initialData, isOpen, profile]);
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
