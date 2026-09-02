@@ -266,29 +266,26 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               </div>
             </div>
 
-            {/* Right: School Emblem */}
+            {/* Right: NHS Official Keystone Emblem */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <div
                 style={{
-                  width: '280px',
-                  height: '280px',
-                  borderRadius: '50%',
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 12px 28px rgba(0, 0, 0, 0.06)',
+                  maxWidth: '340px',
+                  width: '100%',
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  padding: '1.5rem',
+                  padding: '1rem',
                 }}
               >
                 <img
-                  src="/cas-logo.png"
-                  alt="Casablanca American School"
+                  src="/nhs-logo-bw.png"
+                  alt="National Honor Society"
                   style={{
-                    width: '100%',
-                    height: '100%',
+                    maxHeight: '360px',
+                    width: 'auto',
                     objectFit: 'contain',
+                    filter: 'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.08))',
                   }}
                 />
               </div>
