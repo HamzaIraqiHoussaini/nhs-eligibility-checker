@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { ProjectProposal } from '../../types/nhs';
-import { CheckCircle2, XCircle, Clock, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Eye, X, FileCheck, ExternalLink, Receipt } from 'lucide-react';
+
+function projectHasMonetaryCosts(project: ProjectProposal): boolean {
+  if (!project.costs || project.costs.length === 0) return false;
+  return project.costs.some((c) => /\d+/.test(c));
+}
 
 export const TwoStageReviewDesk: React.FC = () => {
   const { user, profile, isLeadership, isSupervisor } = useAuth();
@@ -10,6 +15,9 @@ export const TwoStageReviewDesk: React.FC = () => {
   const [selectedProposal, setSelectedProposal] = useState<ProjectProposal | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Receipt review notes
+  const [receiptFeedback, setReceiptFeedback] = useState('');
 
   const loadProposals = async () => {
     try {
@@ -36,14 +44,12 @@ export const TwoStageReviewDesk: React.FC = () => {
       const updates: Partial<ProjectProposal> = {};
 
       if (isLeadership && selectedProposal.status === 'pending_leadership') {
-        // Stage 1: Leadership decision
         updates.leadership_decision = decision;
         updates.leadership_notes = decisionNotes.trim() || undefined;
         updates.leadership_reviewer_id = user.id;
         updates.leadership_reviewed_at = new Date().toISOString();
         updates.status = decision === 'approved' ? 'pending_supervisor' : 'rejected_leadership';
       } else if (isSupervisor && selectedProposal.status === 'pending_supervisor') {
-        // Stage 2: Supervisor decision
         updates.supervisor_decision = decision;
         updates.supervisor_notes = decisionNotes.trim() || undefined;
         updates.supervisor_reviewer_id = user.id;
@@ -68,10 +74,44 @@ export const TwoStageReviewDesk: React.FC = () => {
     }
   };
 
+  const handleReceiptAudit = async (status: 'approved' | 'rejected') => {
+    if (!selectedProposal || !user) return;
+    setActionLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({
+          receipt_status: status,
+          receipt_notes: receiptFeedback.trim() || undefined,
+          receipt_reviewed_by: user.id,
+          receipt_reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', selectedProposal.id);
+
+      if (error) throw error;
+
+      alert(`Proof of purchase receipt has been marked as ${status}.`);
+      setReceiptFeedback('');
+      await loadProposals();
+      // Update selected
+      setSelectedProposal((prev) => (prev ? { ...prev, receipt_status: status, receipt_notes: receiptFeedback.trim() } : null));
+    } catch (err: any) {
+      alert(err.message || 'Failed updating receipt status.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Filter queues
-  const pendingStage1 = proposals.filter(p => p.status === 'pending_leadership');
-  const pendingStage2 = proposals.filter(p => p.status === 'pending_supervisor');
-  const resolvedProposals = proposals.filter(p => !['pending_leadership', 'pending_supervisor'].includes(p.status));
+  const pendingStage1 = proposals.filter((p) => p.status === 'pending_leadership');
+  const pendingStage2 = proposals.filter((p) => p.status === 'pending_supervisor');
+  const completedWithReceiptPending = proposals.filter(
+    (p) => (p.is_completed || p.status === 'completed') && projectHasMonetaryCosts(p) && p.receipt_status === 'pending_review'
+  );
+  const resolvedProposals = proposals.filter(
+    (p) => !['pending_leadership', 'pending_supervisor'].includes(p.status)
+  );
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -79,16 +119,45 @@ export const TwoStageReviewDesk: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          <Clock size={16} /> Two-Stage Approval Pipeline
+          <Clock size={16} /> Two-Stage Approval Pipeline & Receipt Audits
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
           Project Proposal Review Desk
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-          {isLeadership ? 'Step 1: Leadership Review (Authorize Stage 1 approval)' : ''}
-          {isSupervisor ? 'Step 2: Chapter Advisor / Supervisor Review (Final approval)' : ''}
+          {isLeadership ? 'Step 1: Leadership Review (Authorize Stage 1 approval & review completed project receipts)' : ''}
+          {isSupervisor ? 'Step 2: Chapter Advisor / Supervisor Review (Final project authorization)' : ''}
         </p>
       </div>
+
+      {/* Receipts Awaiting Audit Alert Queue */}
+      {completedWithReceiptPending.length > 0 && (
+        <div style={{ marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '4px solid var(--color-gold)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <Receipt size={18} color="var(--color-gold-text)" />
+            <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+              Completed Projects Awaiting Proof of Purchase (Receipt) Audit ({completedWithReceiptPending.length})
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {completedWithReceiptPending.map((p) => (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                <div>
+                  <strong>{p.project_title}</strong> (Led by {p.leaders})
+                </div>
+                <button
+                  type="button"
+                  className="btn-inspect"
+                  style={{ color: 'var(--color-oxford)' }}
+                  onClick={() => setSelectedProposal(p)}
+                >
+                  <Eye size={12} /> Audit Receipt
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stage 1: Pending Leadership Queue */}
       <div style={{ marginBottom: '2.5rem' }}>
@@ -98,37 +167,32 @@ export const TwoStageReviewDesk: React.FC = () => {
           </h2>
           {isLeadership && (
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-oxford)', textTransform: 'uppercase' }}>
-              Action Required by Leadership
+              Your Action Required
             </span>
           )}
         </div>
 
         {pendingStage1.length === 0 ? (
-          <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.88rem' }}>
-            No proposals currently awaiting Stage 1 Leadership review.
+          <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            No proposals awaiting Stage 1 leadership determination.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingStage1.map(p => (
-              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-                    {p.project_title}
-                  </h3>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', gap: '1rem' }}>
-                    <span><strong>Proposed by:</strong> {p.leaders}</span>
-                    <span><strong>Advisor:</strong> {p.advisor_name}</span>
-                    <span><strong>Date:</strong> {p.event_date}</span>
+            {pendingStage1.map((p) => (
+              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+                      {p.project_title}
+                    </h3>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                      Proposed by: <strong>{p.creator_name}</strong> • Leaders: {p.leaders} • Event Date: {p.event_date}
+                    </div>
                   </div>
+                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
+                    <Eye size={13} /> Inspect & Vote
+                  </button>
                 </div>
-
-                <button
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                  onClick={() => { setSelectedProposal(p); setDecisionNotes(''); }}
-                >
-                  <Eye size={14} /> Inspect & Review
-                </button>
               </div>
             ))}
           </div>
@@ -139,103 +203,119 @@ export const TwoStageReviewDesk: React.FC = () => {
       <div style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0 }}>
-            Stage 2: Awaiting Supervisor Review ({pendingStage2.length})
+            Stage 2: Awaiting Advisor / Supervisor Final Approval ({pendingStage2.length})
           </h2>
           {isSupervisor && (
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gold-text)', textTransform: 'uppercase' }}>
-              Action Required by Advisor/Supervisor
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-oxford)', textTransform: 'uppercase' }}>
+              Your Action Required
             </span>
           )}
         </div>
 
         {pendingStage2.length === 0 ? (
-          <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.88rem' }}>
-            No proposals currently awaiting Stage 2 Supervisor review.
+          <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            No proposals currently awaiting Stage 2 supervisor determination.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingStage2.map(p => (
-              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: 0 }}>
+            {pendingStage2.map((p) => (
+              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-oxford)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
                       {p.project_title}
                     </h3>
-                    <span className="status-pill" style={{ backgroundColor: '#ECFDF5', color: '#065F46', fontSize: '0.72rem' }}>
-                      <CheckCircle2 size={10} /> Leadership Approved
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', gap: '1rem' }}>
-                    <span><strong>Proposed by:</strong> {p.leaders}</span>
-                    <span><strong>Advisor:</strong> {p.advisor_name}</span>
-                    <span><strong>Date:</strong> {p.event_date}</span>
-                  </div>
-                  {p.leadership_notes && (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
-                      <em>Leadership Note: {p.leadership_notes}</em>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                      Approved by Leadership • Sponsor: {p.advisor_name} • Date: {p.event_date}
                     </div>
-                  )}
+                  </div>
+                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
+                    <Eye size={13} /> Inspect & Finalize
+                  </button>
                 </div>
-
-                <button
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-                  onClick={() => { setSelectedProposal(p); setDecisionNotes(''); }}
-                >
-                  <Eye size={14} /> Inspect & Review
-                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Resolved / Historical Projects */}
+      {/* Concluded / Active Projects Queue */}
       <div>
         <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', marginBottom: '1rem' }}>
-          Historical & Approved Projects ({resolvedProposals.length})
+          Active & Concluded Projects ({resolvedProposals.length})
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {resolvedProposals.map(p => (
-            <div key={p.id} className="sharp-card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.95rem' }}>{p.project_title}</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  Leaders: {p.leaders} • Date: {p.event_date} • Status: <strong style={{ textTransform: 'capitalize' }}>{p.status.replace('_', ' ')}</strong>
+          {resolvedProposals.map((p) => {
+            const hasCosts = projectHasMonetaryCosts(p);
+            const isCompleted = p.is_completed || p.status === 'completed';
+
+            return (
+              <div key={p.id} className="sharp-card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{p.project_title}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                    Leaders: {p.leaders} • Date: {p.event_date} • Status: <strong style={{ textTransform: 'capitalize' }}>{p.status.replace('_', ' ')}</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {isCompleted && hasCosts && (
+                    p.receipt_url ? (
+                      p.receipt_status === 'approved' ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
+                          <FileCheck size={11} /> Receipt Approved
+                        </span>
+                      ) : (
+                        <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: '#1E3A8A', fontSize: '0.7rem' }}>
+                          <Receipt size={11} /> Receipt Uploaded
+                        </span>
+                      )
+                    ) : (
+                      <span className="status-pill ineligible" style={{ fontSize: '0.7rem' }}>
+                        Receipt Missing
+                      </span>
+                    )
+                  )}
+
+                  <button className="btn-inspect" onClick={() => setSelectedProposal(p)}>
+                    <Eye size={12} /> View Details
+                  </button>
                 </div>
               </div>
-              <button
-                className="btn-secondary"
-                style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
-                onClick={() => setSelectedProposal(p)}
-              >
-                View Dossier
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Review Dossier Modal */}
+      {/* PROPOSAL DETAILS & AUDIT MODAL */}
       {selectedProposal && (
         <div className="drawer-backdrop" onClick={() => setSelectedProposal(null)}>
           <div
             className="sharp-card"
-            style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', margin: 'auto', backgroundColor: 'var(--color-surface)', padding: '2.5rem' }}
-            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              margin: 'auto',
+              backgroundColor: 'var(--color-surface)',
+              padding: '2.5rem',
+              position: 'relative',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div style={{ borderBottom: '2px solid var(--color-navy)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                <span>CAS NHS Project Proposal Dossier</span>
-                <span>STATUS: {selectedProposal.status.toUpperCase()}</span>
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0.5rem 0 0' }}>
-                {selectedProposal.project_title}
-              </h2>
-              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
-                Proposed by: <strong>{selectedProposal.leaders}</strong> • Advisor: <strong>{selectedProposal.advisor_name}</strong>
-              </div>
+            <button
+              onClick={() => setSelectedProposal(null)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+            >
+              <X size={20} />
+            </button>
+
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+              {selectedProposal.project_title}
+            </h2>
+            <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
+              Proposed by: <strong>{selectedProposal.leaders}</strong> • Advisor: <strong>{selectedProposal.advisor_name}</strong>
             </div>
 
             {/* Event Specs */}
@@ -272,15 +352,87 @@ export const TwoStageReviewDesk: React.FC = () => {
               </ul>
             </div>
 
-            {/* The Event Will Entail */}
+            {/* Costs */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <div className="drawer-section-title">The Event Will Entail</div>
-              <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                {selectedProposal.event_details?.map((det, i) => (
-                  <li key={i}>{det}</li>
-                ))}
-              </ul>
+              <div className="drawer-section-title">Project Costs & Budget</div>
+              {selectedProposal.costs && selectedProposal.costs.length > 0 ? (
+                <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                  {selectedProposal.costs.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>No monetary costs requested.</div>
+              )}
             </div>
+
+            {/* PROOF OF PURCHASE AUDIT SECTION */}
+            {(selectedProposal.is_completed || selectedProposal.status === 'completed') && projectHasMonetaryCosts(selectedProposal) && (
+              <div style={{ marginTop: '1.5rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <Receipt size={16} color="var(--color-gold-text)" />
+                  <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.9rem' }}>
+                    Proof of Purchase (Receipt) Audit
+                  </span>
+                </div>
+
+                {selectedProposal.receipt_url ? (
+                  <div>
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <a
+                        href={selectedProposal.receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-primary"
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <FileCheck size={14} /> Open Receipt Document / Image <ExternalLink size={12} />
+                      </a>
+                    </div>
+
+                    <div style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                      Current Audit Status: <strong style={{ textTransform: 'capitalize' }}>{selectedProposal.receipt_status || 'Pending'}</strong>
+                    </div>
+
+                    {isLeadership && (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Optional feedback notes for student (e.g. Total matches budget, or Re-upload itemized receipt)..."
+                          value={receiptFeedback}
+                          onChange={(e) => setReceiptFeedback(e.target.value)}
+                          style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.82rem', marginBottom: '0.5rem' }}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                            disabled={actionLoading}
+                            onClick={() => handleReceiptAudit('approved')}
+                          >
+                            <CheckCircle2 size={13} /> Approve Receipt
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', borderColor: 'var(--color-terracotta)', color: 'var(--color-terracotta)' }}
+                            disabled={actionLoading}
+                            onClick={() => handleReceiptAudit('rejected')}
+                          >
+                            <XCircle size={13} /> Request Resubmission
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.82rem', color: 'var(--color-terracotta-text)' }}>
+                    Student has not yet uploaded proof of purchase receipt.
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Decision Controls (if active reviewer) */}
             {((isLeadership && selectedProposal.status === 'pending_leadership') ||
@@ -293,7 +445,7 @@ export const TwoStageReviewDesk: React.FC = () => {
                   rows={2}
                   placeholder="Optional review feedback, notes, or required revisions..."
                   value={decisionNotes}
-                  onChange={e => setDecisionNotes(e.target.value)}
+                  onChange={(e) => setDecisionNotes(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none', marginBottom: '1rem' }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -319,7 +471,7 @@ export const TwoStageReviewDesk: React.FC = () => {
 
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setSelectedProposal(null)}>
-                Close Dossier
+                Close
               </button>
             </div>
           </div>

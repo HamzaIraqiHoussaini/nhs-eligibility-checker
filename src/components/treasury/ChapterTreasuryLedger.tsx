@@ -2,28 +2,30 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { ChapterFundEntry, ChapterTreasurySummary } from '../../types/nhs';
-import { Coins, Plus, Trash2, X } from 'lucide-react';
+import { Coins, Trash2, X, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
+
+const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '2028-2029'];
 
 export const ChapterTreasuryLedger: React.FC = () => {
   const { isLeadership, isSupervisor } = useAuth();
   const canManage = isLeadership || isSupervisor;
 
+  const [selectedYear, setSelectedYear] = useState('2025-2026');
   const [entries, setEntries] = useState<ChapterFundEntry[]>([]);
-  const [summary, setSummary] = useState<ChapterTreasurySummary>({
-    id: 'main',
+  const [yearlySummary, setYearlySummary] = useState<ChapterTreasurySummary>({
+    id: '2025-2026',
     total_funds: 23000,
     total_income: 0,
     as_of_date: 'April 28, 2026',
   });
   const [loading, setLoading] = useState(true);
 
-  // Add/Edit Modal
+  // Add Entry Modal (Expense or Income)
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
   const [transDate, setTransDate] = useState('Apr 2026');
   const [projectName, setProjectName] = useState('');
   const [who, setWho] = useState('');
-  const [reimbursed, setReimbursed] = useState<'YES' | 'NO'>('NO');
   const [reason, setReason] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -31,58 +33,101 @@ export const ChapterTreasuryLedger: React.FC = () => {
   // Edit Baseline Modal
   const [isBaselineOpen, setIsBaselineOpen] = useState(false);
   const [baseTotalFunds, setBaseTotalFunds] = useState('23000');
-  const [baseTotalIncome, setBaseTotalIncome] = useState('0');
   const [baseAsOfDate, setBaseAsOfDate] = useState('April 28, 2026');
 
-  const loadTreasuryData = async () => {
+  const loadTreasuryData = async (year: string) => {
     setLoading(true);
     try {
-      // 1. Load Summary
+      // 1. Load Yearly Baseline
       const { data: sumData } = await supabase
-        .from('chapter_treasury_summary')
+        .from('chapter_yearly_treasury')
         .select('*')
-        .eq('id', 'main')
-        .single();
+        .eq('academic_year', year)
+        .maybeSingle();
+
       if (sumData) {
-        setSummary(sumData as ChapterTreasurySummary);
-        setBaseTotalFunds(String(sumData.total_funds));
-        setBaseTotalIncome(String(sumData.total_income));
+        setYearlySummary({
+          id: sumData.academic_year,
+          total_funds: Number(sumData.starting_funds),
+          total_income: 0,
+          as_of_date: sumData.as_of_date,
+        });
+        setBaseTotalFunds(String(sumData.starting_funds));
         setBaseAsOfDate(sumData.as_of_date);
+      } else {
+        // Default rollover baseline
+        setYearlySummary({
+          id: year,
+          total_funds: 21600,
+          total_income: 0,
+          as_of_date: `Academic Year ${year}`,
+        });
+        setBaseTotalFunds('21600');
+        setBaseAsOfDate(`Academic Year ${year}`);
       }
 
-      // 2. Load Ledger Entries
+      // 2. Load Ledger Entries for this Academic Year
       const { data: entData, error } = await supabase
         .from('chapter_funds')
         .select('*')
+        .eq('academic_year', year)
         .order('created_at', { ascending: true });
+
       if (error) throw error;
       setEntries((entData as ChapterFundEntry[]) || []);
     } catch (err) {
-      console.error('Failed to load treasury data:', err);
+      console.error('Failed to load treasury data for year:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadTreasuryData();
-  }, []);
+    loadTreasuryData(selectedYear);
+  }, [selectedYear]);
 
   // Compute calculated metrics
-  const totalAmountTakenOut = entries.reduce((acc, curr) => acc + Number(curr.amount_taken_out || 0), 0);
-  const totalReimbursedCosts = entries
+  const expenseEntries = entries.filter((e: any) => e.entry_type !== 'income');
+  const incomeEntries = entries.filter((e: any) => e.entry_type === 'income');
+
+  const totalExpensesRecorded = expenseEntries.reduce((acc, curr) => acc + Number(curr.amount_taken_out || 0), 0);
+  const totalReimbursedCosts = expenseEntries
     .filter((e) => e.reimbursed === 'YES')
     .reduce((acc, curr) => acc + Number(curr.amount_taken_out || 0), 0);
 
-  // Final Balance = Total Funds - Reimbursed Costs + Total Income
-  const finalBalance = Number(summary.total_funds) - totalReimbursedCosts + Number(summary.total_income);
+  const totalDynamicIncome = incomeEntries.reduce((acc, curr) => acc + Number(curr.amount_taken_out || 0), 0) + Number(yearlySummary.total_income || 0);
 
-  const handleOpenAddModal = () => {
-    setEditingId(null);
+  // Logical continuation: Final Balance = Total Funds - Reimbursed Costs + Total Income
+  const finalBalance = Number(yearlySummary.total_funds) - totalReimbursedCosts + totalDynamicIncome;
+
+  // Toggle Reimbursed Status In-Table
+  const handleToggleReimbursed = async (entry: ChapterFundEntry) => {
+    if (!canManage) return;
+    const newStatus = entry.reimbursed === 'YES' ? 'NO' : 'YES';
+
+    // Optimistic update
+    setEntries((prev) =>
+      prev.map((e) => (e.id === entry.id ? { ...e, reimbursed: newStatus } : e))
+    );
+
+    try {
+      const { error } = await supabase
+        .from('chapter_funds')
+        .update({ reimbursed: newStatus })
+        .eq('id', entry.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed toggling reimbursed status:', err);
+      // Revert on error
+      loadTreasuryData(selectedYear);
+    }
+  };
+
+  const handleOpenAddModal = (type: 'expense' | 'income') => {
+    setEntryType(type);
     setTransDate('Apr 2026');
     setProjectName('');
     setWho('');
-    setReimbursed('NO');
     setReason('');
     setAmount('');
     setIsModalOpen(true);
@@ -91,43 +136,31 @@ export const ChapterTreasuryLedger: React.FC = () => {
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 0) {
-      alert('Please enter a valid numeric amount.');
+    if (isNaN(numAmount) || numAmount <= 0) {
+      alert('Please enter a valid positive numeric amount.');
       return;
     }
 
     setSaving(true);
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('chapter_funds')
-          .update({
-            transaction_date: transDate.trim(),
-            project_name: projectName.trim(),
-            who: who.trim(),
-            reimbursed,
-            reason: reason.trim(),
-            amount_taken_out: numAmount,
-          })
-          .eq('id', editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('chapter_funds').insert({
-          transaction_date: transDate.trim(),
-          project_name: projectName.trim(),
-          who: who.trim(),
-          reimbursed,
-          reason: reason.trim(),
-          amount_taken_out: numAmount,
-        });
-        if (error) throw error;
-      }
+      const { error } = await supabase.from('chapter_funds').insert({
+        academic_year: selectedYear,
+        entry_type: entryType,
+        transaction_date: transDate.trim(),
+        project_name: projectName.trim(),
+        who: who.trim(),
+        reimbursed: 'NO', // Default to NO, toggled in table
+        reason: reason.trim(),
+        amount_taken_out: numAmount,
+      });
+
+      if (error) throw error;
 
       setIsModalOpen(false);
-      await loadTreasuryData();
+      await loadTreasuryData(selectedYear);
     } catch (err: any) {
-      console.error('Failed saving funding entry:', err);
-      alert(err.message || 'Failed to save funding record.');
+      console.error('Failed saving entry:', err);
+      alert(err.message || 'Failed to save record.');
     } finally {
       setSaving(false);
     }
@@ -138,7 +171,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
     try {
       const { error } = await supabase.from('chapter_funds').delete().eq('id', id);
       if (error) throw error;
-      await loadTreasuryData();
+      await loadTreasuryData(selectedYear);
     } catch (err: any) {
       alert(err.message || 'Failed to delete record.');
     }
@@ -148,16 +181,15 @@ export const ChapterTreasuryLedger: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const { error } = await supabase.from('chapter_treasury_summary').upsert({
-        id: 'main',
-        total_funds: parseFloat(baseTotalFunds) || 0,
-        total_income: parseFloat(baseTotalIncome) || 0,
+      const { error } = await supabase.from('chapter_yearly_treasury').upsert({
+        academic_year: selectedYear,
+        starting_funds: parseFloat(baseTotalFunds) || 0,
         as_of_date: baseAsOfDate.trim(),
         updated_at: new Date().toISOString(),
       });
       if (error) throw error;
       setIsBaselineOpen(false);
-      await loadTreasuryData();
+      await loadTreasuryData(selectedYear);
     } catch (err: any) {
       alert(err.message || 'Failed to update treasury baseline.');
     } finally {
@@ -178,12 +210,12 @@ export const ChapterTreasuryLedger: React.FC = () => {
             Project Funding & Reimbursements
           </h1>
           <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-            Official accounting ledger for Casablanca American School National Honor Society chapter funds.
+            Accounting ledger with academic year timelines, revenue tracking, and in-table reimbursement toggles.
           </p>
         </div>
 
         {canManage && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               className="btn-secondary"
@@ -194,34 +226,71 @@ export const ChapterTreasuryLedger: React.FC = () => {
             </button>
             <button
               type="button"
+              className="btn-secondary"
+              style={{ fontSize: '0.82rem', color: 'var(--color-sage-text)' }}
+              onClick={() => handleOpenAddModal('income')}
+            >
+              <TrendingUp size={14} /> + Record Income
+            </button>
+            <button
+              type="button"
               className="btn-primary"
               style={{ fontSize: '0.82rem' }}
-              onClick={handleOpenAddModal}
+              onClick={() => handleOpenAddModal('expense')}
             >
-              <Plus size={14} /> Record Project Expense
+              <TrendingDown size={14} /> + Record Expense
             </button>
           </div>
         )}
       </div>
 
-      {/* Official Balance Title Banner */}
+      {/* Academic Year Timeline Selector & Balance Bar */}
       <div style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderLeft: '4px solid var(--color-navy)',
-        padding: '1rem 1.25rem',
+        padding: '1.25rem 1.5rem',
         marginBottom: '1.5rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem',
+        gap: '1.25rem',
       }}>
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', fontWeight: 700 }}>
-          Balance as of {summary.as_of_date} ({finalBalance.toLocaleString()} DHS)
+        {/* Timeline Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Academic Year Timeline:
+          </label>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            style={{
+              padding: '0.45rem 0.85rem',
+              fontWeight: 700,
+              fontSize: '0.92rem',
+              color: 'var(--color-navy)',
+              border: '2px solid var(--color-oxford)',
+              backgroundColor: 'var(--color-canvas)',
+              cursor: 'pointer',
+            }}
+          >
+            {ACADEMIC_YEARS.map((yr) => (
+              <option key={yr} value={yr}>
+                Academic Year {yr}
+              </option>
+            ))}
+          </select>
         </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-          Audited under CAS NHS Financial Regulations
+
+        {/* Dynamic Balance Headline */}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', fontWeight: 700 }}>
+            Balance as of {yearlySummary.as_of_date} ({finalBalance.toLocaleString()} DHS)
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+            Sequential fund continuation for {selectedYear}
+          </div>
         </div>
       </div>
 
@@ -232,11 +301,15 @@ export const ChapterTreasuryLedger: React.FC = () => {
             <thead>
               <tr style={{ backgroundColor: '#FCE7F3', borderBottom: '2px solid #F472B6' }}>
                 <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Date</th>
-                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Project</th>
+                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Project / Source</th>
                 <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Who?</th>
-                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem', textAlign: 'center' }}>Reimbursed?</th>
-                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Reason</th>
-                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem', textAlign: 'right' }}>Amount Taken Out (DHS)</th>
+                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem', textAlign: 'center' }}>
+                  Reimbursed? (Toggle)
+                </th>
+                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem' }}>Reason / Details</th>
+                <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem', textAlign: 'right' }}>
+                  Amount (DHS)
+                </th>
                 {canManage && <th style={{ color: '#831843', fontWeight: 700, padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>}
               </tr>
             </thead>
@@ -244,66 +317,102 @@ export const ChapterTreasuryLedger: React.FC = () => {
               {loading ? (
                 <tr>
                   <td colSpan={canManage ? 7 : 6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                    Loading financial ledger...
+                    Loading financial ledger for {selectedYear}...
                   </td>
                 </tr>
               ) : entries.length === 0 ? (
                 <tr>
                   <td colSpan={canManage ? 7 : 6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                    No expenses recorded in chapter treasury.
+                    No expenses or income entries recorded for Academic Year {selectedYear}.
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
-                  <tr key={entry.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ fontWeight: 600, color: 'var(--color-navy)', whiteSpace: 'nowrap' }}>
-                      {entry.transaction_date}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{entry.project_name}</td>
-                    <td style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{entry.who}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.2rem 0.6rem',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          borderRadius: '2px',
-                          backgroundColor: entry.reimbursed === 'YES' ? 'var(--color-sage-bg)' : '#F1F5F9',
-                          color: entry.reimbursed === 'YES' ? 'var(--color-sage-text)' : 'var(--color-text-muted)',
-                          border: entry.reimbursed === 'YES' ? '1px solid #A7F3D0' : '1px solid var(--color-border)',
-                        }}
-                      >
-                        {entry.reimbursed}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{entry.reason}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.92rem' }}>
-                      {Number(entry.amount_taken_out).toLocaleString()}
-                    </td>
-                    {canManage && (
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          className="btn-inspect"
-                          style={{ color: 'var(--color-terracotta)', padding: '0.25rem 0.5rem' }}
-                          title="Delete line"
-                          onClick={() => handleDeleteEntry(entry.id, entry.project_name)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                entries.map((entry: any) => {
+                  const isIncome = entry.entry_type === 'income';
+                  return (
+                    <tr key={entry.id} style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: isIncome ? '#F0FDF4' : undefined }}>
+                      <td style={{ fontWeight: 600, color: 'var(--color-navy)', whiteSpace: 'nowrap' }}>
+                        {entry.transaction_date}
                       </td>
-                    )}
-                  </tr>
-                ))
+                      <td style={{ fontWeight: 600 }}>
+                        {entry.project_name}
+                        {isIncome && (
+                          <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.15rem 0.4rem', backgroundColor: '#DCFCE7', color: '#166534', fontWeight: 700 }}>
+                            INCOME
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>{entry.who}</td>
+                      
+                      {/* IN-TABLE INTERACTIVE TOGGLE */}
+                      <td style={{ textAlign: 'center' }}>
+                        {isIncome ? (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
+                        ) : canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReimbursed(entry)}
+                            title="Click to toggle reimbursement status"
+                            style={{
+                              padding: '0.25rem 0.65rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              borderRadius: '2px',
+                              border: entry.reimbursed === 'YES' ? '1px solid #A7F3D0' : '1px solid var(--color-border)',
+                              backgroundColor: entry.reimbursed === 'YES' ? 'var(--color-sage-bg)' : '#F1F5F9',
+                              color: entry.reimbursed === 'YES' ? 'var(--color-sage-text)' : 'var(--color-text-muted)',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            {entry.reimbursed} <ArrowRightLeft size={10} style={{ display: 'inline', marginLeft: '3px' }} />
+                          </button>
+                        ) : (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '0.2rem 0.6rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              borderRadius: '2px',
+                              backgroundColor: entry.reimbursed === 'YES' ? 'var(--color-sage-bg)' : '#F1F5F9',
+                              color: entry.reimbursed === 'YES' ? 'var(--color-sage-text)' : 'var(--color-text-muted)',
+                              border: entry.reimbursed === 'YES' ? '1px solid #A7F3D0' : '1px solid var(--color-border)',
+                            }}
+                          >
+                            {entry.reimbursed}
+                          </span>
+                        )}
+                      </td>
+
+                      <td style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{entry.reason}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'monospace', fontSize: '0.92rem', color: isIncome ? '#166534' : 'inherit' }}>
+                        {isIncome ? `+${Number(entry.amount_taken_out).toLocaleString()}` : Number(entry.amount_taken_out).toLocaleString()}
+                      </td>
+                      {canManage && (
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            className="btn-inspect"
+                            style={{ color: 'var(--color-terracotta)', padding: '0.25rem 0.5rem' }}
+                            title="Delete line"
+                            onClick={() => handleDeleteEntry(entry.id, entry.project_name)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             <tfoot>
               <tr style={{ backgroundColor: '#F8FAFC', borderTop: '2px solid var(--color-border)', fontWeight: 700 }}>
                 <td colSpan={5} style={{ textAlign: 'right', padding: '0.85rem 1rem', textTransform: 'uppercase', fontSize: '0.82rem', letterSpacing: '0.04em' }}>
-                  Total Expenses Recorded
+                  Total Expenses Recorded ({selectedYear})
                 </td>
                 <td style={{ textAlign: 'right', padding: '0.85rem 1rem', fontFamily: 'monospace', fontSize: '1rem', color: 'var(--color-navy)' }}>
-                  {totalAmountTakenOut.toLocaleString()} DHS
+                  {totalExpensesRecorded.toLocaleString()} DHS
                 </td>
                 {canManage && <td></td>}
               </tr>
@@ -324,7 +433,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
             <thead>
               <tr style={{ backgroundColor: '#FCE7F3', borderBottom: '2px solid #F472B6' }}>
                 <th style={{ textAlign: 'left', padding: '0.75rem 1.25rem', color: '#831843', fontWeight: 700 }}>
-                  Summary
+                  Summary ({selectedYear})
                 </th>
                 <th style={{ textAlign: 'right', padding: '0.75rem 1.25rem', color: '#831843', fontWeight: 700 }}>
                   Amount (DHS)
@@ -333,9 +442,9 @@ export const ChapterTreasuryLedger: React.FC = () => {
             </thead>
             <tbody>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '0.65rem 1.25rem', color: 'var(--color-navy)', fontWeight: 600 }}>Total Funds</td>
+                <td style={{ padding: '0.65rem 1.25rem', color: 'var(--color-navy)', fontWeight: 600 }}>Total Funds (Baseline)</td>
                 <td style={{ padding: '0.65rem 1.25rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
-                  {Number(summary.total_funds).toLocaleString()}
+                  {Number(yearlySummary.total_funds).toLocaleString()}
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -348,8 +457,8 @@ export const ChapterTreasuryLedger: React.FC = () => {
               </tr>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <td style={{ padding: '0.65rem 1.25rem', color: 'var(--color-navy)', fontWeight: 600 }}>Total Income</td>
-                <td style={{ padding: '0.65rem 1.25rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
-                  {Number(summary.total_income).toLocaleString()}
+                <td style={{ padding: '0.65rem 1.25rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#166534' }}>
+                  +{totalDynamicIncome.toLocaleString()}
                 </td>
               </tr>
               {/* Highlighted Yellow Final Balance Row */}
@@ -368,20 +477,20 @@ export const ChapterTreasuryLedger: React.FC = () => {
         {/* Informational Guidance Box */}
         <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.5rem', lineHeight: '1.6' }}>
           <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-            CAS Chapter Reimbursement Guidelines
+            Academic Year Continuation Guidelines
           </h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 0.75rem' }}>
-            All expenditures must be pre-approved during the 2-stage project proposal process (Leadership Review followed by Chapter Supervisor approval).
+            The <strong>Final Balance</strong> of each academic year seamlessly rolls into the starting baseline of the subsequent year.
           </p>
           <ul style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', paddingLeft: '1.25rem', margin: 0 }}>
-            <li>Original receipts and itemized proof of purchase must be filed with the CAS Nurse or Faculty Sponsor.</li>
-            <li>Reimbursements marked <strong>YES</strong> are immediately deducted against the chapter's master fund.</li>
-            <li>All withdrawals require consensus from both Chapter Leadership and Chapter Supervisors.</li>
+            <li>Clicking <strong>NO / YES</strong> in the table toggles whether the expenditure has been officially reimbursed.</li>
+            <li>Only expenses with <strong>YES</strong> are subtracted from the chapter's master funds.</li>
+            <li>Revenues recorded as <strong>Income</strong> augment chapter funds directly.</li>
           </ul>
         </div>
       </div>
 
-      {/* RECORD EXPENSE MODAL */}
+      {/* RECORD ENTRY MODAL (EXPENSE OR INCOME) */}
       {isModalOpen && (
         <div className="drawer-backdrop" onClick={() => setIsModalOpen(false)}>
           <div
@@ -404,10 +513,12 @@ export const ChapterTreasuryLedger: React.FC = () => {
             </button>
 
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-              Record Project Expense
+              Record {entryType === 'income' ? 'Chapter Income' : 'Project Expense'} ({selectedYear})
             </h2>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 1.25rem' }}>
-              Add an itemized expenditure to the official CAS NHS ledger.
+              {entryType === 'income'
+                ? 'Record funds generated from bake sales, member dues, or CAS institutional grants.'
+                : 'Log an expenditure. Reimbursement status (YES/NO) can be toggled directly in the table.'}
             </p>
 
             <form onSubmit={handleSaveEntry} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -428,12 +539,12 @@ export const ChapterTreasuryLedger: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                    Project Name *
+                    {entryType === 'income' ? 'Income Source / Project *' : 'Project Name *'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. CPR Training, Spelling Bee"
+                    placeholder={entryType === 'income' ? 'e.g. Bake Sale Proceeds' : 'e.g. CPR Training'}
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
@@ -441,45 +552,29 @@ export const ChapterTreasuryLedger: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                    Who? (Recipient / Organizer) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. CAS Nurse, Student Names"
-                    value={who}
-                    onChange={(e) => setWho(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                    Reimbursed? *
-                  </label>
-                  <select
-                    value={reimbursed}
-                    onChange={(e) => setReimbursed(e.target.value as 'YES' | 'NO')}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
-                  >
-                    <option value="NO">NO (Pending / Non-reimbursed)</option>
-                    <option value="YES">YES (Deducted from Funds)</option>
-                  </select>
-                </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                  {entryType === 'income' ? 'Organizer / Donor *' : 'Who? (Recipient / Organizer) *'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={entryType === 'income' ? 'e.g. NHS Officers, Sponsor' : 'e.g. CAS Nurse, Student Names'}
+                  value={who}
+                  onChange={(e) => setWho(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                    Reason *
+                    Reason / Details *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Pizza, Case Packets, Costs Covered"
+                    placeholder={entryType === 'income' ? 'e.g. Spring Bake Sale revenue' : 'e.g. Pizza, Case Packets, Costs Covered'}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
@@ -493,9 +588,9 @@ export const ChapterTreasuryLedger: React.FC = () => {
                   <input
                     type="number"
                     required
-                    min="0"
+                    min="1"
                     step="any"
-                    placeholder="1400"
+                    placeholder="1000"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
@@ -508,7 +603,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Saving...' : 'Add to Ledger'}
+                  {saving ? 'Saving...' : entryType === 'income' ? 'Record Income' : 'Record Expense'}
                 </button>
               </div>
             </form>
@@ -539,10 +634,10 @@ export const ChapterTreasuryLedger: React.FC = () => {
             </button>
 
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-              Edit Treasury Baseline
+              Edit Baseline ({selectedYear})
             </h2>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 1.25rem' }}>
-              Configure base chapter funding allocation and reporting date.
+              Configure base chapter funding allocation and reporting date for this academic year.
             </p>
 
             <form onSubmit={handleSaveBaseline} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -555,19 +650,6 @@ export const ChapterTreasuryLedger: React.FC = () => {
                   required
                   value={baseTotalFunds}
                   onChange={(e) => setBaseTotalFunds(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                  Total Income / Sponsorships (DHS) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={baseTotalIncome}
-                  onChange={(e) => setBaseTotalIncome(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
                 />
               </div>

@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import type { AllowlistEntry, UserRole } from '../../types/nhs';
-import { UserPlus, Trash2, Key, Copy, Check, ShieldCheck, RefreshCw, X } from 'lucide-react';
+import {
+  UserPlus,
+  Trash2,
+  Key,
+  Copy,
+  Check,
+  ShieldCheck,
+  RefreshCw,
+  X,
+  Archive,
+  UserMinus,
+  RotateCcw,
+} from 'lucide-react';
 
 function generateAccessCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -22,9 +35,15 @@ interface RevealCodeData {
   isReset?: boolean;
 }
 
+const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
+
 export const AllowlistManager: React.FC = () => {
+  const { user, refreshProfile } = useAuth();
+  const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
+
   const [entries, setEntries] = useState<AllowlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewTab, setViewTab] = useState<'active' | 'archived'>('active');
 
   // Single Add Form
   const [email, setEmail] = useState('');
@@ -62,6 +81,11 @@ export const AllowlistManager: React.FC = () => {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) return;
 
+    if (role === 'leadership' && !isSuperadmin) {
+      alert('Only the Superadmin can authorize new Leadership accounts directly. You can promote existing members to leadership.');
+      return;
+    }
+
     setProvisioning(true);
     setErrorMsg(null);
 
@@ -69,7 +93,6 @@ export const AllowlistManager: React.FC = () => {
     const memberName = fullName.trim() || cleanEmail.split('@')[0];
 
     try {
-      // Call Supabase Database RPC to securely provision member in auth.users and allowlist
       const { data, error } = await supabase.rpc('provision_member', {
         p_email: cleanEmail,
         p_full_name: memberName,
@@ -80,7 +103,6 @@ export const AllowlistManager: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Show one-time code reveal modal
       setRevealData({
         email: cleanEmail,
         fullName: memberName,
@@ -102,6 +124,11 @@ export const AllowlistManager: React.FC = () => {
   };
 
   const handleResetCode = async (entry: AllowlistEntry) => {
+    if (entry.role === 'leadership' && !isSuperadmin) {
+      alert('Leadership policy: Only the Chapter Superadmin can reset Leadership access codes.');
+      return;
+    }
+
     if (!confirm(`Generate a new access code for ${entry.email}? Their old code will be invalidated.`)) return;
 
     const newCode = generateAccessCode();
@@ -132,6 +159,83 @@ export const AllowlistManager: React.FC = () => {
     }
   };
 
+  // Promote Member to Leadership
+  const handlePromoteToLeadership = async (entry: AllowlistEntry) => {
+    if (!confirm(`Promote ${entry.full_name || entry.email} to Chapter Leadership?`)) return;
+
+    try {
+      await supabase.from('allowlist').update({ role: 'leadership' }).eq('email', entry.email);
+      await supabase.from('profiles').update({ role: 'leadership' }).eq('email', entry.email);
+      await loadAllowlist();
+      alert(`${entry.full_name || entry.email} has been promoted to Leadership.`);
+    } catch (err: any) {
+      alert(`Failed to promote member: ${err.message}`);
+    }
+  };
+
+  // Self-demote leader to "past leader"
+  const handleSelfDemote = async () => {
+    if (!user?.email) return;
+    if (isSuperadmin) {
+      alert('The primary Superadmin cannot demote themselves.');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to step down from Leadership and become a "Past Leader"? You will transition to past officer standing.')) {
+      return;
+    }
+
+    try {
+      await supabase.from('allowlist').update({ role: 'past_leadership' }).eq('email', user.email);
+      await supabase.from('profiles').update({ role: 'past_leadership' }).eq('id', user.id);
+      await refreshProfile();
+      await loadAllowlist();
+      alert('You have stepped down to Past Leader status.');
+    } catch (err: any) {
+      alert(`Failed to step down: ${err.message}`);
+    }
+  };
+
+  // Archive Account (e.g. past_member, kicked_out, etc.)
+  const handleArchiveAccount = async (targetEmail: string, archiveRole: UserRole) => {
+    if (targetEmail.toLowerCase() === SUPERADMIN_EMAIL) {
+      alert('The primary Superadmin cannot be archived.');
+      return;
+    }
+
+    if (!confirm(`Move ${targetEmail} to status: ${archiveRole}?`)) return;
+
+    try {
+      await supabase.from('allowlist').update({ role: archiveRole }).eq('email', targetEmail);
+      await supabase.from('profiles').update({
+        role: archiveRole,
+        is_restricted: archiveRole === 'kicked_out',
+        restricted_reason: archiveRole === 'kicked_out' ? 'Dismissed from CAS NHS.' : null,
+      }).eq('email', targetEmail);
+      await loadAllowlist();
+    } catch (err: any) {
+      alert(`Failed to archive account: ${err.message}`);
+    }
+  };
+
+  // Restore Account from Archive to Active Member
+  const handleRestoreAccount = async (targetEmail: string) => {
+    if (!confirm(`Restore ${targetEmail} back to active Member standing?`)) return;
+
+    try {
+      await supabase.from('allowlist').update({ role: 'member' }).eq('email', targetEmail);
+      await supabase.from('profiles').update({
+        role: 'member',
+        is_restricted: false,
+        restricted_reason: null,
+      }).eq('email', targetEmail);
+      await loadAllowlist();
+      alert(`${targetEmail} has been restored to active Member standing.`);
+    } catch (err: any) {
+      alert(`Failed to restore account: ${err.message}`);
+    }
+  };
+
   const handleCopyCode = () => {
     if (!revealData) return;
     navigator.clipboard.writeText(revealData.code);
@@ -139,36 +243,38 @@ export const AllowlistManager: React.FC = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleRemove = async (targetEmail: string) => {
-    if (targetEmail.toLowerCase() === 'hiraqihoussaini@cas.ac.ma') {
-      alert('The primary super admin cannot be removed.');
-      return;
-    }
-
-    if (!confirm(`Revoke access for ${targetEmail}?`)) return;
-
-    try {
-      await supabase.from('allowlist').delete().eq('email', targetEmail);
-      await loadAllowlist();
-    } catch (err) {
-      console.error('Failed deleting allowlist entry:', err);
-    }
-  };
+  const activeEntries = entries.filter((e) => !['past_leadership', 'past_member', 'past_supervisor', 'kicked_out'].includes(e.role));
+  const archivedEntries = entries.filter((e) => ['past_leadership', 'past_member', 'past_supervisor', 'kicked_out'].includes(e.role));
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          <ShieldCheck size={16} /> Access Control & Account Provisioning
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+            <ShieldCheck size={16} /> Access Control & Governance
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
+            Member Onboarding & Account Management
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
+            Provision one-time codes, manage leadership promotions, and view chapter account archives.
+          </p>
         </div>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-          Member Onboarding & Access Codes
-        </h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-          Add authorized students and officers. An automated 24-character one-time passcode is generated for you to send to each person.
-        </p>
+
+        {/* Self Demotion for non-superadmin Leaders */}
+        {!isSuperadmin && (
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ fontSize: '0.82rem', color: 'var(--color-terracotta)' }}
+            onClick={handleSelfDemote}
+            title="Step down to Past Leader status"
+          >
+            <UserMinus size={14} /> Demote Myself to Past Leader
+          </button>
+        )}
       </div>
 
       {errorMsg && (
@@ -192,7 +298,7 @@ export const AllowlistManager: React.FC = () => {
               required
               placeholder="student@cas.ac.ma"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             />
           </div>
@@ -206,22 +312,22 @@ export const AllowlistManager: React.FC = () => {
               required
               placeholder="First & Last Name"
               value={fullName}
-              onChange={e => setFullName(e.target.value)}
+              onChange={(e) => setFullName(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-              Assigned Role *
+              Role *
             </label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as UserRole)}
+              onChange={(e) => setRole(e.target.value as UserRole)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             >
               <option value="member">Member</option>
-              <option value="leadership">Leadership (Officer)</option>
+              {isSuperadmin && <option value="leadership">Leadership (Officer)</option>}
               <option value="supervisor">Supervisor (Advisor)</option>
             </select>
           </div>
@@ -233,66 +339,148 @@ export const AllowlistManager: React.FC = () => {
         </form>
       </div>
 
+      {/* Tabs: Active Accounts vs Archive */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.25rem' }}>
+        <button
+          type="button"
+          className={`filter-chip ${viewTab === 'active' ? 'active' : ''}`}
+          style={{ padding: '0.55rem 1.15rem' }}
+          onClick={() => setViewTab('active')}
+        >
+          Active Chapter Accounts ({activeEntries.length})
+        </button>
+
+        <button
+          type="button"
+          className={`filter-chip ${viewTab === 'archived' ? 'active' : ''}`}
+          style={{ padding: '0.55rem 1.15rem' }}
+          onClick={() => setViewTab('archived')}
+        >
+          <Archive size={13} style={{ display: 'inline', marginRight: '4px' }} />
+          Account Archive ({archivedEntries.length})
+        </button>
+      </div>
+
       {/* Roster Table */}
       <div className="roster-table-wrapper">
         <table className="roster-table">
           <thead>
             <tr>
-              <th>Authorized Member</th>
+              <th>Account</th>
               <th>Full Name</th>
-              <th>Assigned Role</th>
-              <th style={{ textAlign: 'right' }}>Security & Code Actions</th>
+              <th>Chapter Role</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  Loading authorized members...
+                  Loading accounts...
                 </td>
               </tr>
-            ) : entries.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                  No members currently authorized.
-                </td>
-              </tr>
-            ) : (
-              entries.map(item => (
-                <tr key={item.email}>
-                  <td>
-                    <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{item.email}</div>
-                  </td>
-                  <td>{item.full_name || '—'}</td>
-                  <td>
-                    <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
-                      {item.role}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                      <button
-                        className="btn-inspect"
-                        style={{ color: 'var(--color-oxford)' }}
-                        title="Generate a new one-time passcode for this member"
-                        onClick={() => handleResetCode(item)}
-                      >
-                        <RefreshCw size={12} /> Reset Code
-                      </button>
-
-                      {item.email.toLowerCase() !== 'hiraqihoussaini@cas.ac.ma' && (
-                        <button
-                          className="btn-inspect"
-                          style={{ color: 'var(--color-terracotta)' }}
-                          onClick={() => handleRemove(item.email)}
-                        >
-                          <Trash2 size={12} /> Revoke
-                        </button>
-                      )}
-                    </div>
+            ) : viewTab === 'active' ? (
+              activeEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    No active members found.
                   </td>
                 </tr>
-              ))
+              ) : (
+                activeEntries.map((item) => {
+                  const isItemLeader = item.role === 'leadership';
+                  const canResetThisCode = !isItemLeader || isSuperadmin;
+
+                  return (
+                    <tr key={item.email}>
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{item.email}</div>
+                      </td>
+                      <td>{item.full_name || '—'}</td>
+                      <td>
+                        <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
+                          {item.role}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {/* Reset Code Button */}
+                          {canResetThisCode ? (
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-oxford)' }}
+                              title="Generate a new one-time passcode for this member"
+                              onClick={() => handleResetCode(item)}
+                            >
+                              <RefreshCw size={12} /> Reset Code
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '0.2rem 0.4rem' }}>
+                              Protected (Superadmin only)
+                            </span>
+                          )}
+
+                          {/* Promote Member to Leadership */}
+                          {item.role === 'member' && (
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-gold-text)' }}
+                              title="Promote this member to chapter leadership"
+                              onClick={() => handlePromoteToLeadership(item)}
+                            >
+                              Promote to Leader
+                            </button>
+                          )}
+
+                          {/* Archive Options */}
+                          {item.email.toLowerCase() !== SUPERADMIN_EMAIL && (
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-terracotta)' }}
+                              onClick={() => handleArchiveAccount(item.email, item.role === 'leadership' ? 'past_leadership' : 'kicked_out')}
+                            >
+                              <Trash2 size={12} /> {item.role === 'leadership' ? 'Demote to Past Leader' : 'Dismiss / Kick Out'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )
+            ) : (
+              /* ARCHIVED VIEW */
+              archivedEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    No archived accounts found.
+                  </td>
+                </tr>
+              ) : (
+                archivedEntries.map((item) => (
+                  <tr key={item.email}>
+                    <td>
+                      <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{item.email}</div>
+                    </td>
+                    <td>{item.full_name || '—'}</td>
+                    <td>
+                      <span className="status-pill ineligible" style={{ textTransform: 'capitalize', fontSize: '0.72rem' }}>
+                        {item.role.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="btn-inspect"
+                        style={{ color: 'var(--color-sage-text)' }}
+                        onClick={() => handleRestoreAccount(item.email)}
+                        title="Restore account back to active member standing"
+                      >
+                        <RotateCcw size={12} /> Restore Account
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )
             )}
           </tbody>
         </table>
@@ -312,7 +500,7 @@ export const AllowlistManager: React.FC = () => {
               position: 'relative',
               textAlign: 'center',
             }}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setRevealData(null)}
@@ -332,7 +520,6 @@ export const AllowlistManager: React.FC = () => {
               Generated for <strong>{revealData.fullName}</strong> ({revealData.email}) • Role: <strong style={{ textTransform: 'capitalize' }}>{revealData.role}</strong>
             </p>
 
-            {/* Monospace Code Display */}
             <div style={{
               backgroundColor: '#0F172A',
               color: '#38BDF8',

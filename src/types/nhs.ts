@@ -1,4 +1,11 @@
-export type UserRole = 'leadership' | 'supervisor' | 'member';
+export type UserRole =
+  | 'leadership'
+  | 'supervisor'
+  | 'member'
+  | 'past_leadership'
+  | 'past_supervisor'
+  | 'past_member'
+  | 'kicked_out';
 
 export type ProbationReason = 'grades' | 'behavior' | 'attendance' | 'inactivity' | null;
 
@@ -32,6 +39,8 @@ export interface Semester {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  academic_year?: string;
+  semester_number?: number;
   created_at: string;
 }
 
@@ -74,6 +83,12 @@ export interface ProjectProposal {
   is_completed: boolean;
   completed_notes?: string;
   completed_at?: string;
+  receipt_url?: string;
+  receipt_status?: 'none' | 'pending_review' | 'approved' | 'rejected';
+  receipt_notes?: string;
+  receipt_uploaded_at?: string;
+  receipt_reviewed_by?: string;
+  receipt_reviewed_at?: string;
   created_at: string;
 }
 
