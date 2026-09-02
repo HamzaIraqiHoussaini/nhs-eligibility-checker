@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
-import type { Profile, ProbationReason } from '../../types/nhs';
+import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
 import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2 } from 'lucide-react';
 
@@ -12,12 +12,14 @@ export const MemberRosterManager: React.FC = () => {
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'restricted'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'restricted'>('all');
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [probationTarget, setProbationTarget] = useState<Profile | null>(null);
   const [probationReason, setProbationReason] = useState<ProbationReason>('grades');
   const [probationNotes, setProbationNotes] = useState('');
   const [loading, setLoading] = useState(true);
+  const [participationMap, setParticipationMap] = useState<Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }>>({});
+  const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
 
   const loadMembers = async () => {
     setLoading(true);
@@ -27,7 +29,48 @@ export const MemberRosterManager: React.FC = () => {
         .select('*')
         .order('full_name', { ascending: true });
       if (error) throw error;
-      setMembers((data as Profile[]) || []);
+      const mems = (data as Profile[]) || [];
+      setMembers(mems);
+
+      // Fetch active semester & project participation
+      const { data: activeSem } = await supabase
+        .from('semesters')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle();
+      setActiveSemester(activeSem as Semester);
+
+      const { data: allProposals } = await supabase
+        .from('project_proposals')
+        .select('id, creator_id, co_leader_emails, semester_id, event_date');
+      
+      const semProposals = (allProposals || []).filter((p: any) =>
+        !activeSem || p.semester_id === activeSem.id || (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+      );
+      const semProposalIds = semProposals.map((p: any) => p.id);
+
+      let semVolunteers: any[] = [];
+      if (semProposalIds.length > 0) {
+        const { data: vData } = await supabase
+          .from('project_volunteers')
+          .select('id, user_id, project_id')
+          .in('project_id', semProposalIds);
+        semVolunteers = vData || [];
+      }
+
+      const map: Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }> = {};
+      for (const m of mems) {
+        const ledCount = semProposals.filter((p: any) =>
+          p.creator_id === m.id || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.includes(m.email))
+        ).length;
+        const volCount = semVolunteers.filter((v: any) => v.user_id === m.id).length;
+        map[m.id] = {
+          ledCount,
+          volCount,
+          meetsQuota: ledCount >= 1 && volCount >= 2,
+        };
+      }
+      setParticipationMap(map);
     } catch (err) {
       console.error('Failed to load member roster:', err);
     } finally {
@@ -169,9 +212,12 @@ export const MemberRosterManager: React.FC = () => {
     }
     if (statusFilter === 'good' && (m.is_on_probation || m.is_restricted)) return false;
     if (statusFilter === 'probation' && (!m.is_on_probation || m.is_restricted)) return false;
+    if (statusFilter === 'quota_deficit' && (m.is_restricted || participationMap[m.id]?.meetsQuota)) return false;
     if (statusFilter === 'restricted' && !m.is_restricted) return false;
     return true;
   });
+
+  const deficitCount = members.filter(m => !m.is_restricted && !(participationMap[m.id]?.meetsQuota)).length;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -212,6 +258,13 @@ export const MemberRosterManager: React.FC = () => {
             On Probation ({members.filter(m => m.is_on_probation && !m.is_restricted).length})
           </button>
           <button
+            className={`filter-chip ${statusFilter === 'quota_deficit' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('quota_deficit')}
+            title="Members who have not led 1 project and volunteered twice this semester"
+          >
+            Needs Activity ({deficitCount})
+          </button>
+          <button
             className={`filter-chip ${statusFilter === 'restricted' ? 'active' : ''}`}
             onClick={() => setStatusFilter('restricted')}
           >
@@ -240,24 +293,28 @@ export const MemberRosterManager: React.FC = () => {
               <th>Grade</th>
               <th>Chapter Role</th>
               <th>Standing & Probations</th>
+              <th>Semester Quota ({activeSemester?.name || 'Active'})</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                   Loading member roster...
                 </td>
               </tr>
             ) : filteredMembers.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                   No members matched the filter.
                 </td>
               </tr>
             ) : (
-              filteredMembers.map(member => (
+              filteredMembers.map(member => {
+                const part = participationMap[member.id] || { ledCount: 0, volCount: 0, meetsQuota: false };
+
+                return (
                 <tr
                   key={member.id}
                   style={{ cursor: 'pointer' }}
@@ -285,6 +342,19 @@ export const MemberRosterManager: React.FC = () => {
                     ) : (
                       <span className="status-pill eligible">
                         <CheckCircle2 size={12} /> Good Standing
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {member.is_restricted ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
+                    ) : part.meetsQuota ? (
+                      <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                        <CheckCircle2 size={11} /> Met ({part.ledCount}L • {part.volCount}V)
+                      </span>
+                    ) : (
+                      <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} title="Must lead >= 1 project and volunteer >= 2 projects per semester">
+                        <AlertTriangle size={11} /> Deficit ({part.ledCount}/1L • {part.volCount}/2V)
                       </span>
                     )}
                   </td>
@@ -319,16 +389,20 @@ export const MemberRosterManager: React.FC = () => {
                             </button>
                           </>
                         ) : (
-                          <button
-                            className="btn-inspect"
-                            style={{ color: 'var(--color-gold-text)' }}
-                            onClick={() => { setProbationTarget(member); setProbationNotes(''); }}
-                            title="Place member on Chapter Probation #1"
-                          >
-                            <UserX size={12} /> Place on Probation
-                          </button>
-                        )
-                      )}
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-gold-text)' }}
+                              onClick={() => {
+                                setProbationTarget(member);
+                                setProbationReason(part.meetsQuota ? 'grades' : 'inactivity');
+                                setProbationNotes(part.meetsQuota ? '' : `Semester participation deficit: Has only led ${part.ledCount}/1 project and volunteered in ${part.volCount}/2 projects in ${activeSemester?.name || 'current semester'}.`);
+                              }}
+                              title="Place member on Chapter Probation #1"
+                            >
+                              <UserX size={12} /> Place on Probation
+                            </button>
+                          )
+                        )}
 
                       {isSuperadmin && member.email.toLowerCase() !== SUPERADMIN_EMAIL && (
                         <button
@@ -343,7 +417,8 @@ export const MemberRosterManager: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))
+              );
+            })
             )}
           </tbody>
         </table>
@@ -386,9 +461,9 @@ export const MemberRosterManager: React.FC = () => {
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
                 >
                   <option value="grades">Grades (Fell below required 5.8 / 5.6 average)</option>
-                  <option value="behavior">Behavior / Conduct (AE or BE marks in multiple classes)</option>
-                  <option value="attendance">Attendance (2 unexcused meeting absences)</option>
-                  <option value="inactivity">Inactivity (No NHS activity in entire trimester)</option>
+                  <option value="behavior">Behavior / Conduct (AEs or BEs in more than one class)</option>
+                  <option value="attendance">Attendance (2 unexcused meeting absences — 5m late = absent)</option>
+                  <option value="inactivity">Participation Deficit (Failed to lead 1 project & volunteer twice in semester)</option>
                 </select>
               </div>
 

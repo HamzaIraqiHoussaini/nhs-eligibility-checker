@@ -12,31 +12,68 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
   const [projectCount, setProjectCount] = useState(0);
   const [volunteerCount, setVolunteerCount] = useState(0);
   const [attendanceStats, setAttendanceStats] = useState({ attended: 0, total: 0, absences: 0 });
+  const [semesterProjectsLed, setSemesterProjectsLed] = useState(0);
+  const [semesterVolunteered, setSemesterVolunteered] = useState(0);
+  const [activeSemesterName, setActiveSemesterName] = useState('Current Semester');
 
   useEffect(() => {
     if (!user) return;
 
     const loadStats = async () => {
-      // 1. Project count
-      const { count: pCount } = await supabase
-        .from('project_proposals')
-        .select('*', { count: 'exact', head: true })
-        .or(`creator_id.eq.${user.id},co_leader_emails.cs.{${user.email}}`);
-      if (pCount !== null) setProjectCount(pCount);
-
-      // 2. Volunteer count
-      const { count: vCount } = await supabase
-        .from('project_volunteers')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-      if (vCount !== null) setVolunteerCount(vCount);
-
-      // 3. Attendance count scoped to active semester
+      // Fetch active semester
       const { data: activeSem } = await supabase
         .from('semesters')
-        .select('start_date, end_date')
+        .select('*')
         .eq('is_active', true)
         .maybeSingle();
+
+      if (activeSem?.name) {
+        setActiveSemesterName(activeSem.name);
+      }
+
+      // 1. Project count (overall and active semester)
+      const { data: userProposals } = await supabase
+        .from('project_proposals')
+        .select('id, semester_id, event_date')
+        .or(`creator_id.eq.${user.id},co_leader_emails.cs.{${user.email}}`);
+      
+      const allLed = userProposals || [];
+      setProjectCount(allLed.length);
+
+      if (activeSem) {
+        const semLed = allLed.filter((p: any) =>
+          p.semester_id === activeSem.id ||
+          (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+        );
+        setSemesterProjectsLed(semLed.length);
+      } else {
+        setSemesterProjectsLed(allLed.length);
+      }
+
+      // 2. Volunteer count (overall and active semester)
+      const { data: allVols } = await supabase
+        .from('project_volunteers')
+        .select('id, project_id')
+        .eq('user_id', user.id);
+      
+      const vols = allVols || [];
+      setVolunteerCount(vols.length);
+
+      if (activeSem && vols.length > 0) {
+        const volProjIds = vols.map((v: any) => v.project_id);
+        const { data: semProjs } = await supabase
+          .from('project_proposals')
+          .select('id, semester_id, event_date')
+          .in('id', volProjIds);
+
+        const semVolCount = (semProjs || []).filter((p: any) =>
+          p.semester_id === activeSem.id ||
+          (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+        ).length;
+        setSemesterVolunteered(semVolCount);
+      } else {
+        setSemesterVolunteered(vols.length);
+      }
 
       let meetingIds: string[] = [];
       if (activeSem) {
@@ -177,18 +214,83 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         </div>
       )}
 
+      {/* SEMESTER PARTICIPATION STANDING BANNER */}
+      <div
+        className="sharp-card"
+        style={{
+          padding: '1.25rem 1.5rem',
+          marginBottom: '2rem',
+          borderLeft: (semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? '4px solid var(--color-sage)' : '4px solid var(--color-gold)',
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+              Bylaw Mandate • {activeSemesterName} Participation
+            </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
+              Semester Project & Volunteering Quota
+            </h3>
+          </div>
+          <span
+            className={`status-pill ${semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'eligible' : ''}`}
+            style={!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) ? { backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.75rem' } : { fontSize: '0.75rem' }}
+          >
+            {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+            {semesterProjectsLed >= 1 && semesterVolunteered >= 2 ? 'Semester Quota Satisfied' : 'Action Required This Semester'}
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+          <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>1. Lead $\ge$ 1 Project / Sem</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterProjectsLed >= 1 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                {semesterProjectsLed} / 1 Led
+              </div>
+            </div>
+            {semesterProjectsLed >= 1 ? (
+              <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
+            ) : (
+              <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
+            )}
+          </div>
+
+          <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer $\ge$ 2 Projects / Sem</div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterVolunteered >= 2 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                {semesterVolunteered} / 2 Volunteered
+              </div>
+            </div>
+            {semesterVolunteered >= 2 ? (
+              <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
+            ) : (
+              <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
+            )}
+          </div>
+        </div>
+
+        {!(semesterProjectsLed >= 1 && semesterVolunteered >= 2) && (
+          <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+            <strong>Chapter Bylaw Rule:</strong> Not participating in any NHS activity for an entire semester AND not leading an NHS project for an entire semester (failing to lead $\ge 1$ project and volunteer twice) constitutes grounds for Chapter Probation.
+          </div>
+        )}
+      </div>
+
       {/* Statistics Grid */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-label">Projects Led</div>
-          <div className="kpi-value">{projectCount}</div>
-          <div className="kpi-subtext">Proposals submitted or co-led</div>
+          <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} total)</span></div>
+          <div className="kpi-subtext">Min 1 / sem • Max 4 / year</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-label">Times Volunteered</div>
-          <div className="kpi-value">{volunteerCount}</div>
-          <div className="kpi-subtext">Chapter initiatives supported</div>
+          <div className="kpi-value">{semesterVolunteered} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({volunteerCount} total)</span></div>
+          <div className="kpi-subtext">Min 2 / sem (excluding own)</div>
         </div>
 
         <div className="kpi-card">
@@ -199,16 +301,16 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="kpi-subtext">
-            {attendanceStats.absences} absences recorded ({attendanceStats.absences >= 2 ? 'Probation Threshold Reached' : `${2 - attendanceStats.absences} left before probation`})
+            {attendanceStats.absences} absences ({attendanceStats.absences >= 2 ? 'Probation Triggered' : `${2 - attendanceStats.absences} left before probation`})
           </div>
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-label">Semester Project Limit</div>
+          <div className="kpi-label">Annual Project Cap</div>
           <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
-            Max 2 Projects
+            Max 4 Led / Year
           </div>
-          <div className="kpi-subtext">Per active academic semester</div>
+          <div className="kpi-subtext">$\ge$ 1 must be service-based</div>
         </div>
       </div>
 

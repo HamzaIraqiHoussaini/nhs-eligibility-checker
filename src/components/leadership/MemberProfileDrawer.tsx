@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance } from '../../types/nhs';
+import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance, Semester } from '../../types/nhs';
 import { X, AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 interface MemberProfileDrawerProps {
@@ -12,6 +12,8 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   const [ledProjects, setLedProjects] = useState<ProjectProposal[]>([]);
   const [volunteerHistory, setVolunteerHistory] = useState<ProjectVolunteer[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<MeetingAttendance[]>([]);
+  const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
+  const [semesterVolCount, setSemesterVolCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,19 +30,45 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
     const loadMemberData = async () => {
       setLoading(true);
       try {
+        // 0. Fetch active semester
+        const { data: activeSem } = await supabase
+          .from('semesters')
+          .select('*')
+          .eq('is_active', true)
+          .maybeSingle();
+        setActiveSemester(activeSem as Semester);
+
         // 1. Fetch led / co-led projects
         const { data: pData } = await supabase
           .from('project_proposals')
           .select('*')
           .or(`creator_id.eq.${member.id},co_leader_emails.cs.{${member.email}}`);
-        setLedProjects((pData as ProjectProposal[]) || []);
+        const projects = (pData as ProjectProposal[]) || [];
+        setLedProjects(projects);
 
         // 2. Fetch volunteer participation
         const { data: vData } = await supabase
           .from('project_volunteers')
           .select('*')
           .eq('user_id', member.id);
-        setVolunteerHistory((vData as ProjectVolunteer[]) || []);
+        const vols = (vData as ProjectVolunteer[]) || [];
+        setVolunteerHistory(vols);
+
+        if (activeSem && vols.length > 0) {
+          const volProjIds = vols.map((v: any) => v.project_id);
+          const { data: semProjs } = await supabase
+            .from('project_proposals')
+            .select('id, semester_id, event_date')
+            .in('id', volProjIds);
+          
+          const count = (semProjs || []).filter((p: any) =>
+            p.semester_id === activeSem.id ||
+            (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+          ).length;
+          setSemesterVolCount(count);
+        } else {
+          setSemesterVolCount(vols.length);
+        }
 
         // 3. Fetch attendance
         const { data: aData } = await supabase
@@ -124,6 +152,36 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
               </div>
             </div>
           )}
+
+          {/* Semester Participation Audit Banner */}
+          {(() => {
+            const semLed = activeSemester
+              ? ledProjects.filter(p => p.semester_id === activeSemester.id || (p.event_date >= activeSemester.start_date && p.event_date <= activeSemester.end_date)).length
+              : ledProjects.length;
+            const meetsQuota = semLed >= 1 && semesterVolCount >= 2;
+
+            return (
+              <div style={{ padding: '1rem', backgroundColor: meetsQuota ? 'var(--color-sage-bg)' : '#FFFBEB', border: meetsQuota ? '1px solid #A7F3D0' : '1px solid #FDE68A' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <strong style={{ fontSize: '0.85rem', color: meetsQuota ? 'var(--color-sage-text)' : '#92400E' }}>
+                    Semester Participation Audit ({activeSemester?.name || 'Active Semester'})
+                  </strong>
+                  <span className="grade-badge" style={{ backgroundColor: meetsQuota ? 'var(--color-sage)' : 'var(--color-gold)', color: '#FFFFFF', fontSize: '0.68rem' }}>
+                    {meetsQuota ? 'Quota Satisfied' : 'Quota Unfulfilled'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: meetsQuota ? '#065F46' : '#78350F', display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                  <span>Projects Led: <strong>{semLed} / 1 min</strong> {semLed >= 1 ? '✓' : '(Incomplete)'}</span>
+                  <span>Times Volunteered: <strong>{semesterVolCount} / 2 min</strong> {semesterVolCount >= 2 ? '✓' : '(Incomplete)'}</span>
+                </div>
+                {!meetsQuota && (
+                  <div style={{ fontSize: '0.72rem', color: '#92400E', marginTop: '0.4rem', fontStyle: 'italic' }}>
+                    *Bylaw: Members failing to lead $\ge 1$ project and volunteer twice in a semester trigger Chapter Probation.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Quick Metrics */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>

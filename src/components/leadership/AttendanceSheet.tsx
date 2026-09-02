@@ -314,7 +314,7 @@ export const AttendanceSheet: React.FC = () => {
             Chapter Bylaw Reminder (Section 4.2)
           </strong>
           <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-            Accumulation of two (2) unexcused absences within a single semester constitutes grounds for automatic probationary status. Two probations result in chapter dismissal and account restriction.
+            Accumulation of two (2) unexcused absences within a single semester constitutes grounds for automatic probationary status. <strong>Being 5 minutes late to a meeting constitutes an absence.</strong> Accumulating two probations results in chapter dismissal and account restriction.
           </span>
         </div>
       </div>
