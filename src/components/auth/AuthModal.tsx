@@ -6,9 +6,10 @@ import { X, Lock, Mail, AlertCircle } from 'lucide-react';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,15 +32,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       });
 
       if (error) {
-        const msg = error.message || '';
-        if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid email or password')) {
+        let raw = (error.message || '').trim();
+        const status = (error as any)?.status;
+
+        // Never allow literal '{}', '[]', or empty objects to propagate
+        if (raw === '{}' || raw === '[]' || raw === 'null' || raw === 'undefined') {
+          raw = '';
+        }
+
+        const lower = raw.toLowerCase();
+        if (!raw || lower.includes('invalid login credentials') || lower.includes('invalid email or password')) {
           setErrorMsg('Invalid email or access code. Please verify your credentials or contact leadership.');
-        } else if (msg.toLowerCase().includes('email not confirmed')) {
+        } else if (lower.includes('email not confirmed')) {
           setErrorMsg('Your account email has not been confirmed. Contact chapter leadership.');
-        } else if (msg) {
-          setErrorMsg(msg);
+        } else if (status === 500 || lower.includes('database error') || lower.includes('unexpected_failure')) {
+          setErrorMsg('Authentication server is experiencing issues. Please try again or notify leadership.');
         } else {
-          setErrorMsg('Authentication failed. Please try again.');
+          setErrorMsg(raw);
         }
         return;
       }
@@ -47,9 +56,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       if (data?.user) {
         await refreshProfile();
       }
+      setEmail('');
+      setPassword('');
       onClose();
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : typeof err === 'string' ? err : 'An unexpected error occurred. Please try again.';
+      let message = 'An unexpected error occurred. Please try again.';
+      if (err instanceof Error) {
+        const msg = (err.message || '').trim();
+        if (msg && msg !== '{}' && msg !== '[]') {
+          message = msg;
+        }
+      } else if (typeof err === 'string' && err.trim() && err.trim() !== '{}' && err.trim() !== '[]') {
+        message = err.trim();
+      }
       setErrorMsg(message);
     } finally {
       setLoading(false);

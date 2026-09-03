@@ -25,6 +25,8 @@ import {
   Eye,
   UserPlus,
   UserCheck,
+  Lock,
+  Star,
 } from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -121,9 +123,9 @@ export const MyProjectsView: React.FC = () => {
     loadData();
   }, [user]);
 
-  // Current semester project count for current user
+  // Current semester project count for current user (Yearly projects do not count toward limit)
   const currentSemesterProjects = proposals.filter(
-    (p) => activeSemester && p.semester_id === activeSemester.id
+    (p) => activeSemester && p.semester_id === activeSemester.id && !p.is_yearly
   );
   const currentSemesterCount = currentSemesterProjects.length;
 
@@ -158,10 +160,20 @@ export const MyProjectsView: React.FC = () => {
   const handleDeleteProposal = async (project: ProjectProposal, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
+    // Rule: Yearly projects assigned by leadership cannot be deleted
+    if (project.is_yearly) {
+      await alert({
+        title: 'Action Prohibited',
+        message: 'Yearly projects are assigned by Chapter Leadership and cannot be removed. You are required to submit and lead this proposal.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected)
     if (project.status === 'approved' || project.status === 'completed') {
       await alert({
-        title: 'Action Restricted',
+        title: 'Cannot Delete Approved Proposal',
         message: 'Approved proposals cannot be deleted as they are finalized chapter projects.',
         variant: 'warning',
       });
@@ -393,6 +405,23 @@ export const MyProjectsView: React.FC = () => {
                             {project.project_title}
                           </h3>
                           {getStatusBadge(project.status)}
+                          {project.is_yearly && (
+                            <span
+                              className="status-pill"
+                              style={{
+                                backgroundColor: '#FEF3C7',
+                                color: '#92400E',
+                                border: '1px solid #FDE68A',
+                                fontSize: '0.7rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}
+                              title="Assigned Annual Project — Exempt from semester limits"
+                            >
+                              <Star size={11} /> Annual Project
+                            </span>
+                          )}
                           {commentCount > 0 && (
                             <span
                               style={{
@@ -547,14 +576,33 @@ export const MyProjectsView: React.FC = () => {
                           <Edit3 size={13} /> Modify
                         </button>
 
-                        <button
-                          type="button"
-                          className="btn-inspect"
-                          style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={(e) => handleDeleteProposal(project, e)}
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
+                        {!project.is_yearly ? (
+                          <button
+                            type="button"
+                            className="btn-inspect"
+                            style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={(e) => handleDeleteProposal(project, e)}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--color-text-muted)',
+                              fontStyle: 'italic',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '0.3rem 0.5rem',
+                              backgroundColor: '#F8FAFC',
+                              border: '1px solid var(--color-border)',
+                            }}
+                            title="Yearly projects are mandatory and cannot be deleted"
+                          >
+                            <Lock size={12} /> Mandatory
+                          </span>
+                        )}
                       </>
                     )}
 

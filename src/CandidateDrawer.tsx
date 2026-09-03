@@ -112,11 +112,11 @@ export const CandidateDrawer: React.FC<CandidateDrawerProps> = ({ candidate, sem
               {/* Criterion 3: No grades <= 3 */}
               <div className="checklist-item">
                 <div>
-                  <div className="checklist-title">No Grades &lt; 3 (Passing Standard)</div>
+                  <div className="checklist-title">No Grades ≤ 3 (Passing Standard)</div>
                   <div className="checklist-desc">
                     {candidate.has3OrLower
-                      ? 'Flagged: Academic grade below 3 found'
-                      : 'Clear: All assessed subjects are 3 or above'}
+                      ? 'Flagged: Academic grade of 3 or lower found'
+                      : 'Clear: All assessed subjects are 4 or above'}
                   </div>
                 </div>
                 {!candidate.has3OrLower ? (

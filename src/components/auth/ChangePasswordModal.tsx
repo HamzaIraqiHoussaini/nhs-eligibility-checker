@@ -47,7 +47,11 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
         setSuccessMsg(null);
       }, 2000);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to update access code.');
+      let msg = (err?.message || '').trim();
+      if (!msg || msg === '{}' || msg === '[]') {
+        msg = 'Failed to update access code. Please try again.';
+      }
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }

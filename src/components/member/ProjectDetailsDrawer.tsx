@@ -66,8 +66,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const isApprovedOrCompleted = project.status === 'approved' || project.status === 'completed';
   const canModify = !isApprovedOrCompleted && (isOwner || isLeadership || isSupervisor);
 
-  // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected)
-  const canDelete = !isApprovedOrCompleted && (isOwner || isSuperadmin || isLeadership);
+  // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected), and is_yearly cannot be deleted
+  const canDelete = !isApprovedOrCompleted && !project.is_yearly && (isOwner || isSuperadmin || isLeadership);
 
   const comments: ProjectComment[] = project.comments || [];
 
@@ -345,6 +345,15 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   };
 
   const handleDeleteProposal = async () => {
+    if (project.is_yearly) {
+      await alert({
+        title: 'Action Prohibited',
+        message: 'Yearly projects are assigned by Chapter Leadership and cannot be removed. You are required to complete and lead this proposal.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     if (!canDelete) {
       await alert({
         title: 'Action Restricted',

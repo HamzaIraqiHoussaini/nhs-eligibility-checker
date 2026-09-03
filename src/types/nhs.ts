@@ -90,6 +90,8 @@ export interface ProjectProposal {
   receipt_uploaded_at?: string;
   receipt_reviewed_by?: string;
   receipt_reviewed_at?: string;
+  is_yearly?: boolean;
+  annual_project_id?: string | null;
   comments?: ProjectComment[];
   created_at: string;
 }
@@ -156,5 +158,30 @@ export interface ChapterTreasurySummary {
   total_income: number;
   as_of_date: string;
   updated_at?: string;
+}
+
+export interface AnnualProject {
+  id: string;
+  title: string;
+  description: string | null;
+  academic_year: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface AnnualProjectApplication {
+  id: string;
+  user_id: string;
+  academic_year: string;
+  pick_1: string | null;
+  pick_2: string | null;
+  pick_3: string | null;
+  essay: string;
+  assigned_project_id: string | null;
+  status: 'pending' | 'assigned' | 'declined';
+  leadership_notes: string | null;
+  submitted_at: string;
+  updated_at?: string;
+  profiles?: { full_name: string; email: string };
 }
 

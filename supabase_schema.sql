@@ -319,3 +319,227 @@ create policy "Attendance manage" on public.meeting_attendance for all using (
     where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor')
   )
 );
+
+-- ==============================================================================
+-- 10. Provision Member Function (Used by AllowlistManager)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.provision_member(p_email text, p_full_name text, p_role text, p_password text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller_email text;
+  v_caller_role text;
+  v_user_id uuid;
+  v_clean_email text;
+  v_clean_role public.user_role;
+  v_existing_role text;
+  v_encrypted_pw text;
+BEGIN
+  v_caller_email := lower(auth.jwt() ->> 'email');
+
+  -- Verify caller is leadership
+  SELECT role INTO v_caller_role FROM public.profiles WHERE id = auth.uid();
+  IF v_caller_role IS DISTINCT FROM 'leadership' THEN
+    RAISE EXCEPTION 'Forbidden: Only Leadership can provision or reset members.';
+  END IF;
+
+  v_clean_email := lower(trim(p_email));
+  v_clean_role := p_role::public.user_role;
+
+  -- Security check: Can only reset other leadership if caller is the superadmin
+  SELECT role INTO v_existing_role FROM public.profiles WHERE lower(email) = v_clean_email;
+
+  IF (v_existing_role = 'leadership' OR v_clean_role = 'leadership') AND v_clean_email <> v_caller_email THEN
+    IF v_caller_email <> 'hiraqihoussaini@cas.ac.ma' AND v_clean_role = 'leadership' AND v_existing_role = 'leadership' THEN
+      RAISE EXCEPTION 'Forbidden: Only the Chapter Superadmin (hiraqihoussaini@cas.ac.ma) can reset leadership credentials.';
+    END IF;
+  END IF;
+
+  -- 1. Insert/update allowlist
+  INSERT INTO public.allowlist (email, full_name, role, added_by)
+  VALUES (v_clean_email, p_full_name, v_clean_role, v_caller_email)
+  ON CONFLICT (email) DO UPDATE
+  SET full_name = EXCLUDED.full_name,
+      role = EXCLUDED.role;
+
+  -- Hash password using extensions.crypt and extensions.gen_salt
+  v_encrypted_pw := extensions.crypt(p_password, extensions.gen_salt('bf'));
+
+  -- 2. Check if user already exists in auth.users
+  SELECT id INTO v_user_id FROM auth.users WHERE lower(email) = v_clean_email;
+
+  IF v_user_id IS NOT NULL THEN
+    UPDATE auth.users
+    SET encrypted_password = v_encrypted_pw,
+        raw_user_meta_data = jsonb_build_object('full_name', p_full_name, 'role', p_role, 'email_verified', true),
+        confirmation_token = COALESCE(confirmation_token, ''),
+        recovery_token = COALESCE(recovery_token, ''),
+        email_change_token_new = COALESCE(email_change_token_new, ''),
+        email_change = COALESCE(email_change, ''),
+        email_change_token_current = COALESCE(email_change_token_current, ''),
+        phone_change = COALESCE(phone_change, ''),
+        phone_change_token = COALESCE(phone_change_token, ''),
+        reauthentication_token = COALESCE(reauthentication_token, ''),
+        email_confirmed_at = COALESCE(email_confirmed_at, now()),
+        confirmed_at = COALESCE(confirmed_at, now()),
+        updated_at = now()
+    WHERE id = v_user_id;
+
+    UPDATE public.profiles
+    SET full_name = p_full_name,
+        role = v_clean_role
+    WHERE id = v_user_id;
+  ELSE
+    v_user_id := gen_random_uuid();
+    INSERT INTO auth.users (
+      id,
+      instance_id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      confirmed_at,
+      confirmation_token,
+      recovery_token,
+      email_change_token_new,
+      email_change,
+      email_change_token_current,
+      phone_change,
+      phone_change_token,
+      reauthentication_token,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      role,
+      aud,
+      is_sso_user,
+      is_anonymous,
+      created_at,
+      updated_at
+    ) VALUES (
+      v_user_id,
+      '00000000-0000-0000-0000-000000000000'::uuid,
+      v_clean_email,
+      v_encrypted_pw,
+      now(),
+      now(),
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '{"provider":"email","providers":["email"]}'::jsonb,
+      jsonb_build_object('full_name', p_full_name, 'role', p_role, 'email_verified', true),
+      'authenticated',
+      'authenticated',
+      false,
+      false,
+      now(),
+      now()
+    );
+
+    INSERT INTO public.profiles (id, email, full_name, role)
+    VALUES (v_user_id, v_clean_email, p_full_name, v_clean_role)
+    ON CONFLICT (id) DO UPDATE
+    SET full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role;
+  END IF;
+
+  -- 3. Ensure auth.identities record exists
+  INSERT INTO auth.identities (
+    id,
+    provider_id,
+    user_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  ) VALUES (
+    gen_random_uuid(),
+    v_user_id::text,
+    v_user_id,
+    jsonb_build_object('sub', v_user_id::text, 'email', v_clean_email, 'email_verified', true, 'phone_verified', false),
+    'email',
+    now(),
+    now(),
+    now()
+  )
+  ON CONFLICT (provider, provider_id) DO UPDATE
+  SET identity_data = EXCLUDED.identity_data,
+      updated_at = now();
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'user_id', v_user_id,
+    'email', v_clean_email
+  );
+END;
+$function$;
+
+-- ============================================================================
+-- 11. ANNUAL / YEARLY PROJECTS SCHEMA & IMMUTABILITY GUARD
+-- ============================================================================
+
+-- Add is_yearly and annual_project_id columns to project_proposals
+ALTER TABLE public.project_proposals
+ADD COLUMN IF NOT EXISTS is_yearly boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS annual_project_id uuid REFERENCES public.annual_projects(id) ON DELETE SET NULL;
+
+-- Guard Yearly / Annual Projects from being deleted by members
+CREATE OR REPLACE FUNCTION public.delete_project_proposal(p_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller_email text;
+  v_caller_id uuid;
+  v_role user_role;
+  v_prop project_proposals%ROWTYPE;
+BEGIN
+  v_caller_email := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_caller_id := auth.uid();
+
+  SELECT role INTO v_role FROM profiles WHERE id = v_caller_id;
+  SELECT * INTO v_prop FROM project_proposals WHERE id = p_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Proposal not found');
+  END IF;
+
+  -- Superadmin can delete anything
+  IF v_caller_email = 'hiraqihoussaini@cas.ac.ma' THEN
+    DELETE FROM project_volunteers WHERE project_id = p_id;
+    DELETE FROM project_proposals WHERE id = p_id;
+    RETURN jsonb_build_object('success', true, 'message', 'Proposal deleted by superadmin');
+  END IF;
+
+  -- Yearly / Annual Projects cannot be deleted by members or standard leadership
+  IF v_prop.is_yearly THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Yearly projects are assigned by Chapter Leadership and cannot be deleted.');
+  END IF;
+
+  -- Approved or completed proposals cannot be deleted
+  IF v_prop.status IN ('approved', 'completed') THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Approved proposals cannot be deleted as they are finalized chapter projects.');
+  END IF;
+
+  -- Creator, co-leader, leadership, or supervisor can delete pending/rejected proposals
+  IF v_prop.creator_id = v_caller_id 
+     OR v_caller_email = ANY (v_prop.co_leader_emails) 
+     OR v_role IN ('leadership', 'supervisor') THEN
+    DELETE FROM project_volunteers WHERE project_id = p_id;
+    DELETE FROM project_proposals WHERE id = p_id;
+    RETURN jsonb_build_object('success', true, 'message', 'Proposal successfully deleted');
+  ELSE
+    RETURN jsonb_build_object('success', false, 'message', 'Permission denied: You do not have permission to delete this proposal.');
+  END IF;
+END;
+$function$;
+

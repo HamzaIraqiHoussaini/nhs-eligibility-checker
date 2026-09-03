@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X } from 'lucide-react';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
@@ -328,14 +328,88 @@ export const MemberRosterManager: React.FC = () => {
           </button>
         </div>
 
-        <div className="search-box">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search member by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--color-border)',
+              padding: '0.42rem 0.85rem',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              width: '280px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Search size={15} color="var(--color-text-muted)" style={{ marginRight: '0.5rem', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search member by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                border: 'none',
+                outline: 'none',
+                padding: 0,
+                width: '100%',
+                fontSize: '0.84rem',
+                backgroundColor: 'transparent',
+                color: 'var(--color-navy)',
+                fontFamily: 'var(--font-sans)',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  marginLeft: '0.35rem',
+                  color: 'var(--color-text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="btn-primary"
+            style={{
+              fontSize: '0.82rem',
+              padding: '0.45rem 0.95rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <Search size={13} />
+            <span>Search</span>
+          </button>
+
+          {searchQuery && (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{
+                fontSize: '0.8rem',
+                padding: '0.45rem 0.75rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}
+              onClick={() => setSearchQuery('')}
+            >
+              <X size={12} /> Clear ({filteredMembers.length})
+            </button>
+          )}
         </div>
       </div>
 

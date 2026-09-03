@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmProvider } from './context/ConfirmContext';
@@ -14,6 +14,8 @@ import { MemberRosterManager } from './components/leadership/MemberRosterManager
 import { SemesterSettings } from './components/leadership/SemesterSettings';
 import { AllowlistManager } from './components/leadership/AllowlistManager';
 import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
+import { AnnualProjectsView } from './components/member/AnnualProjectsView';
+import { AnnualProjectsManager } from './components/leadership/AnnualProjectsManager';
 import { PublicHomepage } from './components/public/PublicHomepage';
 import {
   LayoutDashboard,
@@ -31,6 +33,7 @@ import {
   ShieldAlert,
   Key,
   Coins,
+  Star,
 } from 'lucide-react';
 import './index.css';
 
@@ -38,6 +41,7 @@ type ActiveTab =
   | 'home'
   | 'dashboard'
   | 'projects'
+  | 'annual_projects'
   | 'screener'
   | 'rules'
   | 'review'
@@ -51,6 +55,7 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
   home: '/',
   dashboard: '/dashboard',
   projects: '/project_hub',
+  annual_projects: '/annual_projects',
   screener: '/screener',
   rules: '/rules',
   review: '/review_desk',
@@ -67,6 +72,8 @@ const PATH_TO_TAB: Record<string, ActiveTab> = {
   '/dashboard': 'dashboard',
   '/project_hub': 'projects',
   '/projects': 'projects',
+  '/annual_projects': 'annual_projects',
+  '/yearly_projects': 'annual_projects',
   '/screener': 'screener',
   '/eligibility': 'screener',
   '/rules': 'rules',
@@ -101,6 +108,15 @@ function PortalContent() {
       window.history.pushState({ tab }, '', path);
     }
   };
+
+  // Automatically direct newly authenticated users to the member dashboard
+  const prevUserRef = useRef(user);
+  useEffect(() => {
+    if (!prevUserRef.current && user) {
+      navigateTo('dashboard');
+    }
+    prevUserRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -177,15 +193,6 @@ function PortalContent() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
-                onClick={() => navigateTo('home')}
-              >
-                ← Back to Homepage
-              </button>
-
               {user ? (
                 <button
                   type="button"
@@ -207,6 +214,15 @@ function PortalContent() {
                   <span>Sign In</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+                onClick={() => navigateTo('home')}
+              >
+                ← Back to Homepage
+              </button>
             </div>
           </div>
         </header>
@@ -219,6 +235,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={() => navigateTo('dashboard')}
         />
       </div>
     );
@@ -242,6 +259,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={() => navigateTo('dashboard')}
         />
       </div>
     );
@@ -259,6 +277,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={() => navigateTo('dashboard')}
         />
       </div>
     );
@@ -317,6 +336,15 @@ function PortalContent() {
 
           <button
             type="button"
+            className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
+            onClick={() => navigateTo('annual_projects')}
+          >
+            <Star size={16} />
+            <span>Annual Projects</span>
+          </button>
+
+          <button
+            type="button"
             className="stitch-nav-item"
             onClick={() => navigateTo('screener')}
           >
@@ -345,6 +373,15 @@ function PortalContent() {
               >
                 <ClipboardCheck size={16} />
                 <span>Project Reviews</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
+                onClick={() => navigateTo('annual_projects')}
+              >
+                <Star size={16} />
+                <span>Annual Projects Desk</span>
               </button>
 
               <button
@@ -489,6 +526,13 @@ function PortalContent() {
       <main className="stitch-main-content">
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
+        {activeTab === 'annual_projects' && (
+          (isLeadership || isSupervisor) ? (
+            <AnnualProjectsManager />
+          ) : (
+            <AnnualProjectsView onNavigate={(t) => navigateTo(t as ActiveTab)} />
+          )
+        )}
         {activeTab === 'rules' && <ChapterRules />}
         {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
         {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
@@ -502,6 +546,7 @@ function PortalContent() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => navigateTo('dashboard')}
       />
 
       {/* Change Password / Access Code Modal */}

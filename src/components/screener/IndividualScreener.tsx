@@ -90,7 +90,7 @@ export const IndividualScreener: React.FC = () => {
         failReasons.push('Report card contains an Approaching Expectations (AE) or Beginning Expectations (BE) mark.');
       }
       if (has3OrLower) {
-        failReasons.push('Report card contains a course grade below 3.');
+        failReasons.push('Report card contains a course grade of 3 or lower.');
       }
 
       const isEligible = average >= threshold && !hasAEorBE && !has3OrLower;
@@ -136,7 +136,7 @@ export const IndividualScreener: React.FC = () => {
     const average = total / eligibleCourses.length;
 
     const threshold = manualGradeLevel >= 11 && manualIs4HL ? 5.60 : 5.80;
-    const has3OrLower = eligibleCourses.some(c => Number(c.grade) < 3);
+    const has3OrLower = eligibleCourses.some(c => Number(c.grade) <= 3);
 
     const failReasons: string[] = [];
     if (average < threshold) {
@@ -146,7 +146,7 @@ export const IndividualScreener: React.FC = () => {
       failReasons.push('Flagged for having an Approaching Expectations (AE) or Beginning Expectations (BE) mark.');
     }
     if (has3OrLower) {
-      failReasons.push('Includes at least one course grade below 3.');
+      failReasons.push('Includes at least one course grade of 3 or lower.');
     }
 
     const isEligible = average >= threshold && !manualHasAEorBE && !has3OrLower;
@@ -326,10 +326,10 @@ export const IndividualScreener: React.FC = () => {
                 Minimum Grade Check
               </div>
               <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: !result.has3OrLower ? 'var(--color-sage-text)' : 'var(--color-terracotta-text)', marginTop: '0.6rem' }}>
-                {!result.has3OrLower ? 'All ≥ 3' : 'Grade < 3 Found'}
+                {!result.has3OrLower ? 'All ≥ 4' : 'Grade ≤ 3 Found'}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.25rem' }}>
-                {!result.has3OrLower ? 'No failing course marks' : 'Must have no grades below 3'}
+                {!result.has3OrLower ? 'No course marks ≤ 3' : 'Must have no grades of 3 or lower'}
               </div>
             </div>
           </div>

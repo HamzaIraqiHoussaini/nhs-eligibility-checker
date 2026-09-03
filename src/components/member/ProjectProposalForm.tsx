@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
-import { X, Plus, Trash2, Send, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, Send, AlertCircle, Star } from 'lucide-react';
 
 interface ProjectProposalFormProps {
   isOpen: boolean;
@@ -234,6 +234,27 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             Your Submitted Projects: <strong>{currentMemberProjectCount} / 2 Allowed</strong>
           </span>
         </div>
+
+        {initialData?.is_yearly && (
+          <div
+            style={{
+              padding: '0.85rem 1rem',
+              backgroundColor: '#FEF3C7',
+              border: '1px solid #FDE68A',
+              color: '#92400E',
+              fontSize: '0.85rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Star size={16} color="#B45309" style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Assigned Annual Project:</strong> This proposal was assigned to you by Chapter Leadership. It is exempt from semester project limits and cannot be deleted. Please finalize the proposal details.
+            </span>
+          </div>
+        )}
 
         {isLimitReached && (
           <div

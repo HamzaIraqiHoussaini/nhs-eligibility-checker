@@ -310,89 +310,58 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
           {/* Pillar 1 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-                <GraduationCap size={22} color="var(--color-oxford)" />
-              </div>
-              <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-                Pillar 1
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Scholarship
-              </h3>
-              <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Maintaining a minimum 5.80 GPA on the 7.00 scale (5.60 for students taking 4 IB Higher Level courses).
-              </p>
+          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
+              <GraduationCap size={22} color="var(--color-oxford)" />
             </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-oxford)' }}>
-              5.80+ GPA Required
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
+              Pillar 1
             </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+              Scholarship
+            </h3>
           </div>
 
           {/* Pillar 2 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-                <Compass size={22} color="#B45309" />
-              </div>
-              <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-                Pillar 2
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Leadership
-              </h3>
-              <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Taking initiative by proposing and leading community service projects during the semester.
-              </p>
+          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
+              <Compass size={22} color="#B45309" />
             </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: '#B45309' }}>
-              Lead ≥ 1 Project / Semester
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
+              Pillar 2
             </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+              Leadership
+            </h3>
           </div>
 
           {/* Pillar 3 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-sage-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-                <Users size={22} color="var(--color-sage)" />
-              </div>
-              <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-                Pillar 3
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Service
-              </h3>
-              <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Volunteering in projects organized by other members throughout the school year.
-              </p>
+          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-sage-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
+              <Users size={22} color="var(--color-sage)" />
             </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-sage-text)' }}>
-              Volunteer ≥ 2 Projects / Semester
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
+              Pillar 3
             </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+              Service
+            </h3>
           </div>
 
           {/* Pillar 4 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#EDE9FE', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-                <Shield size={22} color="#6D28D9" />
-              </div>
-              <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-                Pillar 4
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                Character
-              </h3>
-              <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: 1.55 }}>
-                Upholding school conduct standards, academic honesty, and positive citizenship.
-              </p>
+          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: '#EDE9FE', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
+              <Shield size={22} color="#6D28D9" />
             </div>
-            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid #F1F5F9', fontSize: '0.78rem', fontWeight: 700, color: '#6D28D9' }}>
-              No AE / BE Conduct Marks
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
+              Pillar 4
             </div>
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+              Character
+            </h3>
           </div>
         </div>
+
       </section>
 
       {/* Academic Requirements */}

@@ -84,7 +84,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
       s.gradeLevel > 0 ? `Grade ${s.gradeLevel}` : 'Not Specified',
       s.average.toFixed(2),
       s.hasAEorBE ? 'Flagged (AE/BE)' : 'Clean (EE/ME)',
-      s.has3OrLower ? 'Flagged (<3)' : 'Pass (All >= 3)',
+      s.has3OrLower ? 'Flagged (≤3)' : 'Pass (All ≥ 4)',
       s.isEligible ? 'Eligible' : 'Ineligible',
       s.grades.join('; '),
       s.failReasons.join('; '),
@@ -320,11 +320,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
                     <td>
                       {candidate.has3OrLower ? (
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-terracotta)' }}>
-                          Has &lt; 3
+                          Has ≤ 3
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-sage)' }}>
-                          All ≥ 3
+                          All ≥ 4
                         </span>
                       )}
                     </td>
