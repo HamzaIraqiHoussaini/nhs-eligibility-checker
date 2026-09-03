@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -29,6 +29,7 @@ import {
 
 interface ProjectDetailsDrawerProps {
   project: ProjectProposal | null;
+  initialSection?: 'details' | 'comments';
   onClose: () => void;
   onEdit: (project: ProjectProposal) => void;
   onDeleted: () => void;
@@ -37,6 +38,7 @@ interface ProjectDetailsDrawerProps {
 
 export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   project,
+  initialSection = 'details',
   onClose,
   onDeleted,
   onUpdated,
@@ -47,6 +49,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const commentsRef = useRef<HTMLDivElement>(null);
 
   // Volunteer management state
   const [volunteers, setVolunteers] = useState<ProjectVolunteer[]>([]);
@@ -56,11 +59,26 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const [updatingVolId, setUpdatingVolId] = useState<string | null>(null);
   const [concludingProject, setConcludingProject] = useState(false);
 
+  useEffect(() => {
+    if (initialSection === 'comments' && commentsRef.current) {
+      const timer = setTimeout(() => {
+        commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [initialSection, project?.id]);
+
   if (!project) return null;
 
-  const isOwner = user?.id === project.creator_id || user?.email?.toLowerCase() === project.creator_email?.toLowerCase();
-  const isSuperadmin = user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma';
-  const isCoLeader = Array.isArray(project.co_leader_emails) && project.co_leader_emails.some((e: string) => e.toLowerCase() === user?.email?.toLowerCase());
+  const isOwner = Boolean(
+    (user?.id && project.creator_id && user.id === project.creator_id) ||
+    (user?.email && project.creator_email && user.email.toLowerCase() === project.creator_email.toLowerCase())
+  );
+  const isSuperadmin = Boolean(user?.email && user.email.toLowerCase() === 'hiraqihoussaini@cas.ac.ma');
+  const isCoLeader = Boolean(
+    Array.isArray(project.co_leader_emails) &&
+    project.co_leader_emails.some((e: unknown) => typeof e === 'string' && user?.email && e.toLowerCase() === user.email.toLowerCase())
+  );
   const isProjectLeader = isOwner || isCoLeader || isLeadership || isSupervisor;
 
   // Rule: Proposals can only be modified until approved by supervisor
@@ -70,7 +88,19 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected), and is_yearly cannot be deleted
   const canDelete = !isApprovedOrCompleted && !project.is_yearly && (isOwner || isSuperadmin || isLeadership);
 
-  const comments: ProjectComment[] = project.comments || [];
+  // Safe comment normalization
+  const comments: ProjectComment[] = Array.isArray(project.comments)
+    ? project.comments
+    : typeof project.comments === 'string'
+    ? (() => {
+        try {
+          const parsed = JSON.parse(project.comments);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })()
+    : [];
 
   // Load volunteers for this project
   const loadVolunteers = async () => {
@@ -99,7 +129,10 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   }, [project?.id]);
 
   const myVolunteerRecord = volunteers.find(
-    (v) => v.user_id === user?.id || (user?.email && v.student_email?.toLowerCase() === user.email.toLowerCase())
+    (v) => Boolean(
+      (user?.id && v.user_id === user.id) ||
+      (user?.email && v.student_email && typeof v.student_email === 'string' && v.student_email.toLowerCase() === user.email.toLowerCase())
+    )
   );
   const acceptedVolunteers = volunteers.filter((v) => v.status === 'accepted' || v.status === 'confirmed');
   const pendingApplicants = volunteers.filter((v) => v.status === 'applied' || !v.status);
@@ -480,14 +513,38 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               {getStatusBadge()}
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                ID: {project.id.slice(0, 8)}
+                ID: {project.id ? String(project.id).slice(0, 8) : ''}
               </span>
+              {comments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.72rem',
+                    color: 'var(--color-navy)',
+                    backgroundColor: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '2px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                  title="Jump to revision feedback comments"
+                >
+                  <MessageSquare size={12} /> {comments.length} Comment{comments.length > 1 ? 's' : ''}
+                </button>
+              )}
             </div>
             <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-              {project.project_title}
+              {project.project_title || 'Untitled Project'}
             </h2>
             <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-              Submitted by <strong>{project.creator_name}</strong> ({project.creator_email})
+              Submitted by <strong>{project.creator_name || 'Member'}</strong> ({project.creator_email || '—'})
             </div>
           </div>
 
@@ -518,12 +575,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                 This proposal was not approved. You can review the feedback below, modify the proposal to address the concerns and resubmit, or delete it permanently.
               </p>
               {project.leadership_notes && (
-                <div style={{ fontSize: '0.8rem', color: '#991B1B', marginTop: '0.35rem' }}>
+                <div style={{ fontSize: '0.82rem', color: '#991B1B', marginTop: '0.35rem' }}>
                   <strong>Leadership Feedback:</strong> {project.leadership_notes}
                 </div>
               )}
               {project.supervisor_notes && (
-                <div style={{ fontSize: '0.8rem', color: '#991B1B', marginTop: '0.35rem' }}>
+                <div style={{ fontSize: '0.82rem', color: '#991B1B', marginTop: '0.35rem' }}>
                   <strong>Supervisor Feedback:</strong> {project.supervisor_notes}
                 </div>
               )}
@@ -557,27 +614,18 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             </div>
           )}
 
-          {/* Quick Info Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '1rem',
-              backgroundColor: 'var(--color-canvas)',
-              padding: '1.25rem',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div>
+          {/* Quick Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+            <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700, marginBottom: '0.2rem' }}>
                 <Calendar size={13} /> Event Date
               </span>
-              <strong style={{ fontSize: '0.92rem', color: 'var(--color-navy)', fontFamily: 'monospace' }}>
+              <strong style={{ fontSize: '0.92rem', color: 'var(--color-navy)' }}>
                 {project.event_date || '—'}
               </strong>
             </div>
 
-            <div>
+            <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700, marginBottom: '0.2rem' }}>
                 <MapPin size={13} /> Location
               </span>
@@ -586,7 +634,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               </strong>
             </div>
 
-            <div>
+            <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1rem' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700, marginBottom: '0.2rem' }}>
                 <Users size={13} /> Volunteers Needed
               </span>
@@ -595,7 +643,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               </strong>
             </div>
 
-            <div>
+            <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1rem' }}>
               <span style={{ display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 700, marginBottom: '0.2rem' }}>
                 Designated Advisor
               </span>
@@ -611,14 +659,14 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               Project Leaders & Team
             </span>
             <div style={{ fontSize: '0.88rem', color: 'var(--color-navy)' }}>
-              {project.leaders}
+              {project.leaders || '—'}
             </div>
-            {project.co_leader_emails && project.co_leader_emails.length > 0 && (
+            {Array.isArray(project.co_leader_emails) && project.co_leader_emails.length > 0 && (
               <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <Users size={13} color="var(--color-oxford)" />
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-navy)', fontWeight: 600 }}>Co-Leaders:</span>
                 <span style={{ fontSize: '0.78rem', color: 'var(--color-oxford)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.15rem 0.5rem', borderRadius: '2px' }}>
-                  {project.co_leader_emails.join(', ')}
+                  {project.co_leader_emails.filter(Boolean).join(', ')}
                 </span>
               </div>
             )}
@@ -630,33 +678,33 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               Background & Need
             </span>
             <p style={{ margin: '0', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
-              {project.background}
+              {project.background || 'No background description provided.'}
             </p>
           </div>
 
           {/* Objectives */}
-          {project.objectives && project.objectives.length > 0 && (
+          {Array.isArray(project.objectives) && project.objectives.length > 0 && (
             <div>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
                 Measurable Objectives
               </span>
               <ul style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
                 {project.objectives.map((obj, i) => (
-                  <li key={i}>{obj}</li>
+                  <li key={i}>{typeof obj === 'string' ? obj : String(obj)}</li>
                 ))}
               </ul>
             </div>
           )}
 
           {/* Event Details */}
-          {project.event_details && project.event_details.length > 0 && (
+          {Array.isArray(project.event_details) && project.event_details.length > 0 && (
             <div>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
                 Execution Plan & Activities
               </span>
               <ol style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
                 {project.event_details.map((det, i) => (
-                  <li key={i}>{det}</li>
+                  <li key={i}>{typeof det === 'string' ? det : String(det)}</li>
                 ))}
               </ol>
             </div>
@@ -668,13 +716,16 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               Financial Breakdown & Anticipated Costs
             </span>
             <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1.15rem' }}>
-              {project.costs && project.costs.length > 0 ? (
+              {Array.isArray(project.costs) && project.costs.length > 0 ? (
                 <ul style={{ margin: '0', paddingLeft: '1.15rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                  {project.costs.map((c, i) => (
-                    <li key={i} style={{ fontFamily: /\d+/.test(c) ? 'monospace' : 'inherit' }}>
-                      {c}
-                    </li>
-                  ))}
+                  {project.costs.map((c, i) => {
+                    const cStr = typeof c === 'string' ? c : String(c);
+                    return (
+                      <li key={i} style={{ fontFamily: /\d+/.test(cStr) ? 'monospace' : 'inherit' }}>
+                        {cStr}
+                      </li>
+                    );
+                  })}
                 </ul>
               ) : (
                 <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
@@ -685,14 +736,14 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           </div>
 
           {/* Institutional Needs */}
-          {project.needs_from_school && project.needs_from_school.length > 0 && (
+          {Array.isArray(project.needs_from_school) && project.needs_from_school.length > 0 && (
             <div>
               <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
                 School Facilities & Support Needed
               </span>
               <ul style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
                 {project.needs_from_school.map((need, i) => (
-                  <li key={i}>{need}</li>
+                  <li key={i}>{typeof need === 'string' ? need : String(need)}</li>
                 ))}
               </ul>
             </div>
@@ -1055,7 +1106,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           )}
 
           {/* Reviewer Comments & Revision Feedback Thread */}
-          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+          <div ref={commentsRef} id="comments-section" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
               <MessageSquare size={16} color="var(--color-oxford)" />
               <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
@@ -1070,34 +1121,47 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   No comments or revision feedback posted yet. Leadership and supervisors can leave instructions here.
                 </div>
               ) : (
-                comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    style={{
-                      padding: '1rem',
-                      backgroundColor: 'var(--color-canvas)',
-                      border: '1px solid var(--color-border)',
-                      borderLeft: comment.author_role === 'leadership' || comment.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <strong style={{ fontSize: '0.85rem', color: 'var(--color-navy)' }}>
-                          {comment.author_name}
-                        </strong>
-                        <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.68rem', padding: '0.1rem 0.4rem' }}>
-                          {comment.author_role}
-                        </span>
+                comments.map((comment, index) => {
+                  const commentKey = comment.id || `comment-${index}`;
+                  const commentDate = comment.created_at ? new Date(comment.created_at) : null;
+                  const isValidDate = commentDate && !isNaN(commentDate.getTime());
+                  const formattedDate = isValidDate
+                    ? `${commentDate.toLocaleDateString()} at ${commentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : '';
+
+                  return (
+                    <div
+                      key={commentKey}
+                      style={{
+                        padding: '1rem',
+                        backgroundColor: 'var(--color-canvas)',
+                        border: '1px solid var(--color-border)',
+                        borderLeft: comment.author_role === 'leadership' || comment.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.85rem', color: 'var(--color-navy)' }}>
+                            {comment.author_name || 'Anonymous Reviewer'}
+                          </strong>
+                          {comment.author_role && (
+                            <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.68rem', padding: '0.1rem 0.4rem' }}>
+                              {comment.author_role}
+                            </span>
+                          )}
+                        </div>
+                        {formattedDate && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                            {formattedDate}
+                          </span>
+                        )}
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                        {new Date(comment.created_at).toLocaleDateString()} at {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                      <p style={{ margin: '0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
+                        {comment.content}
+                      </p>
                     </div>
-                    <p style={{ margin: '0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--color-text-primary)' }}>
-                      {comment.content}
-                    </p>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

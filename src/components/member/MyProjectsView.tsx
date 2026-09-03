@@ -12,6 +12,7 @@ import type {
 } from '../../types/nhs';
 import { ProjectProposalForm } from './ProjectProposalForm';
 import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import {
   Plus,
   CheckCircle2,
@@ -70,6 +71,7 @@ export const MyProjectsView: React.FC = () => {
 
   // Details drawer & editing state
   const [selectedProject, setSelectedProject] = useState<ProjectProposal | null>(null);
+  const [drawerInitialSection, setDrawerInitialSection] = useState<'details' | 'comments'>('details');
   const [editingProject, setEditingProject] = useState<ProjectProposal | null>(null);
 
   // Completion modal state
@@ -683,7 +685,10 @@ export const MyProjectsView: React.FC = () => {
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                   }}
-                  onClick={() => setSelectedProject(project)}
+                  onClick={() => {
+                    setDrawerInitialSection('details');
+                    setSelectedProject(project);
+                  }}
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -728,23 +733,31 @@ export const MyProjectsView: React.FC = () => {
                             </span>
                           )}
                           {commentCount > 0 && (
-                            <span
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDrawerInitialSection('comments');
+                                setSelectedProject(project);
+                              }}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '3px',
+                                gap: '4px',
                                 fontSize: '0.72rem',
                                 color: 'var(--color-navy)',
                                 backgroundColor: '#EFF6FF',
                                 border: '1px solid #BFDBFE',
-                                padding: '0.15rem 0.45rem',
+                                padding: '0.15rem 0.5rem',
                                 borderRadius: '2px',
                                 fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'background-color 0.15s ease, border-color 0.15s ease',
                               }}
-                              title={`${commentCount} revision comment${commentCount > 1 ? 's' : ''}`}
+                              title={`View ${commentCount} revision comment${commentCount > 1 ? 's' : ''} (Click to open feedback)`}
                             >
                               <MessageSquare size={12} /> {commentCount}
-                            </span>
+                            </button>
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
@@ -860,6 +873,7 @@ export const MyProjectsView: React.FC = () => {
                       style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        setDrawerInitialSection('details');
                         setSelectedProject(project);
                       }}
                     >
@@ -947,7 +961,10 @@ export const MyProjectsView: React.FC = () => {
                   key={project.id}
                   className="sharp-card"
                   style={{ padding: '1.5rem', cursor: 'pointer' }}
-                  onClick={() => setSelectedProject(project)}
+                  onClick={() => {
+                    setDrawerInitialSection('details');
+                    setSelectedProject(project);
+                  }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                     <div style={{ flex: 1, minWidth: '280px' }}>
@@ -984,22 +1001,31 @@ export const MyProjectsView: React.FC = () => {
                           </span>
                         ) : null}
                         {project.comments && project.comments.length > 0 && (
-                          <span
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDrawerInitialSection('comments');
+                              setSelectedProject(project);
+                            }}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '3px',
+                              gap: '4px',
                               fontSize: '0.72rem',
                               color: 'var(--color-navy)',
                               backgroundColor: '#EFF6FF',
                               border: '1px solid #BFDBFE',
-                              padding: '0.15rem 0.45rem',
+                              padding: '0.15rem 0.5rem',
                               borderRadius: '2px',
                               fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s ease, border-color 0.15s ease',
                             }}
+                            title={`View ${project.comments.length} revision comment${project.comments.length > 1 ? 's' : ''}`}
                           >
                             <MessageSquare size={12} /> {project.comments.length}
-                          </span>
+                          </button>
                         )}
                       </div>
                       <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem' }}>
@@ -1303,29 +1329,36 @@ export const MyProjectsView: React.FC = () => {
         ) : null}
 
       {/* Project Details Drawer with Comments, Edit & Delete */}
-      <ProjectDetailsDrawer
-        project={selectedProject}
-        onClose={() => setSelectedProject(null)}
-        onEdit={(proj) => {
-          setEditingProject(proj);
-          setIsFormOpen(true);
-        }}
-        onDeleted={() => {
-          setSelectedProject(null);
-          loadData();
-        }}
-        onUpdated={async () => {
-          await loadData();
-          if (selectedProject) {
-            const { data } = await supabase
-              .from('project_proposals')
-              .select('*')
-              .eq('id', selectedProject.id)
-              .maybeSingle();
-            if (data) setSelectedProject(data as ProjectProposal);
-          }
-        }}
-      />
+      <ErrorBoundary
+        fallbackTitle="Unable to Display Project Details"
+        fallbackMessage="An error occurred while loading this project's details. Your data is secure."
+        onReset={() => setSelectedProject(null)}
+      >
+        <ProjectDetailsDrawer
+          project={selectedProject}
+          initialSection={drawerInitialSection}
+          onClose={() => setSelectedProject(null)}
+          onEdit={(proj) => {
+            setEditingProject(proj);
+            setIsFormOpen(true);
+          }}
+          onDeleted={() => {
+            setSelectedProject(null);
+            loadData();
+          }}
+          onUpdated={async () => {
+            await loadData();
+            if (selectedProject) {
+              const { data } = await supabase
+                .from('project_proposals')
+                .select('*')
+                .eq('id', selectedProject.id)
+                .maybeSingle();
+              if (data) setSelectedProject(data as ProjectProposal);
+            }
+          }}
+        />
+      </ErrorBoundary>
 
       {/* Proposal Modal */}
       <ProjectProposalForm

@@ -16,6 +16,7 @@ import { AllowlistManager } from './components/leadership/AllowlistManager';
 import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
 import { AnnualProjectsManager } from './components/leadership/AnnualProjectsManager';
 import { PublicHomepage } from './components/public/PublicHomepage';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import {
   LayoutDashboard,
   FileText,
@@ -516,18 +517,24 @@ function PortalContent() {
 
       {/* Stitch Main Content Area */}
       <main className="stitch-main-content">
-        {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
-        {activeTab === 'projects' && <MyProjectsView />}
-        {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
-          <AnnualProjectsManager />
-        )}
-        {activeTab === 'rules' && <ChapterRules />}
-        {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
-        {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
-        {activeTab === 'roster' && (isLeadership || isSupervisor) && <MemberRosterManager />}
-        {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
-        {activeTab === 'treasury' && (isLeadership || isSupervisor) && <ChapterTreasuryLedger />}
-        {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
+        <ErrorBoundary
+          fallbackTitle="Unable to Display Portal View"
+          fallbackMessage="An unexpected error occurred while loading this section. Please try again or return to the dashboard."
+          onReset={() => navigateTo('dashboard')}
+        >
+          {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
+          {activeTab === 'projects' && <MyProjectsView />}
+          {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
+            <AnnualProjectsManager />
+          )}
+          {activeTab === 'rules' && <ChapterRules />}
+          {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
+          {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
+          {activeTab === 'roster' && (isLeadership || isSupervisor) && <MemberRosterManager />}
+          {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
+          {activeTab === 'treasury' && (isLeadership || isSupervisor) && <ChapterTreasuryLedger />}
+          {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
+        </ErrorBoundary>
       </main>
 
       {/* Auth Modal */}

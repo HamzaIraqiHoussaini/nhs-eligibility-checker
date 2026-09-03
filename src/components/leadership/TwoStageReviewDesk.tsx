@@ -585,43 +585,53 @@ export const TwoStageReviewDesk: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                 <MessageSquare size={16} color="var(--color-oxford)" />
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
-                  Revision Feedback & Comments ({selectedProposal.comments?.length || 0})
+                  Revision Feedback & Comments ({Array.isArray(selectedProposal.comments) ? selectedProposal.comments.length : 0})
                 </h3>
               </div>
 
               {/* Comments list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                {(!selectedProposal.comments || selectedProposal.comments.length === 0) ? (
+                {(!Array.isArray(selectedProposal.comments) || selectedProposal.comments.length === 0) ? (
                   <div style={{ padding: '1rem', textAlign: 'center', backgroundColor: '#F8FAFC', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
                     No feedback comments posted yet. Add instructions or required modifications below.
                   </div>
                 ) : (
-                  selectedProposal.comments.map((c) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid var(--color-border)',
-                        borderLeft: c.author_role === 'leadership' || c.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name}</strong>
-                          <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.65rem' }}>
-                            {c.author_role}
-                          </span>
+                  selectedProposal.comments.map((c, idx) => {
+                    const cDate = c.created_at ? new Date(c.created_at) : null;
+                    const cDateFormatted = cDate && !isNaN(cDate.getTime())
+                      ? `${cDate.toLocaleDateString()} ${cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : '';
+                    return (
+                      <div
+                        key={c.id || `comment-${idx}`}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid var(--color-border)',
+                          borderLeft: c.author_role === 'leadership' || c.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name || 'Reviewer'}</strong>
+                            {c.author_role && (
+                              <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.65rem' }}>
+                                {c.author_role}
+                              </span>
+                            )}
+                          </div>
+                          {cDateFormatted && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                              {cDateFormatted}
+                            </span>
+                          )}
                         </div>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                          {new Date(c.created_at).toLocaleDateString()} {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <p style={{ margin: '0', fontSize: '0.82rem', lineHeight: '1.5', color: 'var(--color-text-primary)' }}>
+                          {c.content}
+                        </p>
                       </div>
-                      <p style={{ margin: '0', fontSize: '0.82rem', lineHeight: '1.5', color: 'var(--color-text-primary)' }}>
-                        {c.content}
-                      </p>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
