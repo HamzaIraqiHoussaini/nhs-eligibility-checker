@@ -384,7 +384,6 @@ BEGIN
         phone_change_token = COALESCE(phone_change_token, ''),
         reauthentication_token = COALESCE(reauthentication_token, ''),
         email_confirmed_at = COALESCE(email_confirmed_at, now()),
-        confirmed_at = COALESCE(confirmed_at, now()),
         updated_at = now()
     WHERE id = v_user_id;
 
@@ -400,7 +399,6 @@ BEGIN
       email,
       encrypted_password,
       email_confirmed_at,
-      confirmed_at,
       confirmation_token,
       recovery_token,
       email_change_token_new,
@@ -422,7 +420,6 @@ BEGIN
       '00000000-0000-0000-0000-000000000000'::uuid,
       v_clean_email,
       v_encrypted_pw,
-      now(),
       now(),
       '',
       '',

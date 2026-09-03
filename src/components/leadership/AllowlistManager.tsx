@@ -15,6 +15,7 @@ import {
   Archive,
   UserMinus,
   RotateCcw,
+  Mail,
 } from 'lucide-react';
 
 function generateAccessCode(): string {
@@ -34,6 +35,31 @@ interface RevealCodeData {
   role: UserRole;
   code: string;
   isReset?: boolean;
+}
+
+function getMailtoLink(data: RevealCodeData): string {
+  const roleDisplay = data.role === 'supervisor' ? 'Chapter Advisor / Supervisor' : data.role === 'leadership' ? 'Leadership' : 'Member';
+  const subject = encodeURIComponent(`Your CAS National Honor Society Portal Access Code`);
+  const body = encodeURIComponent(
+`Hello ${data.fullName},
+
+You have been granted access to the Casablanca American School National Honor Society Portal as a ${roleDisplay}.
+
+Here is your one-time access code:
+${data.code}
+
+Portal URL: https://casnhs.vercel.app
+
+Steps to sign in:
+1. Open the portal: https://casnhs.vercel.app
+2. Click "Member Portal" and enter your CAS email: ${data.email}
+3. Enter your access code above as the password.
+4. Once logged in, you can update your passcode at any time via "Change Code" in the top-right header.
+
+Best regards,
+CAS NHS Leadership Team`
+  );
+  return `mailto:${data.email}?subject=${subject}&body=${body}`;
 }
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
@@ -733,14 +759,40 @@ export const AllowlistManager: React.FC = () => {
               {revealData.code}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <button
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+              <a
+                href={getMailtoLink(revealData)}
                 className="btn-primary"
+                style={{
+                  padding: '0.65rem 1.35rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textDecoration: 'none',
+                  backgroundColor: 'var(--color-navy)',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                }}
+              >
+                <Mail size={16} /> Open Mail & Send Code
+              </a>
+
+              <button
+                type="button"
+                className="btn-secondary"
                 onClick={handleCopyCode}
-                style={{ padding: '0.65rem 1.5rem' }}
+                style={{
+                  padding: '0.65rem 1.25rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                }}
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied to Clipboard!' : 'Copy Access Code'}
+                {copied ? 'Copied to Clipboard!' : 'Copy Code'}
               </button>
             </div>
 
