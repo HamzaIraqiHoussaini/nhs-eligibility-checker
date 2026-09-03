@@ -3,7 +3,14 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
-import { X, Plus, Trash2, Send, AlertCircle, Star } from 'lucide-react';
+import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users } from 'lucide-react';
+
+interface CoLeaderMember {
+  id: string;
+  full_name: string;
+  email: string;
+  grade_level?: number | null;
+}
 
 interface ProjectProposalFormProps {
   isOpen: boolean;
@@ -27,9 +34,12 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   const isEditing = Boolean(initialData);
 
   const [projectTitle, setProjectTitle] = useState(initialData?.project_title || '');
-  const [leaders, setLeaders] = useState(initialData?.leaders || profile?.full_name || '');
-  const [coLeaderEmails, setCoLeaderEmails] = useState(initialData?.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
   const [advisorName, setAdvisorName] = useState(initialData?.advisor_name || '');
+  const [selectedCoLeaders, setSelectedCoLeaders] = useState<CoLeaderMember[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<CoLeaderMember[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [checkingQuotaEmail, setCheckingQuotaEmail] = useState<string | null>(null);
   const [eventDate, setEventDate] = useState(initialData?.event_date || '');
   const [location, setLocation] = useState(initialData?.location || '');
   const [awards, setAwards] = useState(initialData?.awards || '');
@@ -46,8 +56,6 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   useEffect(() => {
     if (initialData) {
       setProjectTitle(initialData.project_title || '');
-      setLeaders(initialData.leaders || profile?.full_name || '');
-      setCoLeaderEmails(initialData.co_leader_emails ? initialData.co_leader_emails.join(', ') : '');
       setAdvisorName(initialData.advisor_name || '');
       setEventDate(initialData.event_date || '');
       setLocation(initialData.location || '');
@@ -58,10 +66,34 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setCosts(initialData.costs?.length ? initialData.costs : ['No costs expected']);
       setNeedsFromSchool(initialData.needs_from_school?.length ? initialData.needs_from_school : ['Classroom space and projector']);
       setVolunteersNeeded(initialData.volunteers_needed || 0);
+
+      // Load existing co-leaders from database
+      if (initialData.co_leader_emails && initialData.co_leader_emails.length > 0) {
+        supabase
+          .from('profiles')
+          .select('id, full_name, email, grade_level')
+          .in('email', initialData.co_leader_emails)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              setSelectedCoLeaders(data as CoLeaderMember[]);
+            } else {
+              setSelectedCoLeaders(
+                (initialData.co_leader_emails || []).map(e => ({
+                  id: e,
+                  full_name: e.split('@')[0],
+                  email: e,
+                }))
+              );
+            }
+          });
+      } else {
+        setSelectedCoLeaders([]);
+      }
     } else {
       setProjectTitle('');
-      setLeaders(profile?.full_name || '');
-      setCoLeaderEmails('');
+      setSelectedCoLeaders([]);
+      setSearchQuery('');
+      setSearchResults([]);
       setAdvisorName('');
       setEventDate('');
       setLocation('');
@@ -74,6 +106,95 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setVolunteersNeeded(0);
     }
   }, [initialData, isOpen]);
+
+  // Debounced search for students (300ms delay to prevent excessive database requests)
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const query = trimmed.toLowerCase();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, grade_level, role')
+          .eq('role', 'member')
+          .neq('id', user?.id || '')
+          .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+          .limit(8);
+
+        if (error) throw error;
+
+        const currentEmails = new Set(selectedCoLeaders.map(c => c.email.toLowerCase()));
+        if (user?.email) currentEmails.add(user.email.toLowerCase());
+        if (profile?.email) currentEmails.add(profile.email.toLowerCase());
+
+        const filtered = (data || []).filter(
+          m => m.email && !currentEmails.has(m.email.toLowerCase())
+        ) as CoLeaderMember[];
+
+        setSearchResults(filtered);
+      } catch (err) {
+        console.error('Error searching students:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCoLeaders, user, profile]);
+
+  const handleAddCoLeader = async (student: CoLeaderMember) => {
+    if (!activeSemester?.id) {
+      await alert({
+        title: 'Active Semester Required',
+        message: 'No active academic semester detected. Co-leader quota cannot be verified.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setCheckingQuotaEmail(student.email);
+    try {
+      // Check whether applicant has reached their project quota of the semester or year
+      const { data: quotaRes, error: quotaErr } = await supabase.rpc('check_member_project_quota', {
+        p_email: student.email,
+        p_semester_id: activeSemester.id,
+      });
+
+      if (quotaErr) throw quotaErr;
+
+      if (quotaRes && quotaRes.allowed === false) {
+        await alert({
+          title: 'Project Quota Limit Reached',
+          message: quotaRes.reason || `${student.full_name} has already reached the maximum project limit for this term.`,
+          variant: 'danger',
+        });
+        return;
+      }
+
+      setSelectedCoLeaders(prev => [...prev, student]);
+      setSearchQuery('');
+      setSearchResults([]);
+    } catch (err: any) {
+      await alert({
+        title: 'Verification Failed',
+        message: err.message || 'Could not verify student project quota.',
+        variant: 'danger',
+      });
+    } finally {
+      setCheckingQuotaEmail(null);
+    }
+  };
+
+  const handleRemoveCoLeader = (email: string) => {
+    setSelectedCoLeaders(prev => prev.filter(c => c.email.toLowerCase() !== email.toLowerCase()));
+  };
 
   if (!isOpen) return null;
 
@@ -108,10 +229,10 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     setLoading(true);
     setErrorMsg(null);
 
-    const cleanCoLeaders = coLeaderEmails
-      .split(',')
-      .map(e => e.trim().toLowerCase())
-      .filter(Boolean);
+    const cleanCoLeaders = selectedCoLeaders.map(c => c.email.trim().toLowerCase());
+    const primaryName = initialData?.creator_name || profile.full_name || 'Member';
+    const leaderNames = [primaryName, ...selectedCoLeaders.map(c => c.full_name)].filter(Boolean);
+    const formattedLeaders = Array.from(new Set(leaderNames)).join(', ');
 
     try {
       if (isEditing && initialData) {
@@ -119,7 +240,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           .from('project_proposals')
           .update({
             project_title: projectTitle.trim(),
-            leaders: leaders.trim(),
+            leaders: formattedLeaders,
             co_leader_emails: cleanCoLeaders,
             advisor_name: advisorName.trim(),
             event_date: eventDate,
@@ -131,15 +252,13 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             costs: costs.map(c => c.trim()).filter(Boolean),
             needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
             volunteers_needed: Number(volunteersNeeded) || 0,
-            status: 'pending_leadership',
-            leadership_decision: null,
-            supervisor_decision: null,
+            status: (initialData.status === 'rejected_leadership' || initialData.status === 'rejected_supervisor') ? 'pending_leadership' : initialData.status,
           })
           .eq('id', initialData.id);
 
         if (error) throw error;
 
-        // Create co-leader invites for any added co-leaders
+        // Upsert pending invitations for newly added co-leaders
         if (cleanCoLeaders.length > 0) {
           const invites = cleanCoLeaders.map(email => ({
             project_id: initialData.id,
@@ -152,9 +271,20 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           await supabase.from('project_co_leaders').upsert(invites, { onConflict: 'project_id,co_leader_email', ignoreDuplicates: true });
         }
 
+        // Clean up project_co_leaders for removed co-leaders
+        const prevEmails = initialData.co_leader_emails || [];
+        const removedEmails = prevEmails.filter(e => !cleanCoLeaders.includes(e.toLowerCase()));
+        if (removedEmails.length > 0) {
+          await supabase
+            .from('project_co_leaders')
+            .delete()
+            .eq('project_id', initialData.id)
+            .in('co_leader_email', removedEmails);
+        }
+
         await alert({
-          title: 'Proposal Resubmitted',
-          message: `Proposal "${projectTitle}" has been modified and resubmitted for leadership review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
+          title: 'Proposal Saved',
+          message: `Proposal "${projectTitle}" has been updated. Both project leaders can see the saved progress.`,
           variant: 'success',
         });
       } else {
@@ -164,7 +294,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           creator_name: profile.full_name,
           creator_email: user.email,
           project_title: projectTitle.trim(),
-          leaders: leaders.trim(),
+          leaders: formattedLeaders,
           co_leader_emails: cleanCoLeaders,
           advisor_name: advisorName.trim(),
           event_date: eventDate,
@@ -196,7 +326,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
         await alert({
           title: 'Proposal Submitted',
-          message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Co-leadership invitations have been sent to ' + cleanCoLeaders.join(', ') + '.' : ''}`,
+          message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
           variant: 'success',
         });
       }
@@ -339,38 +469,6 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Project Leader(s) *
-              </label>
-              <input
-                type="text"
-                required
-                disabled={isLimitReached}
-                placeholder="Primary leader & co-leader names"
-                value={leaders}
-                onChange={e => setLeaders(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Co-Leader Emails (Co-Applicants)
-              </label>
-              <input
-                type="text"
-                disabled={isLimitReached}
-                placeholder="coapplicant1@cas.ac.ma, coapplicant2@cas.ac.ma"
-                value={coLeaderEmails}
-                onChange={e => setCoLeaderEmails(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none' }}
-              />
-              <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>Co-leaders will share attribution for leading this project</span>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 Advisor Name *
               </label>
               <input
@@ -382,6 +480,171 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 onChange={e => setAdvisorName(e.target.value)}
                 style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none' }}
               />
+            </div>
+          </div>
+
+          {/* Project Leadership Team & Debounced Student Search */}
+          <div style={{ padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Users size={14} /> Project Leadership Team
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                Primary leader + invited co-leaders
+              </span>
+            </div>
+
+            {/* Primary Leader */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', fontWeight: 600, width: '105px' }}>
+                Primary Leader:
+              </span>
+              <span style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--color-navy)', backgroundColor: '#FFFFFF', padding: '0.35rem 0.75rem', border: '1px solid #CBD5E1', flex: 1 }}>
+                {initialData?.creator_name || profile?.full_name || 'Project Starter'}
+              </span>
+            </div>
+
+            {/* Co-Leaders list */}
+            {selectedCoLeaders.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                  Selected Co-Leaders ({selectedCoLeaders.length}):
+                </span>
+                {selectedCoLeaders.map((student) => (
+                  <div
+                    key={student.email}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      padding: '0.4rem 0.75rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--color-navy)' }}>
+                        {student.full_name}
+                      </span>
+                      {student.grade_level && (
+                        <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#F1F5F9', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                          Grade {student.grade_level}
+                        </span>
+                      )}
+                      <span style={{ fontSize: '0.76rem', color: 'var(--color-text-muted)' }}>
+                        {student.email}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#F1F5F9', padding: '0.15rem 0.45rem', border: '1px solid #CBD5E1' }}>
+                        Invite on Submit
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCoLeader(student.email)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-terracotta)', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
+                        title="Remove Co-Leader"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Debounced Student Search Input */}
+            <div style={{ position: 'relative', marginTop: '0.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                Add Co-Leader (Search Students)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  disabled={isLimitReached}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Type student name or CAS email to search..."
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem 0.5rem 2rem',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.84rem',
+                    backgroundColor: '#FFFFFF',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {isSearching && (
+                <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '0.3rem' }}>
+                  Searching students...
+                </div>
+              )}
+
+              {/* Search Results Dropdown */}
+              {searchResults.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #94A3B8',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
+                    zIndex: 20,
+                    marginTop: '4px',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {searchResults.map(student => (
+                    <div
+                      key={student.id}
+                      style={{
+                        padding: '0.55rem 0.85rem',
+                        borderBottom: '1px solid #F1F5F9',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--color-navy)' }}>
+                          {student.full_name}
+                          {student.grade_level && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginLeft: '6px' }}>
+                              (Grade {student.grade_level})
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
+                          {student.email}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={checkingQuotaEmail === student.email}
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', whiteSpace: 'nowrap' }}
+                        onClick={() => handleAddCoLeader(student)}
+                      >
+                        {checkingQuotaEmail === student.email ? 'Checking Quota...' : '+ Add Co-Leader'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+                <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '0.3rem', fontStyle: 'italic' }}>
+                  No active chapter members found.
+                </div>
+              )}
             </div>
           </div>
 

@@ -64,7 +64,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
 
   // Rule: Proposals can only be modified until approved by supervisor
   const isApprovedOrCompleted = project.status === 'approved' || project.status === 'completed';
-  const canModify = !isApprovedOrCompleted && (isOwner || isLeadership || isSupervisor);
+  const canModify = !isApprovedOrCompleted && (isOwner || isCoLeader || isLeadership || isSupervisor);
 
   // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected), and is_yearly cannot be deleted
   const canDelete = !isApprovedOrCompleted && !project.is_yearly && (isOwner || isSuperadmin || isLeadership);

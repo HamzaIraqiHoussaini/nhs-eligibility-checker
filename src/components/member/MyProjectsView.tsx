@@ -657,8 +657,10 @@ export const MyProjectsView: React.FC = () => {
               const hasCosts = projectHasMonetaryCosts(project);
               const isCompleted = project.is_completed || project.status === 'completed';
               const isCreator = project.creator_id === user?.id;
-              const isCoLeader = !isCreator;
-              const canModifyOrDelete = project.status !== 'approved' && project.status !== 'completed' && isCreator && !project.is_yearly;
+              const isCoLeader = Array.isArray(project.co_leader_emails) && project.co_leader_emails.some((e: string) => e.toLowerCase() === user?.email?.toLowerCase());
+              const isProjectLeader = isCreator || isCoLeader;
+              const canModify = project.status !== 'approved' && project.status !== 'completed' && isProjectLeader;
+              const canDelete = project.status !== 'approved' && project.status !== 'completed' && isCreator && !project.is_yearly;
               const commentCount = project.comments?.length || 0;
 
               return (
@@ -857,50 +859,48 @@ export const MyProjectsView: React.FC = () => {
                       <Eye size={13} /> Details & Comments
                     </button>
 
-                    {canModifyOrDelete && (
-                      <>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingProject(project);
-                            setIsFormOpen(true);
-                          }}
-                        >
-                          <Edit3 size={13} /> Modify
-                        </button>
-
-                        {!project.is_yearly ? (
-                          <button
-                            type="button"
-                            className="btn-inspect"
-                            style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            onClick={(e) => handleDeleteProposal(project, e)}
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: '0.72rem',
-                              color: 'var(--color-text-muted)',
-                              fontStyle: 'italic',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '0.3rem 0.5rem',
-                              backgroundColor: '#F8FAFC',
-                              border: '1px solid var(--color-border)',
-                            }}
-                            title="Yearly projects are mandatory and cannot be deleted"
-                          >
-                            <Lock size={12} /> Mandatory
-                          </span>
-                        )}
-                      </>
+                    {canModify && (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingProject(project);
+                          setIsFormOpen(true);
+                        }}
+                      >
+                        <Edit3 size={13} /> Modify
+                      </button>
                     )}
+
+                    {canDelete ? (
+                      <button
+                        type="button"
+                        className="btn-inspect"
+                        style={{ fontSize: '0.76rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={(e) => handleDeleteProposal(project, e)}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    ) : project.is_yearly ? (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--color-text-muted)',
+                          fontStyle: 'italic',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '0.3rem 0.5rem',
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid var(--color-border)',
+                        }}
+                        title="Yearly projects are mandatory and cannot be deleted"
+                      >
+                        <Lock size={12} /> Mandatory
+                      </span>
+                    ) : null}
 
                     {project.status === 'approved' && !isCompleted && (
                       <button
