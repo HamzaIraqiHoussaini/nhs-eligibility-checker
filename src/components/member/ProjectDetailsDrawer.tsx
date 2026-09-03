@@ -24,6 +24,7 @@ import {
   UserX,
   Check,
   CheckCheck,
+  FileText,
 } from 'lucide-react';
 
 interface ProjectDetailsDrawerProps {
@@ -417,6 +418,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             <FileCheck size={13} /> Completed
           </span>
         );
+      case 'draft':
+        return (
+          <span className="status-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
+            <FileText size={13} /> Unsubmitted Draft
+          </span>
+        );
       case 'rejected_leadership':
       case 'rejected_supervisor':
         return (
@@ -519,6 +526,33 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                 <div style={{ fontSize: '0.8rem', color: '#991B1B', marginTop: '0.35rem' }}>
                   <strong>Supervisor Feedback:</strong> {project.supervisor_notes}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Draft Banner */}
+          {project.status === 'draft' && (
+            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', padding: '1rem 1.25rem', borderRadius: '2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <strong style={{ color: 'var(--color-navy)', display: 'block', fontSize: '0.88rem', marginBottom: '0.2rem' }}>
+                  Unsubmitted Draft Proposal
+                </strong>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B' }}>
+                  This proposal is in draft mode. Complete all necessary sections and submit when ready for leadership review.
+                </p>
+              </div>
+              {canModify && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  onClick={() => {
+                    onClose();
+                    onEdit(project);
+                  }}
+                >
+                  <Edit3 size={14} /> Edit & Submit
+                </button>
               )}
             </div>
           )}

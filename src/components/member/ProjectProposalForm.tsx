@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import type { Semester, ProjectProposal } from '../../types/nhs';
-import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users } from 'lucide-react';
+import type { Semester, ProjectProposal, ProposalStatus } from '../../types/nhs';
+import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save } from 'lucide-react';
 
 interface CoLeaderMember {
   id: string;
@@ -217,13 +217,54 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     setter(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (isSubmitting: boolean) => {
     if (!user || !profile) return;
 
     if (isLimitReached) {
       setErrorMsg('Semester Project Limit Reached: Members are permitted a maximum of 2 projects per semester (4 projects per year).');
       return;
+    }
+
+    // 1. Validate Title: Always required whether creating draft or submitting
+    if (!projectTitle.trim()) {
+      setErrorMsg('Please enter a project title.');
+      await alert({
+        title: 'Project Title Required',
+        message: 'A proposed project title is required to create or save this project proposal.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    // 2. If Submitting, check that EVERYTHING necessary is filled out
+    if (isSubmitting) {
+      const missing: string[] = [];
+      if (!projectTitle.trim()) missing.push('Proposed Project Title');
+      if (!advisorName.trim()) missing.push('Faculty Advisor Name');
+      if (!eventDate) missing.push('Estimated Event Date');
+      if (!location.trim()) missing.push('Event Location');
+      if (!background.trim()) missing.push('Project Background & Community Need');
+
+      const validObjectives = objectives.map(o => o.trim()).filter(Boolean);
+      if (validObjectives.length === 0) missing.push('At least one Project Objective');
+
+      const validDetails = eventDetails.map(d => d.trim()).filter(Boolean);
+      if (validDetails.length === 0) missing.push('Event Schedule / Logistical Details');
+
+      const validCosts = costs.map(c => c.trim()).filter(Boolean);
+      if (validCosts.length === 0) missing.push('Costs & Budget Breakdown');
+
+      const validNeeds = needsFromSchool.map(n => n.trim()).filter(Boolean);
+      if (validNeeds.length === 0) missing.push('Facility & Equipment Needs from School');
+
+      if (missing.length > 0) {
+        await alert({
+          title: 'Submission Requirements Incomplete',
+          message: `Please complete all necessary sections before submitting for leadership review:\n\n• ${missing.join('\n• ')}`,
+          variant: 'warning',
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -234,6 +275,14 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     const leaderNames = [primaryName, ...selectedCoLeaders.map(c => c.full_name)].filter(Boolean);
     const formattedLeaders = Array.from(new Set(leaderNames)).join(', ');
 
+    // Determine target status
+    let targetStatus: ProposalStatus;
+    if (isSubmitting) {
+      targetStatus = 'pending_leadership';
+    } else {
+      targetStatus = initialData?.status || 'draft';
+    }
+
     try {
       if (isEditing && initialData) {
         const { error } = await supabase
@@ -242,17 +291,17 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             project_title: projectTitle.trim(),
             leaders: formattedLeaders,
             co_leader_emails: cleanCoLeaders,
-            advisor_name: advisorName.trim(),
-            event_date: eventDate,
-            location: location.trim(),
+            advisor_name: advisorName.trim() || null,
+            event_date: eventDate || null,
+            location: location.trim() || null,
             awards: awards.trim() || null,
-            background: background.trim(),
+            background: background.trim() || null,
             objectives: objectives.map(o => o.trim()).filter(Boolean),
             event_details: eventDetails.map(d => d.trim()).filter(Boolean),
             costs: costs.map(c => c.trim()).filter(Boolean),
             needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
             volunteers_needed: Number(volunteersNeeded) || 0,
-            status: (initialData.status === 'rejected_leadership' || initialData.status === 'rejected_supervisor') ? 'pending_leadership' : initialData.status,
+            status: targetStatus,
           })
           .eq('id', initialData.id);
 
@@ -282,11 +331,19 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             .in('co_leader_email', removedEmails);
         }
 
-        await alert({
-          title: 'Proposal Saved',
-          message: `Proposal "${projectTitle}" has been updated. Both project leaders can see the saved progress.`,
-          variant: 'success',
-        });
+        if (isSubmitting) {
+          await alert({
+            title: 'Proposal Submitted',
+            message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.`,
+            variant: 'success',
+          });
+        } else {
+          await alert({
+            title: 'Progress Saved',
+            message: `Proposal "${projectTitle}" progress has been saved. Both project leaders can see and edit the updated proposal.`,
+            variant: 'success',
+          });
+        }
       } else {
         const { data: newProject, error } = await supabase.from('project_proposals').insert({
           semester_id: activeSemester?.id || null,
@@ -296,17 +353,17 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           project_title: projectTitle.trim(),
           leaders: formattedLeaders,
           co_leader_emails: cleanCoLeaders,
-          advisor_name: advisorName.trim(),
-          event_date: eventDate,
-          location: location.trim(),
+          advisor_name: advisorName.trim() || null,
+          event_date: eventDate || null,
+          location: location.trim() || null,
           awards: awards.trim() || null,
-          background: background.trim(),
+          background: background.trim() || null,
           objectives: objectives.map(o => o.trim()).filter(Boolean),
           event_details: eventDetails.map(d => d.trim()).filter(Boolean),
           costs: costs.map(c => c.trim()).filter(Boolean),
           needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
           volunteers_needed: Number(volunteersNeeded) || 0,
-          status: 'pending_leadership',
+          status: targetStatus,
         }).select('id').single();
 
         if (error) throw error;
@@ -324,17 +381,25 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           await supabase.from('project_co_leaders').upsert(invites, { onConflict: 'project_id,co_leader_email', ignoreDuplicates: true });
         }
 
-        await alert({
-          title: 'Proposal Submitted',
-          message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
-          variant: 'success',
-        });
+        if (isSubmitting) {
+          await alert({
+            title: 'Proposal Submitted',
+            message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
+            variant: 'success',
+          });
+        } else {
+          await alert({
+            title: 'Project Created',
+            message: `Project "${projectTitle}" has been created as an unsubmitted draft.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''} You can continue editing anytime and submit when ready.`,
+            variant: 'success',
+          });
+        }
       }
 
       onSubmitted();
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to submit proposal.');
+      setErrorMsg(err.message || 'Failed to process proposal.');
     } finally {
       setLoading(false);
     }
@@ -448,17 +513,16 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <form onSubmit={(e) => { e.preventDefault(); handleSave(true); }} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Top Metadata Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Proposed Project Title *
+                Proposed Project Title * (Required to create)
               </label>
               <input
                 type="text"
-                required
                 disabled={isLimitReached}
                 placeholder="e.g. CAS Middle School Math Olympiad"
                 value={projectTitle}
@@ -469,11 +533,10 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Advisor Name *
+                Faculty Advisor Name (Required for submission)
               </label>
               <input
                 type="text"
-                required
                 disabled={isLimitReached}
                 placeholder="e.g. Faculty Advisor Name"
                 value={advisorName}
@@ -651,11 +714,10 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Date of Event / Competition *
+                Date of Event / Competition (Required for submission)
               </label>
               <input
                 type="date"
-                required
                 disabled={isLimitReached}
                 value={eventDate}
                 onChange={e => setEventDate(e.target.value)}
@@ -665,11 +727,10 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
             <div>
               <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                Location / Room Number *
+                Location / Room Number (Required for submission)
               </label>
               <input
                 type="text"
-                required
                 disabled={isLimitReached}
                 placeholder="e.g. Room 204 / Upper Gym"
                 value={location}
@@ -712,10 +773,9 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           {/* Background */}
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-              Background: *
+              Background & Community Need (Required for submission)
             </label>
             <textarea
-              required
               rows={3}
               disabled={isLimitReached}
               placeholder="Describe the context, motivation, and inspiration for this project..."
@@ -745,7 +805,6 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
               <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <input
                   type="text"
-                  required
                   disabled={isLimitReached}
                   placeholder={`Objective #${i + 1}`}
                   value={obj}
@@ -785,7 +844,6 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
               <div key={i} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <input
                   type="text"
-                  required
                   disabled={isLimitReached}
                   placeholder={`Detail #${i + 1}`}
                   value={det}
@@ -882,21 +940,33 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Two-stage approval required: Leadership Review → Supervisor Review
+              Two-stage review: Leadership Review → Supervisor Review
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button type="button" className="btn-secondary" onClick={onClose}>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
                 Cancel
               </button>
               <button
-                type="submit"
+                type="button"
+                className="btn-secondary"
+                disabled={loading || isLimitReached}
+                onClick={() => handleSave(false)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              >
+                <Save size={14} />
+                <span>{isEditing ? 'Save Progress' : 'Create Project (Draft)'}</span>
+              </button>
+              <button
+                type="button"
                 className="btn-primary"
                 disabled={loading || isLimitReached}
+                onClick={() => handleSave(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
               >
                 <Send size={14} />
-                {loading ? (isEditing ? 'Saving Updates...' : 'Submitting...') : (isEditing ? 'Save & Resubmit Proposal' : 'Submit Proposal for Review')}
+                <span>Submit for Review</span>
               </button>
             </div>
           </div>

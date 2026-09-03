@@ -270,7 +270,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             }
 
             const semLed = activeSemester
-              ? ledProjects.filter(p => p.semester_id === activeSemester.id || (p.event_date >= activeSemester.start_date && p.event_date <= activeSemester.end_date)).length
+              ? ledProjects.filter(p => p.semester_id === activeSemester.id || (Boolean(p.event_date) && p.event_date! >= activeSemester.start_date && p.event_date! <= activeSemester.end_date)).length
               : ledProjects.length;
             const meetsQuota = semLed >= 1 && semesterVolCount >= 2;
 

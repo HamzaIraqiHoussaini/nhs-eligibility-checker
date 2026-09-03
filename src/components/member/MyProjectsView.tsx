@@ -35,6 +35,7 @@ import {
   Lock,
   Star,
   Send,
+  FileText,
 } from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -433,6 +434,12 @@ export const MyProjectsView: React.FC = () => {
 
   const getStatusBadge = (status: ProjectProposal['status']) => {
     switch (status) {
+      case 'draft':
+        return (
+          <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
+            <FileText size={12} /> Draft (Unsubmitted)
+          </span>
+        );
       case 'pending_leadership':
         return (
           <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>
@@ -870,7 +877,7 @@ export const MyProjectsView: React.FC = () => {
                           setIsFormOpen(true);
                         }}
                       >
-                        <Edit3 size={13} /> Modify
+                        <Edit3 size={13} /> {project.status === 'draft' ? 'Edit & Submit' : 'Modify'}
                       </button>
                     )}
 

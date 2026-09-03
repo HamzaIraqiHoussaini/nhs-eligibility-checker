@@ -47,6 +47,7 @@ export interface Semester {
 }
 
 export type ProposalStatus =
+  | 'draft'
   | 'pending_leadership'
   | 'rejected_leadership'
   | 'pending_supervisor'
@@ -63,11 +64,11 @@ export interface ProjectProposal {
   project_title: string;
   leaders: string;
   co_leader_emails: string[];
-  advisor_name: string;
-  event_date: string;
-  location: string;
-  awards?: string;
-  background: string;
+  advisor_name?: string | null;
+  event_date?: string | null;
+  location?: string | null;
+  awards?: string | null;
+  background?: string | null;
   objectives: string[];
   event_details: string[];
   costs: string[];
