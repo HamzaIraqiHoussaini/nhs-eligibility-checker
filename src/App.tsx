@@ -35,7 +35,6 @@ import {
   Key,
   Coins,
   Star,
-  Scale,
 } from 'lucide-react';
 import './index.css';
 
@@ -119,14 +118,28 @@ function PortalContent() {
     }
   };
 
-  // Automatically direct newly authenticated users to the member dashboard
+  // Automatically direct newly authenticated users to the member dashboard (or review desk for supervisor)
   const prevUserRef = useRef(user);
   useEffect(() => {
     if (!prevUserRef.current && user) {
-      navigateTo('dashboard');
+      if (isSupervisor) {
+        navigateTo('review');
+      } else {
+        navigateTo('dashboard');
+      }
     }
     prevUserRef.current = user;
-  }, [user]);
+  }, [user, isSupervisor]);
+
+  // Strict route containment for Supervisor role
+  useEffect(() => {
+    if (user && isSupervisor) {
+      const allowedSupervisorTabs: ActiveTab[] = ['screener', 'review', 'roster', 'legal'];
+      if (!allowedSupervisorTabs.includes(activeTab)) {
+        navigateTo('review');
+      }
+    }
+  }, [user, isSupervisor, activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -211,10 +224,10 @@ function PortalContent() {
                   type="button"
                   className="btn-primary"
                   style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
-                  onClick={() => navigateTo('dashboard')}
+                  onClick={() => navigateTo(isSupervisor ? 'review' : 'dashboard')}
                 >
                   <LayoutDashboard size={14} />
-                  <span>Member Portal</span>
+                  <span>{isSupervisor ? 'Review Desk' : 'Member Portal'}</span>
                 </button>
               ) : (
                 <button
@@ -232,9 +245,9 @@ function PortalContent() {
                 type="button"
                 className="btn-secondary"
                 style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
-                onClick={() => navigateTo('home')}
+                onClick={() => navigateTo(isSupervisor ? 'review' : 'home')}
               >
-                ← Back to Homepage
+                {isSupervisor ? 'Back to Portal' : 'Back to Homepage'}
               </button>
             </div>
           </div>
@@ -361,57 +374,18 @@ function PortalContent() {
         {/* Navigation Items */}
         <nav className="stitch-sidebar-nav">
           
-          <div className="stitch-nav-section-label">General Workspace</div>
-
-          <button
-            type="button"
-            className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => navigateTo('dashboard')}
-          >
-            <LayoutDashboard size={16} />
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            type="button"
-            className={`stitch-nav-item ${activeTab === 'projects' ? 'active' : ''}`}
-            onClick={() => navigateTo('projects')}
-          >
-            <FileText size={16} />
-            <span>Project Hub</span>
-          </button>
-
-          <button
-            type="button"
-            className="stitch-nav-item"
-            onClick={() => navigateTo('screener')}
-          >
-            <CheckCircle2 size={16} />
-            <span>{isLeadership || isSupervisor ? 'Academic Eligibility' : 'Check My Eligibility'}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`stitch-nav-item ${activeTab === 'rules' ? 'active' : ''}`}
-            onClick={() => navigateTo('rules')}
-          >
-            <BookOpen size={16} />
-            <span>Rules</span>
-          </button>
-
-          <button
-            type="button"
-            className={`stitch-nav-item ${activeTab === 'legal' ? 'active' : ''}`}
-            onClick={() => navigateTo('legal')}
-          >
-            <Scale size={16} />
-            <span>Terms & Privacy</span>
-          </button>
-
-          {/* Governance & Councils (Leadership & Supervisors) */}
-          {(isLeadership || isSupervisor) && (
+          {isSupervisor ? (
             <>
-              <div className="stitch-nav-section-label" style={{ marginTop: '0.75rem' }}>Governance Desk</div>
+              <div className="stitch-nav-section-label">Faculty Desk</div>
+
+              <button
+                type="button"
+                className="stitch-nav-item"
+                onClick={() => navigateTo('screener')}
+              >
+                <CheckCircle2 size={16} />
+                <span>Academic Eligibility</span>
+              </button>
 
               <button
                 type="button"
@@ -422,44 +396,6 @@ function PortalContent() {
                 <span>Project Reviews</span>
               </button>
 
-              {isLeadership && isSemester2 && (
-                <button
-                  type="button"
-                  className={`stitch-nav-item ${activeTab === 'annual_projects_desk' ? 'active' : ''}`}
-                  onClick={() => navigateTo('annual_projects_desk')}
-                >
-                  <Star size={16} />
-                  <span>Annual Projects Desk</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                className={`stitch-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => navigateTo('attendance')}
-              >
-                <CalendarCheck size={16} />
-                <span>Attendance Calendar</span>
-              </button>
-
-              <button
-                type="button"
-                className={`stitch-nav-item ${activeTab === 'treasury' ? 'active' : ''}`}
-                onClick={() => navigateTo('treasury')}
-              >
-                <Coins size={16} />
-                <span>Chapter Treasury</span>
-              </button>
-
-              <button
-                type="button"
-                className={`stitch-nav-item ${activeTab === 'semesters' ? 'active' : ''}`}
-                onClick={() => navigateTo('semesters')}
-              >
-                <Calendar size={16} />
-                <span>Semester Manager</span>
-              </button>
-
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
@@ -468,16 +404,117 @@ function PortalContent() {
                 <Users size={16} />
                 <span>Chapter Members</span>
               </button>
+            </>
+          ) : (
+            <>
+              <div className="stitch-nav-section-label">General Workspace</div>
 
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => navigateTo('dashboard')}
+              >
+                <LayoutDashboard size={16} />
+                <span>Dashboard</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'projects' ? 'active' : ''}`}
+                onClick={() => navigateTo('projects')}
+              >
+                <FileText size={16} />
+                <span>Project Hub</span>
+              </button>
+
+              <button
+                type="button"
+                className="stitch-nav-item"
+                onClick={() => navigateTo('screener')}
+              >
+                <CheckCircle2 size={16} />
+                <span>{isLeadership ? 'Academic Eligibility' : 'Check My Eligibility'}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'rules' ? 'active' : ''}`}
+                onClick={() => navigateTo('rules')}
+              >
+                <BookOpen size={16} />
+                <span>Rules</span>
+              </button>
+
+              {/* Governance & Councils (Leadership Only) */}
               {isLeadership && (
-                <button
-                  type="button"
-                  className={`stitch-nav-item ${activeTab === 'allowlist' ? 'active' : ''}`}
-                  onClick={() => navigateTo('allowlist')}
-                >
-                  <ShieldCheck size={16} />
-                  <span>Access Control</span>
-                </button>
+                <>
+                  <div className="stitch-nav-section-label" style={{ marginTop: '0.75rem' }}>Governance Desk</div>
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
+                    onClick={() => navigateTo('review')}
+                  >
+                    <ClipboardCheck size={16} />
+                    <span>Project Reviews</span>
+                  </button>
+
+                  {isSemester2 && (
+                    <button
+                      type="button"
+                      className={`stitch-nav-item ${activeTab === 'annual_projects_desk' ? 'active' : ''}`}
+                      onClick={() => navigateTo('annual_projects_desk')}
+                    >
+                      <Star size={16} />
+                      <span>Annual Projects Desk</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+                    onClick={() => navigateTo('attendance')}
+                  >
+                    <CalendarCheck size={16} />
+                    <span>Attendance Calendar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'treasury' ? 'active' : ''}`}
+                    onClick={() => navigateTo('treasury')}
+                  >
+                    <Coins size={16} />
+                    <span>Chapter Treasury</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'semesters' ? 'active' : ''}`}
+                    onClick={() => navigateTo('semesters')}
+                  >
+                    <Calendar size={16} />
+                    <span>Semester Manager</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
+                    onClick={() => navigateTo('roster')}
+                  >
+                    <Users size={16} />
+                    <span>Chapter Members</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`stitch-nav-item ${activeTab === 'allowlist' ? 'active' : ''}`}
+                    onClick={() => navigateTo('allowlist')}
+                  >
+                    <ShieldCheck size={16} />
+                    <span>Access Control</span>
+                  </button>
+                </>
               )}
             </>
           )}
@@ -582,25 +619,40 @@ function PortalContent() {
         <ErrorBoundary
           fallbackTitle="Unable to Display Portal View"
           fallbackMessage="An unexpected error occurred while loading this section. Please try again or return to the dashboard."
-          onReset={() => navigateTo('dashboard')}
+          onReset={() => navigateTo(isSupervisor ? 'review' : 'dashboard')}
         >
-          {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
-          {activeTab === 'projects' && <MyProjectsView />}
-          {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
-            <AnnualProjectsManager />
-          )}
-          {activeTab === 'rules' && <ChapterRules />}
-          {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
-          {activeTab === 'attendance' && (isLeadership || isSupervisor) && <AttendanceSheet />}
-          {activeTab === 'roster' && (isLeadership || isSupervisor) && <MemberRosterManager />}
-          {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
-          {activeTab === 'treasury' && (isLeadership || isSupervisor) && <ChapterTreasuryLedger />}
-          {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
-          {activeTab === 'legal' && (
-            <TermsAndPrivacyView
-              initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
-              onBack={() => navigateTo('dashboard')}
-            />
+          {isSupervisor ? (
+            <>
+              {activeTab === 'review' && <TwoStageReviewDesk />}
+              {activeTab === 'roster' && <MemberRosterManager />}
+              {activeTab === 'legal' && (
+                <TermsAndPrivacyView
+                  initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+                  onBack={() => navigateTo('review')}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
+              {activeTab === 'projects' && <MyProjectsView />}
+              {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
+                <AnnualProjectsManager />
+              )}
+              {activeTab === 'rules' && <ChapterRules />}
+              {activeTab === 'review' && isLeadership && <TwoStageReviewDesk />}
+              {activeTab === 'attendance' && isLeadership && <AttendanceSheet />}
+              {activeTab === 'roster' && isLeadership && <MemberRosterManager />}
+              {activeTab === 'semesters' && isLeadership && <SemesterSettings />}
+              {activeTab === 'treasury' && isLeadership && <ChapterTreasuryLedger />}
+              {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
+              {activeTab === 'legal' && (
+                <TermsAndPrivacyView
+                  initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+                  onBack={() => navigateTo('dashboard')}
+                />
+              )}
+            </>
           )}
         </ErrorBoundary>
       </main>

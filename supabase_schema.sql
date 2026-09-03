@@ -1033,5 +1033,95 @@ BEGIN
 END;
 $function$;
 
+-- ==============================================================================
+-- 15. ANNUAL PROJECTS, DELETION TRIGGERS & SEMESTER INTEGRITY CONSTRAINTS
+-- ==============================================================================
+
+-- Unique index to prevent duplicate semesters
+CREATE UNIQUE INDEX IF NOT EXISTS idx_semesters_academic_year_sem_num 
+  ON public.semesters(academic_year, semester_number);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_semesters_name_unique 
+  ON public.semesters(lower(trim(name)));
+
+-- Annual Projects table
+CREATE TABLE IF NOT EXISTS public.annual_projects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  academic_year text NOT NULL DEFAULT '2026-2027',
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Annual Project Applications table
+CREATE TABLE IF NOT EXISTS public.annual_project_applications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  academic_year text NOT NULL DEFAULT '2026-2027',
+  pick_1 uuid REFERENCES public.annual_projects(id) ON DELETE SET NULL,
+  pick_2 uuid REFERENCES public.annual_projects(id) ON DELETE SET NULL,
+  pick_3 uuid REFERENCES public.annual_projects(id) ON DELETE SET NULL,
+  essay text NOT NULL,
+  assigned_project_id uuid REFERENCES public.annual_projects(id) ON DELETE SET NULL,
+  status text NOT NULL DEFAULT 'pending',
+  leadership_notes text,
+  submitted_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT annual_project_applications_user_year_key UNIQUE (user_id, academic_year)
+);
+
+-- Row Level Security for annual projects and applications
+ALTER TABLE public.annual_projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.annual_project_applications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "annual_projects_read" ON public.annual_projects
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "annual_projects_leadership_all" ON public.annual_projects
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('leadership', 'supervisor')));
+
+CREATE POLICY "apps_own_read" ON public.annual_project_applications
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('leadership', 'supervisor')));
+
+CREATE POLICY "apps_own_insert" ON public.annual_project_applications
+  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "apps_own_update" ON public.annual_project_applications
+  FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "apps_leadership_all" ON public.annual_project_applications
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('leadership', 'supervisor')));
+
+-- Cascade trigger: When an annual project is deleted, unassign all applications and clean up generated proposals
+CREATE OR REPLACE FUNCTION public.handle_annual_project_deleted()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.annual_project_applications
+  SET assigned_project_id = NULL,
+      status = 'pending',
+      leadership_notes = 'Previously assigned annual project was removed by chapter leadership.'
+  WHERE assigned_project_id = OLD.id;
+
+  DELETE FROM public.project_proposals
+  WHERE annual_project_id = OLD.id
+     OR (is_yearly = true AND project_title = 'Annual Project: ' || OLD.title);
+
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_annual_project_deleted ON public.annual_projects;
+CREATE TRIGGER tr_annual_project_deleted
+BEFORE DELETE ON public.annual_projects
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_annual_project_deleted();
+
 
 

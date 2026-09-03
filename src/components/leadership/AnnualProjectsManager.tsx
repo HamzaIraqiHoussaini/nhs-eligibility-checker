@@ -210,10 +210,43 @@ export const AnnualProjectsManager: React.FC = () => {
   };
 
   const handleDeleteProject = async (project: AnnualProject) => {
-    const confirmed = await confirm({ title: 'Remove Project', message: `Remove "${project.title}" from the list?`, confirmText: 'Remove', variant: 'danger' });
+    const confirmed = await confirm({
+      title: 'Remove Project',
+      message: `Remove "${project.title}" from the annual projects list? Any member assigned to lead this project will be unassigned.`,
+      confirmText: 'Remove',
+      variant: 'danger',
+    });
     if (!confirmed) return;
-    const { error } = await supabase.from('annual_projects').delete().eq('id', project.id);
-    if (!error) await loadData();
+
+    try {
+      // Unassign any applications linked to this project
+      await supabase
+        .from('annual_project_applications')
+        .update({
+          assigned_project_id: null,
+          status: 'pending',
+          leadership_notes: 'Assigned annual project was removed by chapter leadership.',
+        })
+        .eq('assigned_project_id', project.id);
+
+      // Delete the annual project from the database
+      const { error } = await supabase.from('annual_projects').delete().eq('id', project.id);
+      if (error) throw error;
+
+      await alert({
+        title: 'Project Removed',
+        message: `"${project.title}" has been removed and all assigned leadership attributions have been cleared.`,
+        variant: 'success',
+      });
+      await loadData();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to remove annual project.';
+      await alert({
+        title: 'Removal Failed',
+        message,
+        variant: 'danger',
+      });
+    }
   };
 
   const handleTogglePublish = async () => {

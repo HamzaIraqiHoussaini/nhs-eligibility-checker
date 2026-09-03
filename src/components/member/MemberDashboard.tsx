@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Award, AlertTriangle, ShieldAlert, CheckCircle2, FileText, ArrowRight, Star } from 'lucide-react';
+import { Award, AlertTriangle, ShieldAlert, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
 
 interface MemberDashboardProps {
   onNavigate: (tab: string) => void;
@@ -386,23 +386,6 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           </p>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-sage)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
             Run Individual Audit <ArrowRight size={14} />
-          </div>
-        </div>
-
-        <div
-          className="sharp-card"
-          style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.15s ease' }}
-          onClick={() => onNavigate('annual_projects')}
-        >
-          <Star size={24} color="#D97706" style={{ marginBottom: '0.75rem' }} />
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.4rem' }}>
-            Annual Projects
-          </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
-            Apply for flagship chapter initiatives (Spelling Bee, Art Competition). Assigned by leadership in Semester 2.
-          </p>
-          <div style={{ fontSize: '0.78rem', color: '#B45309', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            View Annual Projects <ArrowRight size={14} />
           </div>
         </div>
 

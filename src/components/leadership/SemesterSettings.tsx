@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
-import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, ShieldCheck, CheckCircle2, RotateCw } from 'lucide-react';
+import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, ShieldCheck, CheckCircle2, RotateCw, Trash2 } from 'lucide-react';
 
 interface SemesterStats {
   projectsCompleted: number;
@@ -87,6 +87,24 @@ export const SemesterSettings: React.FC = () => {
     e.preventDefault();
     if (!startDate || !endDate) return;
 
+    const targetYear = computedAcademicYear || startYearInput;
+
+    // Check for existing duplicate semester
+    const existingDuplicate = semesters.find(
+      (s) =>
+        (s.academic_year === targetYear && s.semester_number === selectedSemNum) ||
+        s.name.trim().toLowerCase() === derivedTitle.trim().toLowerCase()
+    );
+
+    if (existingDuplicate) {
+      await alert({
+        title: 'Duplicate Semester Prohibited',
+        message: `A record for "${derivedTitle}" already exists (${existingDuplicate.is_active ? 'Active' : 'Concluded'}). You cannot create duplicate semesters for the same academic cycle.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
     try {
       if (isActive) {
         await supabase.from('semesters').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
@@ -97,7 +115,7 @@ export const SemesterSettings: React.FC = () => {
         start_date: startDate,
         end_date: endDate,
         is_active: isActive,
-        academic_year: computedAcademicYear || startYearInput,
+        academic_year: targetYear,
         semester_number: selectedSemNum,
       });
 
@@ -195,6 +213,42 @@ export const SemesterSettings: React.FC = () => {
       } catch (err) {
         console.error('Failed setting active semester:', err);
       }
+    }
+  };
+
+  const handleDeleteSemester = async (sem: Semester) => {
+    if (sem.is_active) {
+      await alert({
+        title: 'Active Semester Protected',
+        message: 'The currently active semester cannot be deleted. Please activate another semester before removing this term.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Delete Concluded Semester',
+      message: `Are you sure you want to permanently delete "${sem.name}" from historical records? Any associated records may be impacted.`,
+      confirmText: 'Delete Record',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase.from('semesters').delete().eq('id', sem.id);
+      if (error) throw error;
+      await alert({
+        title: 'Semester Removed',
+        message: `"${sem.name}" has been permanently removed from historical records.`,
+        variant: 'success',
+      });
+      await loadSemesters();
+    } catch (err: any) {
+      await alert({
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete semester record.',
+        variant: 'danger',
+      });
     }
   };
 
@@ -454,6 +508,15 @@ export const SemesterSettings: React.FC = () => {
                       onClick={() => handleSetActive(sem.id)}
                     >
                       Set Active
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-inspect"
+                      style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)' }}
+                      onClick={() => handleDeleteSemester(sem)}
+                      title="Delete concluded semester record"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>

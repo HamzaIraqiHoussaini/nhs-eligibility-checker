@@ -304,7 +304,7 @@ export const TwoStageReviewDesk: React.FC = () => {
                     </div>
                   </div>
                   <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
-                    <Eye size={13} /> Inspect & Vote
+                    <Eye size={13} /> {isLeadership ? 'Inspect & Vote (Stage 1)' : 'View Proposal'}
                   </button>
                 </div>
               </div>
@@ -321,7 +321,7 @@ export const TwoStageReviewDesk: React.FC = () => {
           </h2>
           {isSupervisor && (
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-oxford)', textTransform: 'uppercase' }}>
-              Your Action Required
+              Your Action Required (Round 2)
             </span>
           )}
         </div>
@@ -344,7 +344,7 @@ export const TwoStageReviewDesk: React.FC = () => {
                     </div>
                   </div>
                   <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
-                    <Eye size={13} /> Inspect & Finalize
+                    <Eye size={13} /> {isSupervisor ? 'Review & Finalize (Stage 2)' : 'Inspect Proposal'}
                   </button>
                 </div>
               </div>
@@ -657,19 +657,43 @@ export const TwoStageReviewDesk: React.FC = () => {
               </form>
             </div>
 
-            {/* Decision Controls (if active reviewer) */}
+            {/* Informative banner for Supervisor on Stage 1 proposal */}
+            {isSupervisor && selectedProposal.status === 'pending_leadership' && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderLeft: '4px solid var(--color-gold)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
+                  Stage 1: Awaiting Chapter Leadership Determination
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                  This proposal is currently in the first review stage conducted by student chapter leadership. Once approved by leadership, it will advance to Stage 2 for your final faculty determination.
+                </div>
+              </div>
+            )}
+
+            {/* Informative banner for Leadership on Stage 2 proposal */}
+            {isLeadership && selectedProposal.status === 'pending_supervisor' && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderLeft: '4px solid var(--color-oxford)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
+                  Stage 2: Awaiting Faculty Supervisor Determination
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                  Student leadership has approved this proposal for Stage 2. Final authorization is currently awaiting determination from the Chapter Faculty Advisor (Supervisor).
+                </div>
+              </div>
+            )}
+
+            {/* Active Decision Controls */}
             {((isLeadership && selectedProposal.status === 'pending_leadership') ||
               (isSupervisor && selectedProposal.status === 'pending_supervisor')) && (
               <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                  {isLeadership ? 'Stage 1 Leadership Determination' : 'Stage 2 Supervisor Determination'}
+                  {isLeadership ? 'Stage 1 Leadership Determination (First Round)' : 'Stage 2 Faculty Supervisor Determination (Final Round)'}
                 </h3>
                 <textarea
                   rows={2}
-                  placeholder="Optional review feedback, notes, or required revisions..."
+                  placeholder={isSupervisor ? 'Enter faculty guidance, venue/date approval, or review notes...' : 'Optional review feedback, notes, or required revisions...'}
                   value={decisionNotes}
                   onChange={(e) => setDecisionNotes(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none', marginBottom: '1rem' }}
+                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none', marginBottom: '1rem', backgroundColor: '#FFFFFF' }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                   <button
@@ -686,14 +710,14 @@ export const TwoStageReviewDesk: React.FC = () => {
                     onClick={() => handleDecision('approved')}
                   >
                     <CheckCircle2 size={14} />
-                    {isLeadership ? 'Approve for Stage 2 (Supervisor)' : 'Grant Final Approval'}
+                    {isLeadership ? 'Approve for Stage 2 (Supervisor)' : 'Grant Final Chapter Approval'}
                   </button>
                 </div>
               </div>
             )}
 
             <div style={{ marginTop: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-              {selectedProposal.status !== 'approved' && selectedProposal.status !== 'completed' ? (
+              {isLeadership && selectedProposal.status !== 'approved' && selectedProposal.status !== 'completed' ? (
                 <button
                   type="button"
                   className="btn-inspect"
@@ -704,7 +728,9 @@ export const TwoStageReviewDesk: React.FC = () => {
                 </button>
               ) : (
                 <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                  Approved proposals cannot be deleted.
+                  {selectedProposal.status === 'approved' || selectedProposal.status === 'completed'
+                    ? 'Approved projects cannot be deleted.'
+                    : ''}
                 </div>
               )}
 
