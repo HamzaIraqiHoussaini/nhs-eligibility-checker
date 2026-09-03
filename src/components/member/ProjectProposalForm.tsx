@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal, ProposalStatus } from '../../types/nhs';
-import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save } from 'lucide-react';
+import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save, Clock } from 'lucide-react';
 
 interface CoLeaderMember {
   id: string;
@@ -411,7 +411,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         className="sharp-card"
         style={{
           width: '100%',
-          maxWidth: '720px',
+          maxWidth: '840px',
           maxHeight: '90vh',
           margin: 'auto',
           backgroundColor: 'var(--color-surface)',
@@ -940,12 +940,69 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Two-stage review: Leadership Review → Supervisor Review
+          <div
+            style={{
+              borderTop: '1px solid var(--color-border)',
+              paddingTop: '1.5rem',
+              marginTop: '0.75rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1.5rem',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                minWidth: '260px',
+                flex: '1 1 auto',
+              }}
+            >
+              <div
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Clock size={14} color="#64748B" />
+              </div>
+              <div style={{ fontSize: '0.82rem', lineHeight: 1.45, color: '#475569' }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-navy)', display: 'inline-block', marginRight: '0.35rem' }}>
+                  Two-Stage Review:
+                </span>
+                <span style={{ color: 'var(--color-text-muted)' }}>
+                  Leadership Review &rarr; Supervisor Review
+                </span>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                flexShrink: 0,
+                marginLeft: 'auto',
+              }}
+            >
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+                style={{ padding: '0.55rem 1.15rem', fontSize: '0.84rem' }}
+              >
                 Cancel
               </button>
               <button
@@ -953,7 +1010,14 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 className="btn-secondary"
                 disabled={loading || isLimitReached}
                 onClick={() => handleSave(false)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.55rem 1.15rem',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                }}
               >
                 <Save size={14} />
                 <span>{isEditing ? 'Save Progress' : 'Create Project (Draft)'}</span>
@@ -963,7 +1027,14 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 className="btn-primary"
                 disabled={loading || isLimitReached}
                 onClick={() => handleSave(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                }}
               >
                 <Send size={14} />
                 <span>Submit for Review</span>
