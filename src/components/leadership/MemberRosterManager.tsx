@@ -508,9 +508,9 @@ export const MemberRosterManager: React.FC = () => {
                   </td>
                   <td>
                     {member.role === 'graduate' || member.role === 'past_leadership' ? (
-                      <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated</span>
+                      <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated (Exempt)</span>
                     ) : member.role === 'leadership' || member.role === 'supervisor' ? (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Officer)</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Leadership)</span>
                     ) : member.is_restricted ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
                     ) : part.meetsQuota ? (
@@ -532,7 +532,7 @@ export const MemberRosterManager: React.FC = () => {
                         <Eye size={12} /> Profile
                       </button>
 
-                      {isLeadership && !member.is_restricted && (
+                      {isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' && (
                         member.is_on_probation ? (
                           <>
                             <button

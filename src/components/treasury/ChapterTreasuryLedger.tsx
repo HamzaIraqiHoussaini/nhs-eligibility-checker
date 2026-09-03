@@ -678,7 +678,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder={entryType === 'income' ? 'e.g. NHS Officers, Sponsor' : 'e.g. CAS Nurse, Student Names'}
+                  placeholder={entryType === 'income' ? 'e.g. NHS Leadership, Sponsor' : 'e.g. CAS Nurse, Student Names'}
                   value={who}
                   onChange={(e) => setWho(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}

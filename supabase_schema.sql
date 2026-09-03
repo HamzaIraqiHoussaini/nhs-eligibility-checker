@@ -543,3 +543,322 @@ BEGIN
 END;
 $function$;
 
+-- -------------------------------------------------------------
+-- Semester Rollover and Transition Functions
+-- -------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.execute_semester_rollover(
+  p_concluded_semester_id uuid,
+  p_target_semester_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'auth', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  old_sem RECORD;
+  new_sem RECORD;
+  m RECORD;
+  led_count integer;
+  vol_count integer;
+  sem_proposals uuid[];
+  num_probated integer := 0;
+  num_dismissed integer := 0;
+  num_graduated integer := 0;
+  num_passed integer := 0;
+  num_promoted integer := 0;
+  is_annual_rollover boolean := false;
+BEGIN
+  SELECT * INTO old_sem FROM semesters WHERE id = p_concluded_semester_id;
+  SELECT * INTO new_sem FROM semesters WHERE id = p_target_semester_id;
+
+  IF old_sem.id IS NULL OR new_sem.id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Invalid semester IDs');
+  END IF;
+
+  -- Detect if this is an academic year rollover
+  IF old_sem.academic_year IS DISTINCT FROM new_sem.academic_year OR (old_sem.semester_number = 2 AND new_sem.semester_number = 1) THEN
+    is_annual_rollover := true;
+  END IF;
+
+  SELECT array_agg(id) INTO sem_proposals
+  FROM project_proposals
+  WHERE (status = 'approved' OR status = 'completed')
+    AND (semester_id = old_sem.id OR (event_date >= old_sem.start_date AND event_date <= old_sem.end_date));
+
+  -- Loop through active members only (archived/graduated members are strictly excluded)
+  FOR m IN 
+    SELECT * FROM profiles 
+    WHERE is_restricted = false 
+      AND role NOT IN ('supervisor', 'past_supervisor', 'past_leadership', 'kicked_out', 'graduate')
+  LOOP
+    -- Leadership members are exempt from project participation & leadership quotas
+    IF m.role = 'leadership' THEN
+      num_passed := num_passed + 1;
+
+      -- Check if graduating (Grade 12 during annual rollover or concluding senior semester)
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        UPDATE profiles
+        SET role = 'past_leadership',
+            is_on_probation = false,
+            probation_notes = COALESCE(probation_notes || ' • ', '') || 'Successfully graduated NHS with honors (Transitioned to Past Leadership).'
+        WHERE id = m.id;
+        num_graduated := num_graduated + 1;
+      ELSIF is_annual_rollover AND m.grade_level < 12 THEN
+        -- Grade progression for annual rollover
+        UPDATE profiles
+        SET grade_level = m.grade_level + 1
+        WHERE id = m.id;
+        num_promoted := num_promoted + 1;
+      END IF;
+
+      CONTINUE;
+    END IF;
+
+    -- Count led projects
+    SELECT COUNT(*) INTO led_count
+    FROM project_proposals
+    WHERE (status = 'approved' OR status = 'completed')
+      AND (semester_id = old_sem.id OR (event_date >= old_sem.start_date AND event_date <= old_sem.end_date))
+      AND (creator_id = m.id OR (creator_email IS NOT NULL AND LOWER(creator_email) = LOWER(m.email)) OR (co_leader_emails IS NOT NULL AND LOWER(m.email) = ANY(SELECT LOWER(unnest(co_leader_emails)))));
+
+    IF sem_proposals IS NOT NULL AND array_length(sem_proposals, 1) > 0 THEN
+      SELECT COUNT(*) INTO vol_count
+      FROM project_volunteers
+      WHERE project_id = ANY(sem_proposals)
+        AND (user_id = m.id OR (student_email IS NOT NULL AND LOWER(student_email) = LOWER(m.email)))
+        AND (attended = true OR status = 'confirmed');
+    ELSE
+      vol_count := 0;
+    END IF;
+
+    -- Evaluate Quota & Standing
+    IF led_count >= 1 AND vol_count >= 2 THEN
+      num_passed := num_passed + 1;
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        UPDATE profiles
+        SET role = 'graduate',
+            is_on_probation = false,
+            probation_notes = COALESCE(probation_notes || ' • ', '') || 'Successfully graduated NHS with honors.'
+        WHERE id = m.id;
+        num_graduated := num_graduated + 1;
+      ELSIF is_annual_rollover AND m.grade_level < 12 THEN
+        UPDATE profiles
+        SET grade_level = m.grade_level + 1
+        WHERE id = m.id;
+        num_promoted := num_promoted + 1;
+      END IF;
+    ELSE
+      -- Deficit handling
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        IF m.probation_count >= 1 THEN
+          UPDATE profiles
+          SET is_restricted = true,
+              is_on_probation = false,
+              probation_count = m.probation_count + 1,
+              restricted_reason = 'Two accumulated probations (Prior probation + failed Senior project quota)'
+          WHERE id = m.id;
+          num_dismissed := num_dismissed + 1;
+        ELSE
+          UPDATE profiles
+          SET role = 'graduate',
+              is_on_probation = false,
+              probation_count = 1,
+              probation_notes = 'First probation incurred in Grade 12 (project quota deficit). Graduated with honors per Chapter rules.'
+          WHERE id = m.id;
+          num_graduated := num_graduated + 1;
+        END IF;
+      ELSE
+        -- Non-senior deficit
+        IF m.probation_count >= 1 THEN
+          UPDATE profiles
+          SET is_restricted = true,
+              is_on_probation = false,
+              probation_count = m.probation_count + 1,
+              restricted_reason = 'Two accumulated probations (failed semester project participation quotas)'
+          WHERE id = m.id;
+          num_dismissed := num_dismissed + 1;
+        ELSE
+          UPDATE profiles
+          SET is_on_probation = true,
+              probation_count = 1,
+              probation_reason = 'project_quota',
+              probation_notes = 'Placed on probation for failing semester project quota in ' || old_sem.name || ' (led: ' || led_count || '/1, vol: ' || vol_count || '/2)',
+              probation_updated_at = now(),
+              grade_level = CASE WHEN is_annual_rollover AND m.grade_level < 12 THEN m.grade_level + 1 ELSE m.grade_level END
+          WHERE id = m.id;
+          num_probated := num_probated + 1;
+          IF is_annual_rollover AND m.grade_level < 12 THEN
+            num_promoted := num_promoted + 1;
+          END IF;
+        END IF;
+      END IF;
+    END IF;
+  END LOOP;
+
+  -- Ensure any archived/graduated profiles have clean standing and no probation
+  UPDATE profiles
+  SET is_on_probation = false
+  WHERE role IN ('graduate', 'past_leadership') AND is_on_probation = true;
+
+  UPDATE semesters SET is_active = false WHERE id != p_target_semester_id;
+  UPDATE semesters SET is_active = true WHERE id = p_target_semester_id;
+
+  RETURN json_build_object(
+    'success', true,
+    'passed', num_passed,
+    'probated', num_probated,
+    'dismissed', num_dismissed,
+    'graduated', num_graduated,
+    'promoted', num_promoted,
+    'is_annual_rollover', is_annual_rollover
+  );
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.preview_semester_rollover(
+  p_concluded_semester_id uuid,
+  p_target_semester_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'auth', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  old_sem RECORD;
+  new_sem RECORD;
+  m RECORD;
+  led_count integer;
+  vol_count integer;
+  sem_proposals uuid[];
+  results jsonb := '[]'::jsonb;
+  action_type text;
+  action_detail text;
+  is_annual_rollover boolean := false;
+  new_grade integer;
+BEGIN
+  SELECT * INTO old_sem FROM semesters WHERE id = p_concluded_semester_id;
+  SELECT * INTO new_sem FROM semesters WHERE id = p_target_semester_id;
+
+  IF old_sem.id IS NULL OR new_sem.id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Invalid semester IDs');
+  END IF;
+
+  IF old_sem.academic_year IS DISTINCT FROM new_sem.academic_year OR (old_sem.semester_number = 2 AND new_sem.semester_number = 1) THEN
+    is_annual_rollover := true;
+  END IF;
+
+  SELECT array_agg(id) INTO sem_proposals
+  FROM project_proposals
+  WHERE (status = 'approved' OR status = 'completed')
+    AND (semester_id = old_sem.id OR (event_date >= old_sem.start_date AND event_date <= old_sem.end_date));
+
+  FOR m IN 
+    SELECT * FROM profiles 
+    WHERE is_restricted = false 
+      AND role NOT IN ('supervisor', 'past_supervisor', 'past_leadership', 'kicked_out', 'graduate')
+    ORDER BY full_name ASC
+  LOOP
+    new_grade := CASE WHEN is_annual_rollover AND m.grade_level < 12 THEN m.grade_level + 1 ELSE m.grade_level END;
+
+    -- Leadership members are exempt from project participation & leadership quotas
+    IF m.role = 'leadership' THEN
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        action_type := 'graduate_past_leadership';
+        action_detail := 'Grade 12 Leadership graduating NHS. Will transition to Past Leadership with honors.';
+      ELSE
+        action_type := 'exempt';
+        action_detail := 'Chapter Leadership Core (Exempt from project leadership & participation quotas per chapter rules).' || 
+          CASE WHEN is_annual_rollover AND m.grade_level < 12 THEN ' Promoted to Grade ' || new_grade || '.' ELSE '' END;
+      END IF;
+
+      results := results || jsonb_build_object(
+        'id', m.id,
+        'full_name', m.full_name,
+        'email', m.email,
+        'grade_level', m.grade_level,
+        'target_grade_level', new_grade,
+        'role', m.role,
+        'probation_count', m.probation_count,
+        'led_count', 0,
+        'vol_count', 0,
+        'action_type', action_type,
+        'action_detail', action_detail
+      );
+      CONTINUE;
+    END IF;
+
+    SELECT COUNT(*) INTO led_count
+    FROM project_proposals
+    WHERE (status = 'approved' OR status = 'completed')
+      AND (semester_id = old_sem.id OR (event_date >= old_sem.start_date AND event_date <= old_sem.end_date))
+      AND (creator_id = m.id OR (creator_email IS NOT NULL AND LOWER(creator_email) = LOWER(m.email)) OR (co_leader_emails IS NOT NULL AND LOWER(m.email) = ANY(SELECT LOWER(unnest(co_leader_emails)))));
+
+    IF sem_proposals IS NOT NULL AND array_length(sem_proposals, 1) > 0 THEN
+      SELECT COUNT(*) INTO vol_count
+      FROM project_volunteers
+      WHERE project_id = ANY(sem_proposals)
+        AND (user_id = m.id OR (student_email IS NOT NULL AND LOWER(student_email) = LOWER(m.email)))
+        AND (attended = true OR status = 'confirmed');
+    ELSE
+      vol_count := 0;
+    END IF;
+
+    IF led_count >= 1 AND vol_count >= 2 THEN
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        action_type := 'graduate';
+        action_detail := 'Met all quotas and completed Grade 12. Will graduate with NHS Honors.';
+      ELSE
+        action_type := 'pass';
+        action_detail := 'Met semester participation quotas (Led: ' || led_count || ', Vol: ' || vol_count || ').' ||
+          CASE WHEN is_annual_rollover AND m.grade_level < 12 THEN ' Promoted to Grade ' || new_grade || '.' ELSE '' END;
+      END IF;
+    ELSE
+      IF m.grade_level >= 12 AND (is_annual_rollover OR old_sem.semester_number = 1 OR old_sem.name ILIKE '%Semester 1%') THEN
+        IF m.probation_count >= 1 THEN
+          action_type := 'dismissal';
+          action_detail := 'Prior probation + Senior deficit (Led: ' || led_count || '/1, Vol: ' || vol_count || '/2). Will be dismissed.';
+        ELSE
+          action_type := 'graduate_with_probation';
+          action_detail := 'Quota deficit (Led: ' || led_count || '/1, Vol: ' || vol_count || '/2). First probation in Grade 12; still graduates with honors per chapter rules.';
+        END IF;
+      ELSE
+        IF m.probation_count >= 1 THEN
+          action_type := 'dismissal';
+          action_detail := 'Second probation (Led: ' || led_count || '/1, Vol: ' || vol_count || '/2). Will be dismissed from society.';
+        ELSE
+          action_type := 'probation';
+          action_detail := 'Quota deficit (Led: ' || led_count || '/1, Vol: ' || vol_count || '/2). Will be placed on first probation.' ||
+            CASE WHEN is_annual_rollover AND m.grade_level < 12 THEN ' Promoted to Grade ' || new_grade || '.' ELSE '' END;
+        END IF;
+      END IF;
+    END IF;
+
+    results := results || jsonb_build_object(
+      'id', m.id,
+      'full_name', m.full_name,
+      'email', m.email,
+      'grade_level', m.grade_level,
+      'target_grade_level', new_grade,
+      'role', m.role,
+      'probation_count', m.probation_count,
+      'led_count', led_count,
+      'vol_count', vol_count,
+      'action_type', action_type,
+      'action_detail', action_detail
+    );
+  END LOOP;
+
+  RETURN json_build_object(
+    'success', true,
+    'concluded_semester', old_sem.name,
+    'target_semester', new_sem.name,
+    'is_annual_rollover', is_annual_rollover,
+    'members', results
+  );
+END;
+$function$;
+
+

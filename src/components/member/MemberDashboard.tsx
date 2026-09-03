@@ -211,38 +211,10 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
             </div>
           </div>
         </div>
-      ) : (
-        /* GOOD STANDING CALLOUT BANNER */
-        <div style={{
-          padding: '1.25rem 1.5rem',
-          backgroundColor: 'var(--color-sage-bg)',
-          border: '1px solid #A7F3D0',
-          marginBottom: '2rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Award size={32} color="var(--color-gold)" />
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--color-sage-text)', fontSize: '1.1rem' }}>
-                Good Standing • Active Inducted Member
-              </div>
-              <div style={{ fontSize: '0.82rem', color: '#065F46' }}>
-                You are currently satisfying all chapter academic, conduct, and attendance requirements.
-              </div>
-            </div>
-          </div>
-          <span className="status-pill eligible" style={{ padding: '0.35rem 0.85rem' }}>
-            <CheckCircle2 size={14} /> 0 Active Probations
-          </span>
-        </div>
-      )}
+      ) : null}
 
       {/* SEMESTER PARTICIPATION STANDING BANNER */}
-      {!isLeadership && !isSupervisor ? (
+      {!isLeadership && !isSupervisor && profile?.role !== 'graduate' && profile?.role !== 'past_leadership' ? (
         <div
           className="sharp-card"
           style={{
@@ -321,11 +293,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
                 Chapter Governance • {activeSemesterName}
               </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
                 Executive Leadership Core
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', margin: '0.35rem 0 0' }}>
-                Officers oversee chapter administration and governance. Chapter leadership is not required to lead or volunteer in projects and is exempt from project participation quotas.
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+                Leadership oversees chapter administration and governance. Chapter leadership is not required to lead or volunteer in projects and is exempt from project participation quotas.
               </p>
             </div>
             <span
@@ -344,13 +316,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         <div className="kpi-card">
           <div className="kpi-label">Projects Led</div>
           <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} proposed)</span></div>
-          <div className="kpi-subtext">{isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
+          <div className="kpi-subtext">{profile?.role === 'graduate' || profile?.role === 'past_leadership' ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-label">Times Volunteered</div>
           <div className="kpi-value">{semesterVolunteered} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({volunteerCount} total)</span></div>
-          <div className="kpi-subtext">{isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
+          <div className="kpi-subtext">{profile?.role === 'graduate' || profile?.role === 'past_leadership' ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
         </div>
 
         <div className="kpi-card">
@@ -361,7 +333,9 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="kpi-subtext">
-            {attendanceStats.absences} absences ({attendanceStats.absences >= 2 ? 'Probation Triggered' : `${2 - attendanceStats.absences} left before probation`})
+            {profile?.role === 'graduate' || profile?.role === 'past_leadership'
+              ? 'Archived • Attendance exempt'
+              : `${attendanceStats.absences} absences (${attendanceStats.absences >= 2 ? 'Probation Triggered' : `${2 - attendanceStats.absences} left before probation`})`}
           </div>
         </div>
 

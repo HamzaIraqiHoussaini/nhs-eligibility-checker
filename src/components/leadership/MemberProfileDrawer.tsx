@@ -201,7 +201,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   National Honor Society Past Leadership
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#5B21B6', marginTop: '0.2rem' }}>
-                  This officer has completed their executive leadership service and graduated with chapter honors.
+                  This leader has completed their executive leadership service and graduated with chapter honors.
                 </div>
               </div>
             </div>
@@ -261,7 +261,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             if (isOfficer) {
               return (
                 <div style={{ padding: '0.85rem 1rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.82rem', color: 'var(--color-oxford)' }}>
-                  <strong>Chapter Officer:</strong> Exempt from semester project leadership and volunteering quotas per Chapter Rules.
+                  <strong>Leadership:</strong> Exempt from semester project leadership and volunteering quotas per Chapter Rules.
                 </div>
               );
             }

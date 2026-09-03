@@ -153,7 +153,7 @@ export const SemesterSettings: React.FC = () => {
       await loadSemesters();
       await alert({
         title: 'Semester Transition & Rollover Complete',
-        message: `Successfully concluded ${transitionConcludingSem.name} and activated ${transitionTargetSem.name}!\n\n• ${data.passed || 0} members met participation quotas\n• ${data.probated || 0} placed on probation for quota deficits\n• ${data.dismissed || 0} dismissed for repeat deficits\n• ${data.graduated || 0} Grade 12 seniors graduated with honors`,
+        message: `Successfully concluded ${transitionConcludingSem.name} and activated ${transitionTargetSem.name}!\n\n• ${data.passed || 0} members met participation quotas\n• ${data.probated || 0} placed on probation for quota deficits\n• ${data.dismissed || 0} dismissed for repeat deficits\n• ${data.graduated || 0} Grade 12 seniors graduated with honors${data.promoted ? `\n• ${data.promoted} members advanced to the next grade level` : ''}`,
         variant: 'success',
       });
     } catch (err: any) {
@@ -844,6 +844,9 @@ export const SemesterSettings: React.FC = () => {
                 <li>
                   <strong>Grade 12 Senior Graduation:</strong> When Semester 1 concludes for 12th graders, they officially <strong>graduate from active NHS duties</strong> and are recognized as <strong>"graduate"</strong>.
                 </li>
+                <li>
+                  <strong>Annual Grade Progression:</strong> Upon transitioning to a new academic year, all active members advance one grade level (e.g. 10th → 11th grade). Graduated alumni remain archived and unaffected.
+                </li>
               </ul>
             </div>
 
@@ -854,6 +857,12 @@ export const SemesterSettings: React.FC = () => {
               </div>
             ) : transitionPreviewData?.members ? (
               <div>
+                {transitionPreviewData.is_annual_rollover && (
+                  <div style={{ backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#5B21B6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Award size={16} color="#6D28D9" />
+                    <span><strong>Annual Academic Year Rollover:</strong> Continuing members will advance to the next grade level (10th → 11th, 11th → 12th). Graduated alumni are archived and unaffected.</span>
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <div className="kpi-card" style={{ padding: '0.85rem' }}>
                     <div className="kpi-label">Met Quotas / Exempt</div>
@@ -905,10 +914,17 @@ export const SemesterSettings: React.FC = () => {
                               <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{m.full_name}</div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{m.email}</div>
                             </td>
-                            <td style={{ padding: '0.65rem 0.85rem' }}>Grade {m.grade_level}</td>
+                            <td style={{ padding: '0.65rem 0.85rem' }}>
+                              Grade {m.grade_level}
+                              {transitionPreviewData.is_annual_rollover && m.target_grade_level && m.target_grade_level !== m.grade_level && (
+                                <span style={{ marginLeft: '6px', fontSize: '0.75rem', color: 'var(--color-sage-text)', fontWeight: 700 }}>
+                                  → Gr {m.target_grade_level}
+                                </span>
+                              )}
+                            </td>
                             <td style={{ padding: '0.65rem 0.85rem' }}>
                               {m.action_type === 'exempt'
-                                ? 'Exempt (Officer)'
+                                ? 'Exempt (Leadership)'
                                 : `${m.led_count} / 1 Led • ${m.vol_count} / 2 Vol`}
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
@@ -918,7 +934,7 @@ export const SemesterSettings: React.FC = () => {
                                 </span>
                               ) : m.action_type === 'exempt' ? (
                                 <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', border: '1px solid #BFDBFE', fontSize: '0.72rem' }}>
-                                  <ShieldCheck size={11} /> Officer (Exempt)
+                                  <ShieldCheck size={11} /> Leadership (Exempt)
                                 </span>
                               ) : m.action_type === 'graduate' || m.action_type === 'graduate_with_probation' ? (
                                 <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE', fontSize: '0.72rem' }}>

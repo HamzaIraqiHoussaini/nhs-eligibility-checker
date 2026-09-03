@@ -230,7 +230,7 @@ export const ChapterRules: React.FC = () => {
           </div>
 
           <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-            When selecting next year's Executive Leadership and Chapter Officers, candidates are evaluated on the following rigorous standards:
+            When selecting next year's Executive Leadership, candidates are evaluated on the following rigorous standards:
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>

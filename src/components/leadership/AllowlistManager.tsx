@@ -184,7 +184,7 @@ export const AllowlistManager: React.FC = () => {
     const confirmed = await confirm({
       title: 'Promote to Chapter Leadership',
       message: `Are you sure you want to promote ${entry.full_name || entry.email} to Chapter Leadership?`,
-      details: 'This grants officer privileges, project review abilities, and treasury access.',
+      details: 'This grants leadership privileges, project review abilities, and treasury access.',
       confirmText: 'Promote Member',
       variant: 'info',
     });
@@ -227,7 +227,7 @@ export const AllowlistManager: React.FC = () => {
     const confirmed = await confirm({
       title: 'Step Down from Leadership',
       message: 'Are you sure you want to step down from Leadership and become a "Past Leader"?',
-      details: 'You will transition to past officer standing and release administrative privileges.',
+      details: 'You will transition to past leadership standing and release administrative privileges.',
       confirmText: 'Step Down',
       variant: 'warning',
     });
@@ -435,7 +435,7 @@ export const AllowlistManager: React.FC = () => {
           <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-oxford)' }}>
             {activeEntries.filter((e) => e.role === 'leadership').length}
           </div>
-          <div className="kpi-subtext">Active chapter officers</div>
+          <div className="kpi-subtext">Active leadership</div>
         </div>
 
         <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
@@ -499,7 +499,7 @@ export const AllowlistManager: React.FC = () => {
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             >
               <option value="member">Member</option>
-              {isSuperadmin && <option value="leadership">Leadership (Officer)</option>}
+              {isSuperadmin && <option value="leadership">Leadership</option>}
               <option value="supervisor">Supervisor (Advisor)</option>
             </select>
           </div>
