@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
@@ -196,7 +196,7 @@ export const MemberRosterManager: React.FC = () => {
   };
 
   const handleUpdateGrade = async (member: Profile, newGrade: number) => {
-    if (!isLeadership) return;
+    if (!isLeadership || member.role === 'supervisor' || member.role === 'past_supervisor') return;
     try {
       const { error } = await supabase
         .from('profiles')
@@ -480,7 +480,11 @@ export const MemberRosterManager: React.FC = () => {
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{member.email}</div>
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
+                    {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
+                      <span style={{ color: 'var(--color-oxford)', fontWeight: 600, fontSize: '0.82rem' }}>
+                        Faculty Advisor
+                      </span>
+                    ) : isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
                       <select
                         value={member.grade_level || 11}
                         onChange={(e) => handleUpdateGrade(member, Number(e.target.value))}
@@ -504,12 +508,35 @@ export const MemberRosterManager: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    <span className="grade-badge" style={{ textTransform: 'capitalize', backgroundColor: (member.role === 'graduate' || member.role === 'past_leadership') ? '#EDE9FE' : undefined, color: (member.role === 'graduate' || member.role === 'past_leadership') ? '#6D28D9' : undefined }}>
-                      {member.role === 'past_leadership' ? 'Past Leadership' : member.role}
+                    <span
+                      className="grade-badge"
+                      style={{
+                        textTransform: 'capitalize',
+                        backgroundColor: (member.role === 'graduate' || member.role === 'past_leadership')
+                          ? '#EDE9FE'
+                          : member.role === 'supervisor'
+                          ? '#EFF6FF'
+                          : undefined,
+                        color: (member.role === 'graduate' || member.role === 'past_leadership')
+                          ? '#6D28D9'
+                          : member.role === 'supervisor'
+                          ? 'var(--color-oxford)'
+                          : undefined,
+                      }}
+                    >
+                      {member.role === 'past_leadership'
+                        ? 'Past Leadership'
+                        : member.role === 'supervisor'
+                        ? 'Supervisor (Faculty)'
+                        : member.role}
                     </span>
                   </td>
                   <td>
-                    {member.role === 'past_leadership' ? (
+                    {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
+                      <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', border: '1px solid #BFDBFE' }}>
+                        <ShieldCheck size={12} /> Faculty Council
+                      </span>
+                    ) : member.role === 'past_leadership' ? (
                       <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
                         <Award size={12} /> Past Leadership
                       </span>
@@ -532,9 +559,11 @@ export const MemberRosterManager: React.FC = () => {
                     )}
                   </td>
                   <td>
-                    {member.role === 'graduate' || member.role === 'past_leadership' ? (
+                    {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor (Exempt)</span>
+                    ) : member.role === 'graduate' || member.role === 'past_leadership' ? (
                       <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated (Exempt)</span>
-                    ) : member.role === 'leadership' || member.role === 'supervisor' ? (
+                    ) : member.role === 'leadership' ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Leadership)</span>
                     ) : member.is_restricted ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>

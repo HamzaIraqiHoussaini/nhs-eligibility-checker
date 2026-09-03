@@ -127,7 +127,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           Welcome, {profile?.full_name || 'NHS Member'}
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-          Member Portal: Grade {profile?.grade_level || 11} • Role: <strong style={{ textTransform: 'capitalize' }}>{profile?.role}</strong>
+          {profile?.role === 'supervisor' || profile?.role === 'past_supervisor' ? (
+            <span>Chapter Faculty Advisor • Role: <strong style={{ textTransform: 'capitalize' }}>Faculty Supervisor</strong></span>
+          ) : (
+            <span>Member Portal: Grade {profile?.grade_level || 11} • Role: <strong style={{ textTransform: 'capitalize' }}>{profile?.role}</strong></span>
+          )}
         </p>
       </div>
 

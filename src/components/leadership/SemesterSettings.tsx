@@ -915,11 +915,17 @@ export const SemesterSettings: React.FC = () => {
                               <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>{m.email}</div>
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem' }}>
-                              Grade {m.grade_level}
-                              {transitionPreviewData.is_annual_rollover && m.target_grade_level && m.target_grade_level !== m.grade_level && (
-                                <span style={{ marginLeft: '6px', fontSize: '0.75rem', color: 'var(--color-sage-text)', fontWeight: 700 }}>
-                                  → Gr {m.target_grade_level}
-                                </span>
+                              {m.role === 'supervisor' || m.role === 'past_supervisor' || !m.grade_level ? (
+                                <span style={{ color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor</span>
+                              ) : (
+                                <>
+                                  Grade {m.grade_level}
+                                  {transitionPreviewData.is_annual_rollover && m.target_grade_level && m.target_grade_level !== m.grade_level && (
+                                    <span style={{ marginLeft: '6px', fontSize: '0.75rem', color: 'var(--color-sage-text)', fontWeight: 700 }}>
+                                      → Gr {m.target_grade_level}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem' }}>

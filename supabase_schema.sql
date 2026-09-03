@@ -33,7 +33,7 @@ create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   email text unique not null,
   full_name text not null,
-  grade_level integer default 11,
+  grade_level integer,
   role user_role default 'member'::user_role not null,
   is_on_probation boolean default false,
   probation_count integer default 0,
@@ -389,7 +389,8 @@ BEGIN
 
     UPDATE public.profiles
     SET full_name = p_full_name,
-        role = v_clean_role
+        role = v_clean_role,
+        grade_level = CASE WHEN v_clean_role IN ('supervisor', 'past_supervisor') THEN NULL ELSE COALESCE(public.profiles.grade_level, 11) END
     WHERE id = v_user_id;
   ELSE
     v_user_id := gen_random_uuid();
@@ -439,11 +440,12 @@ BEGIN
       now()
     );
 
-    INSERT INTO public.profiles (id, email, full_name, role)
-    VALUES (v_user_id, v_clean_email, p_full_name, v_clean_role)
+    INSERT INTO public.profiles (id, email, full_name, role, grade_level)
+    VALUES (v_user_id, v_clean_email, p_full_name, v_clean_role, CASE WHEN v_clean_role IN ('supervisor', 'past_supervisor') THEN NULL ELSE 11 END)
     ON CONFLICT (id) DO UPDATE
     SET full_name = EXCLUDED.full_name,
-        role = EXCLUDED.role;
+        role = EXCLUDED.role,
+        grade_level = CASE WHEN EXCLUDED.role IN ('supervisor', 'past_supervisor') THEN NULL ELSE COALESCE(public.profiles.grade_level, 11) END;
   END IF;
 
   -- 3. Ensure auth.identities record exists

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance, Semester } from '../../types/nhs';
-import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award } from 'lucide-react';
+import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award, ShieldCheck } from 'lucide-react';
 
 interface MemberProfileDrawerProps {
   member: Profile | null;
@@ -12,7 +12,7 @@ interface MemberProfileDrawerProps {
 
 export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member, onClose, onUpdated }) => {
   const { isLeadership } = useAuth();
-  const [currentGrade, setCurrentGrade] = useState<number>(member?.grade_level || 11);
+  const [currentGrade, setCurrentGrade] = useState<number | null>(member?.grade_level || null);
   const [allProposals, setAllProposals] = useState<ProjectProposal[]>([]);
   const [volunteerHistory, setVolunteerHistory] = useState<ProjectVolunteer[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<MeetingAttendance[]>([]);
@@ -35,7 +35,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   }, [member?.grade_level]);
 
   const handleUpdateGrade = async (newGrade: number) => {
-    if (!member) return;
+    if (!member || member.role === 'supervisor' || member.role === 'past_supervisor') return;
     setCurrentGrade(newGrade);
     try {
       const { error } = await supabase
@@ -154,11 +154,13 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             <div className="drawer-meta">
               <span>{member.email}</span>
               <span style={{ margin: '0 0.5rem' }}>•</span>
-              {isLeadership && !member.is_restricted && member.role !== 'graduate' ? (
+              {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
+                <span style={{ color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor</span>
+              ) : isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span style={{ color: 'var(--color-text-muted)' }}>Grade:</span>
                   <select
-                    value={currentGrade}
+                    value={currentGrade || 11}
                     onChange={(e) => handleUpdateGrade(Number(e.target.value))}
                     style={{
                       padding: '0.15rem 0.4rem',
@@ -176,11 +178,11 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   </select>
                 </span>
               ) : (
-                <span>Grade {currentGrade}</span>
+                <span>Grade {currentGrade || 11}</span>
               )}
               <span style={{ margin: '0 0.5rem' }}>•</span>
-              <span style={{ textTransform: 'capitalize', fontWeight: 600, color: member.role === 'graduate' ? '#6D28D9' : undefined }}>
-                {member.role}
+              <span style={{ textTransform: 'capitalize', fontWeight: 600, color: member.role === 'graduate' ? '#6D28D9' : member.role === 'supervisor' ? 'var(--color-oxford)' : undefined }}>
+                {member.role === 'supervisor' ? 'Chapter Supervisor' : member.role}
               </span>
             </div>
           </div>
@@ -193,7 +195,19 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
         <div className="drawer-body">
           
           {/* Standing Callout */}
-          {member.role === 'past_leadership' ? (
+          {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
+            <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <ShieldCheck size={24} color="var(--color-oxford)" />
+              <div>
+                <div style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.92rem' }}>
+                  Faculty Council Supervisor • Advisor
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-oxford)' }}>
+                  Casablanca American School Faculty Representative with Stage 2 Project Approval Authority.
+                </div>
+              </div>
+            </div>
+          ) : member.role === 'past_leadership' ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Award size={24} color="#6D28D9" />
               <div>
@@ -257,8 +271,14 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
 
           {/* Semester Participation Audit Banner */}
           {(() => {
-            const isOfficer = member.role === 'leadership' || member.role === 'supervisor';
-            if (isOfficer) {
+            if (member.role === 'supervisor' || member.role === 'past_supervisor') {
+              return (
+                <div style={{ padding: '0.85rem 1rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.82rem', color: 'var(--color-oxford)' }}>
+                  <strong>Faculty Advisor:</strong> Chapter Supervisor / Teacher. Exempt from all student participation quotas.
+                </div>
+              );
+            }
+            if (member.role === 'leadership') {
               return (
                 <div style={{ padding: '0.85rem 1rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.82rem', color: 'var(--color-oxford)' }}>
                   <strong>Leadership:</strong> Exempt from semester project leadership and volunteering quotas per Chapter Rules.

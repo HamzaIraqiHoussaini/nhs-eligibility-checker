@@ -77,6 +77,7 @@ export const AllowlistManager: React.FC = () => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>('member');
+  const [studentGrade, setStudentGrade] = useState<number>(11);
   const [provisioning, setProvisioning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -135,6 +136,18 @@ export const AllowlistManager: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      if (role !== 'supervisor') {
+        await supabase
+          .from('profiles')
+          .update({ grade_level: studentGrade })
+          .eq('email', cleanEmail);
+      } else {
+        await supabase
+          .from('profiles')
+          .update({ grade_level: null })
+          .eq('email', cleanEmail);
+      }
+
       setRevealData({
         email: cleanEmail,
         fullName: memberName,
@@ -146,6 +159,7 @@ export const AllowlistManager: React.FC = () => {
       setEmail('');
       setFullName('');
       setRole('member');
+      setStudentGrade(11);
       await loadAllowlist();
     } catch (err: any) {
       console.error('Provisioning failed:', err);
@@ -486,7 +500,7 @@ export const AllowlistManager: React.FC = () => {
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
           Onboard New Student or Chapter Advisor
         </h3>
-        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: role === 'supervisor' ? '2fr 1.5fr 1.2fr auto' : '2fr 1.5fr 1.2fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
               CAS Email *
@@ -494,7 +508,7 @@ export const AllowlistManager: React.FC = () => {
             <input
               type="email"
               required
-              placeholder="student@cas.ac.ma"
+              placeholder="name@cas.ac.ma"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
@@ -524,17 +538,40 @@ export const AllowlistManager: React.FC = () => {
               onChange={(e) => setRole(e.target.value as UserRole)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             >
-              <option value="member">Member</option>
-              {isSuperadmin && <option value="leadership">Leadership</option>}
-              <option value="supervisor">Supervisor (Advisor)</option>
+              <option value="member">Member (Student)</option>
+              {isSuperadmin && <option value="leadership">Leadership (Student)</option>}
+              <option value="supervisor">Supervisor (Faculty Advisor)</option>
             </select>
           </div>
+
+          {/* Grade Level: Only displayed for student roles, never for supervisors */}
+          {role !== 'supervisor' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                Grade Level *
+              </label>
+              <select
+                value={studentGrade}
+                onChange={(e) => setStudentGrade(Number(e.target.value))}
+                style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+              >
+                <option value={10}>Grade 10</option>
+                <option value={11}>Grade 11</option>
+                <option value={12}>Grade 12</option>
+              </select>
+            </div>
+          )}
 
           <button type="submit" className="btn-primary" disabled={provisioning} style={{ padding: '0.55rem 1rem' }}>
             <UserPlus size={14} />
             {provisioning ? 'Generating...' : 'Authorize & Generate Code'}
           </button>
         </form>
+        {role === 'supervisor' && (
+          <div style={{ marginTop: '0.65rem', fontSize: '0.75rem', color: 'var(--color-oxford)', fontStyle: 'italic' }}>
+            Chapter Supervisors are faculty teachers. No high school grade level will be assigned.
+          </div>
+        )}
       </div>
 
       {/* Tabs: Active Accounts vs Archive */}

@@ -14,7 +14,7 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string;
-  grade_level: number;
+  grade_level: number | null;
   role: UserRole;
   is_on_probation: boolean;
   probation_count: number;
