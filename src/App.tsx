@@ -128,16 +128,19 @@ function PortalContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  const [isSemester2, setIsSemester2] = useState(false);
+
   useEffect(() => {
     const fetchActiveSemester = async () => {
       try {
         const { data } = await supabase
           .from('semesters')
-          .select('academic_year, is_active')
+          .select('name, academic_year, semester_number, is_active')
           .eq('is_active', true)
           .maybeSingle();
-        if (data?.academic_year) {
-          setActiveAcademicYear(data.academic_year);
+        if (data) {
+          if (data.academic_year) setActiveAcademicYear(data.academic_year);
+          setIsSemester2(data.semester_number === 2 || (data.name && data.name.toLowerCase().includes('semester 2')));
         }
       } catch (err) {
         console.error('Failed to load active academic year:', err);
@@ -336,15 +339,6 @@ function PortalContent() {
 
           <button
             type="button"
-            className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
-            onClick={() => navigateTo('annual_projects')}
-          >
-            <Star size={16} />
-            <span>Annual Projects</span>
-          </button>
-
-          <button
-            type="button"
             className="stitch-nav-item"
             onClick={() => navigateTo('screener')}
           >
@@ -375,14 +369,16 @@ function PortalContent() {
                 <span>Project Reviews</span>
               </button>
 
-              <button
-                type="button"
-                className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
-                onClick={() => navigateTo('annual_projects')}
-              >
-                <Star size={16} />
-                <span>Annual Projects Desk</span>
-              </button>
+              {isLeadership && isSemester2 && (
+                <button
+                  type="button"
+                  className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
+                  onClick={() => navigateTo('annual_projects')}
+                >
+                  <Star size={16} />
+                  <span>Annual Projects Desk</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -475,7 +471,7 @@ function PortalContent() {
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               
-              {/* Standing Badge */}
+              {/* Standing Badge - only show when on probation or restricted */}
               {isRestricted ? (
                 <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
                   <ShieldAlert size={12} /> Restricted
@@ -484,11 +480,7 @@ function PortalContent() {
                 <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
                   <AlertTriangle size={12} /> Probation
                 </span>
-              ) : (
-                <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
-                  <CheckCircle2 size={12} /> Good Standing
-                </span>
-              )}
+              ) : null}
 
               <button
                 type="button"

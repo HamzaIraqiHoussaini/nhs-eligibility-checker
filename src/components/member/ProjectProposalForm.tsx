@@ -138,13 +138,27 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           .eq('id', initialData.id);
 
         if (error) throw error;
+
+        // Create co-leader invites for any added co-leaders
+        if (cleanCoLeaders.length > 0) {
+          const invites = cleanCoLeaders.map(email => ({
+            project_id: initialData.id,
+            inviter_id: user.id,
+            inviter_email: user.email,
+            inviter_name: profile.full_name,
+            co_leader_email: email,
+            status: 'pending',
+          }));
+          await supabase.from('project_co_leaders').upsert(invites, { onConflict: 'project_id,co_leader_email', ignoreDuplicates: true });
+        }
+
         await alert({
           title: 'Proposal Resubmitted',
-          message: `Proposal "${projectTitle}" has been modified and resubmitted for leadership review.`,
+          message: `Proposal "${projectTitle}" has been modified and resubmitted for leadership review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
           variant: 'success',
         });
       } else {
-        const { error } = await supabase.from('project_proposals').insert({
+        const { data: newProject, error } = await supabase.from('project_proposals').insert({
           semester_id: activeSemester?.id || null,
           creator_id: user.id,
           creator_name: profile.full_name,
@@ -163,9 +177,28 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
           volunteers_needed: Number(volunteersNeeded) || 0,
           status: 'pending_leadership',
-        });
+        }).select('id').single();
 
         if (error) throw error;
+
+        // Send co-leader invitations
+        if (cleanCoLeaders.length > 0 && newProject?.id) {
+          const invites = cleanCoLeaders.map(email => ({
+            project_id: newProject.id,
+            inviter_id: user.id,
+            inviter_email: user.email,
+            inviter_name: profile.full_name,
+            co_leader_email: email,
+            status: 'pending',
+          }));
+          await supabase.from('project_co_leaders').upsert(invites, { onConflict: 'project_id,co_leader_email', ignoreDuplicates: true });
+        }
+
+        await alert({
+          title: 'Proposal Submitted',
+          message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Co-leadership invitations have been sent to ' + cleanCoLeaders.join(', ') + '.' : ''}`,
+          variant: 'success',
+        });
       }
 
       onSubmitted();

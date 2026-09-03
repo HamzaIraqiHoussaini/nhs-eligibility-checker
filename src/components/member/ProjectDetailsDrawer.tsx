@@ -580,8 +580,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               {project.leaders}
             </div>
             {project.co_leader_emails && project.co_leader_emails.length > 0 && (
-              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', fontFamily: 'monospace' }}>
-                Co-Leaders: {project.co_leader_emails.join(', ')}
+              <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <Users size={13} color="var(--color-oxford)" />
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-navy)', fontWeight: 600 }}>Co-Leaders:</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-oxford)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.15rem 0.5rem', borderRadius: '2px' }}>
+                  {project.co_leader_emails.join(', ')}
+                </span>
               </div>
             )}
           </div>

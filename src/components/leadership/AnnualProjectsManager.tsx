@@ -22,16 +22,21 @@ export const AnnualProjectsManager: React.FC = () => {
   const [newDesc, setNewDesc] = useState('');
   const [addingProject, setAddingProject] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: pData }, { data: appData }] = await Promise.all([
+      const [{ data: pData }, { data: appData }, { data: semData }] = await Promise.all([
         supabase.from('annual_projects').select('*').eq('academic_year', CURRENT_YEAR).order('title'),
         supabase.from('annual_project_applications').select('*, profiles(full_name, email)').eq('academic_year', CURRENT_YEAR).order('submitted_at'),
+        supabase.from('semesters').select('id, annual_projects_published').eq('is_active', true).maybeSingle(),
       ]);
       setProjects((pData as AnnualProject[]) || []);
       setApplications((appData as AnnualProjectApplication[]) || []);
+      if (semData) {
+        setIsPublished(!!semData.annual_projects_published);
+      }
     } finally {
       setLoading(false);
     }
@@ -177,6 +182,42 @@ export const AnnualProjectsManager: React.FC = () => {
     if (!error) await loadData();
   };
 
+  const handleTogglePublish = async () => {
+    const nextState = !isPublished;
+    const confirmed = await confirm({
+      title: nextState ? 'Push Annual Projects Selection' : 'Close Applications',
+      message: nextState
+        ? 'Push the annual projects selection to all chapter members? The application form will immediately appear inside their Project Hub.'
+        : 'Close annual projects application? The form will be hidden from members in Project Hub.',
+      confirmText: nextState ? 'Push to Chapter' : 'Close Applications',
+      variant: nextState ? 'success' : 'warning',
+    });
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('semesters')
+        .update({ annual_projects_published: nextState })
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setIsPublished(nextState);
+      await alert({
+        title: nextState ? 'Selection Pushed' : 'Applications Closed',
+        message: nextState
+          ? 'Annual projects selection pushed! Members can now apply directly from their Project Hub.'
+          : 'Annual projects application form is now hidden from Project Hub.',
+        variant: nextState ? 'success' : 'info',
+      });
+    } catch (err: any) {
+      await alert({
+        title: 'Update Failed',
+        message: err.message || 'Could not update publication state.',
+        variant: 'danger',
+      });
+    }
+  };
+
   const statusBadge = (status: AnnualProjectApplication['status']) => {
     switch (status) {
       case 'pending': return <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}><Clock size={11} /> Pending</span>;
@@ -190,10 +231,41 @@ export const AnnualProjectsManager: React.FC = () => {
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>Leadership</div>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--color-navy)', margin: 0 }}>Annual Projects Manager</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {CURRENT_YEAR} annual project list and review member applications.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>Leadership Desk</div>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--color-navy)', margin: 0 }}>Annual Projects Desk</h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {CURRENT_YEAR} annual project list, push selection to members, and assign project leads.</p>
+        </div>
+
+        <button
+          type="button"
+          className={isPublished ? 'btn-secondary' : 'btn-primary'}
+          style={{
+            padding: '0.6rem 1.25rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            backgroundColor: isPublished ? '#EDE9FE' : undefined,
+            color: isPublished ? '#6D28D9' : undefined,
+            borderColor: isPublished ? '#C4B5FD' : undefined,
+          }}
+          onClick={handleTogglePublish}
+        >
+          {isPublished ? (
+            <>
+              <CheckCircle2 size={15} color="#6D28D9" />
+              <span>Selection Pushed to Project Hub (Active)</span>
+            </>
+          ) : (
+            <>
+              <Plus size={15} />
+              <span>Push Selection to Members</span>
+            </>
+          )}
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '1.5rem', alignItems: 'start' }}>

@@ -861,4 +861,178 @@ BEGIN
 END;
 $function$;
 
+-- -----------------------------------------------------------------------------
+-- ANNUAL PROJECTS & CO-LEADERSHIP INVITATIONS
+-- -----------------------------------------------------------------------------
+
+-- 1. Add annual_projects_published to semesters
+ALTER TABLE public.semesters ADD COLUMN IF NOT EXISTS annual_projects_published boolean DEFAULT false;
+
+-- 2. Create project_co_leaders table
+CREATE TABLE IF NOT EXISTS public.project_co_leaders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid REFERENCES public.project_proposals(id) ON DELETE CASCADE,
+  inviter_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  inviter_email text,
+  inviter_name text,
+  co_leader_email text NOT NULL,
+  status text NOT NULL DEFAULT 'pending', -- 'pending', 'accepted', 'declined'
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (project_id, co_leader_email)
+);
+
+-- Enable RLS
+ALTER TABLE public.project_co_leaders ENABLE ROW LEVEL SECURITY;
+
+-- Co-leader RLS Policies
+CREATE POLICY "Users can view co-leader invites"
+  ON public.project_co_leaders
+  FOR SELECT
+  TO authenticated
+  USING (
+    lower(co_leader_email) = lower(auth.jwt() ->> 'email')
+    OR inviter_id = auth.uid()
+    OR lower(inviter_email) = lower(auth.jwt() ->> 'email')
+    OR EXISTS (
+      SELECT 1 FROM public.project_proposals p
+      WHERE p.id = project_co_leaders.project_id
+        AND (p.creator_id = auth.uid() OR lower(p.creator_email) = lower(auth.jwt() ->> 'email'))
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles prof
+      WHERE prof.id = auth.uid() AND prof.role IN ('leadership', 'supervisor')
+    )
+  );
+
+CREATE POLICY "Users can create co-leader invites"
+  ON public.project_co_leaders
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    inviter_id = auth.uid()
+    OR lower(inviter_email) = lower(auth.jwt() ->> 'email')
+    OR EXISTS (
+      SELECT 1 FROM public.project_proposals p
+      WHERE p.id = project_co_leaders.project_id
+        AND (p.creator_id = auth.uid() OR lower(p.creator_email) = lower(auth.jwt() ->> 'email'))
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles prof
+      WHERE prof.id = auth.uid() AND prof.role IN ('leadership', 'supervisor')
+    )
+  );
+
+CREATE POLICY "Invited users can update invite status"
+  ON public.project_co_leaders
+  FOR UPDATE
+  TO authenticated
+  USING (
+    lower(co_leader_email) = lower(auth.jwt() ->> 'email')
+    OR inviter_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.profiles prof
+      WHERE prof.id = auth.uid() AND prof.role IN ('leadership', 'supervisor')
+    )
+  );
+
+CREATE POLICY "Users can delete co-leader invites"
+  ON public.project_co_leaders
+  FOR DELETE
+  TO authenticated
+  USING (
+    inviter_id = auth.uid()
+    OR lower(co_leader_email) = lower(auth.jwt() ->> 'email')
+    OR EXISTS (
+      SELECT 1 FROM public.project_proposals p
+      WHERE p.id = project_co_leaders.project_id
+        AND (p.creator_id = auth.uid() OR lower(p.creator_email) = lower(auth.jwt() ->> 'email'))
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.profiles prof
+      WHERE prof.id = auth.uid() AND prof.role IN ('leadership', 'supervisor')
+    )
+  );
+
+-- 3. Stored procedures for atomic accept and decline
+CREATE OR REPLACE FUNCTION public.accept_co_leader_invite(p_invite_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'auth', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller_email text;
+  v_invite RECORD;
+  v_project RECORD;
+BEGIN
+  v_caller_email := lower(auth.jwt() ->> 'email');
+  
+  SELECT * INTO v_invite FROM public.project_co_leaders WHERE id = p_invite_id;
+  IF v_invite.id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Invitation not found');
+  END IF;
+
+  IF lower(v_invite.co_leader_email) != v_caller_email THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: This invitation was not sent to your email.');
+  END IF;
+
+  SELECT * INTO v_project FROM public.project_proposals WHERE id = v_invite.project_id;
+  IF v_project.id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Associated project not found');
+  END IF;
+
+  -- Update invite status to accepted
+  UPDATE public.project_co_leaders
+  SET status = 'accepted', updated_at = now()
+  WHERE id = p_invite_id;
+
+  -- Ensure caller email is in project_proposals.co_leader_emails array
+  IF v_project.co_leader_emails IS NULL OR NOT (v_caller_email = ANY(v_project.co_leader_emails)) THEN
+    UPDATE public.project_proposals
+    SET co_leader_emails = array_append(COALESCE(co_leader_emails, ARRAY[]::text[]), v_caller_email)
+    WHERE id = v_invite.project_id;
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'message', 'Co-leadership invitation accepted.');
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.decline_co_leader_invite(p_invite_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'auth', 'extensions', 'pg_temp'
+AS $function$
+DECLARE
+  v_caller_email text;
+  v_invite RECORD;
+  v_project RECORD;
+BEGIN
+  v_caller_email := lower(auth.jwt() ->> 'email');
+  
+  SELECT * INTO v_invite FROM public.project_co_leaders WHERE id = p_invite_id;
+  IF v_invite.id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Invitation not found');
+  END IF;
+
+  IF lower(v_invite.co_leader_email) != v_caller_email THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Permission denied: This invitation was not sent to your email.');
+  END IF;
+
+  -- Update invite status to declined
+  UPDATE public.project_co_leaders
+  SET status = 'declined', updated_at = now()
+  WHERE id = p_invite_id;
+
+  -- Remove caller email from project_proposals.co_leader_emails array if present
+  UPDATE public.project_proposals
+  SET co_leader_emails = array_remove(co_leader_emails, v_caller_email)
+  WHERE id = v_invite.project_id;
+
+  RETURN jsonb_build_object('success', true, 'message', 'Co-leadership invitation declined.');
+END;
+$function$;
+
+
 

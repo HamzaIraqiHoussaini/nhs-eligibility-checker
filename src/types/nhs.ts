@@ -42,6 +42,7 @@ export interface Semester {
   is_active: boolean;
   academic_year?: string;
   semester_number?: number;
+  annual_projects_published?: boolean;
   created_at: string;
 }
 
@@ -184,4 +185,18 @@ export interface AnnualProjectApplication {
   updated_at?: string;
   profiles?: { full_name: string; email: string };
 }
+
+export interface ProjectCoLeader {
+  id: string;
+  project_id: string;
+  inviter_id?: string;
+  inviter_email?: string;
+  inviter_name?: string;
+  co_leader_email: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+  updated_at?: string;
+  project?: ProjectProposal;
+}
+
 
