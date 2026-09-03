@@ -5,6 +5,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
 import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X } from 'lucide-react';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
@@ -14,6 +15,17 @@ export const MemberRosterManager: React.FC = () => {
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  useEffect(() => {
+    setAppliedQuery(debouncedSearchQuery);
+  }, [debouncedSearchQuery]);
+
+  const handleImmediateSearch = () => {
+    setAppliedQuery(searchQuery);
+  };
+
   const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'graduates' | 'restricted'>('all');
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [probationTarget, setProbationTarget] = useState<Profile | null>(null);
@@ -244,8 +256,8 @@ export const MemberRosterManager: React.FC = () => {
   };
 
   const filteredMembers = useMemo(() => members.filter((m) => {
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+    if (appliedQuery.trim()) {
+      const query = appliedQuery.toLowerCase();
       if (!m.full_name.toLowerCase().includes(query) && !m.email.toLowerCase().includes(query)) {
         return false;
       }
@@ -263,7 +275,7 @@ export const MemberRosterManager: React.FC = () => {
     if (statusFilter === 'probation') return m.is_on_probation;
     if (statusFilter === 'quota_deficit') return m.role !== 'leadership' && m.role !== 'supervisor' && !participationMap[m.id]?.meetsQuota;
     return true;
-  }), [members, searchQuery, statusFilter, participationMap]);
+  }), [members, appliedQuery, statusFilter, participationMap]);
 
   const activeMembersCount = useMemo(() => members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length, [members]);
   const graduatesCount = useMemo(() => members.filter((m) => m.role === 'graduate' || m.role === 'past_leadership').length, [members]);
@@ -347,6 +359,12 @@ export const MemberRosterManager: React.FC = () => {
               placeholder="Search member by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleImmediateSearch();
+                }
+              }}
               style={{
                 border: 'none',
                 outline: 'none',
@@ -361,7 +379,10 @@ export const MemberRosterManager: React.FC = () => {
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setAppliedQuery('');
+                }}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -382,6 +403,7 @@ export const MemberRosterManager: React.FC = () => {
           <button
             type="button"
             className="btn-primary"
+            onClick={handleImmediateSearch}
             style={{
               fontSize: '0.82rem',
               padding: '0.45rem 0.95rem',
@@ -394,7 +416,7 @@ export const MemberRosterManager: React.FC = () => {
             <span>Search</span>
           </button>
 
-          {searchQuery && (
+          {(searchQuery || appliedQuery) && (
             <button
               type="button"
               className="btn-secondary"
@@ -405,7 +427,10 @@ export const MemberRosterManager: React.FC = () => {
                 alignItems: 'center',
                 gap: '0.35rem',
               }}
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setAppliedQuery('');
+              }}
             >
               <X size={12} /> Clear ({filteredMembers.length})
             </button>

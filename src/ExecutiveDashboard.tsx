@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { BatchResult, StudentResult } from './parser';
 import { CandidateDrawer } from './CandidateDrawer';
+import { useDebounce } from './hooks/useDebounce';
 
 interface ExecutiveDashboardProps {
   result: BatchResult;
@@ -20,6 +21,7 @@ interface ExecutiveDashboardProps {
 export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, onReset }) => {
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'eligible' | 'ineligible'>('all');
   const [sortKey, setSortKey] = useState<'name' | 'grade' | 'average' | 'status'>('name');
@@ -36,8 +38,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
   const filteredCandidates = useMemo(() => {
     return result.students.filter(student => {
       // Search query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
+      if (debouncedSearchQuery.trim()) {
+        const query = debouncedSearchQuery.toLowerCase();
         if (!student.studentName.toLowerCase().includes(query)) return false;
       }
       // Status filter
@@ -48,7 +50,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
 
       return true;
     });
-  }, [result.students, searchQuery, statusFilter, gradeFilter]);
+  }, [result.students, debouncedSearchQuery, statusFilter, gradeFilter]);
 
   const sortedCandidates = useMemo(() => {
     return [...filteredCandidates].sort((a, b) => {

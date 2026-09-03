@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal, ProposalStatus } from '../../types/nhs';
 import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save, Clock } from 'lucide-react';
+import { useDebounce } from '../../hooks/useDebounce';
 
 interface CoLeaderMember {
   id: string;
@@ -37,6 +38,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   const [advisorName, setAdvisorName] = useState(initialData?.advisor_name || '');
   const [selectedCoLeaders, setSelectedCoLeaders] = useState<CoLeaderMember[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<CoLeaderMember[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [checkingQuotaEmail, setCheckingQuotaEmail] = useState<string | null>(null);
@@ -107,17 +109,19 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     }
   }, [initialData, isOpen]);
 
-  // Debounced search for students (300ms delay to prevent excessive database requests)
+  // Debounced search for students (300ms delay via useDebounce)
   useEffect(() => {
-    const trimmed = searchQuery.trim();
+    const trimmed = debouncedSearchQuery.trim();
     if (!trimmed || trimmed.length < 2) {
       setSearchResults([]);
       setIsSearching(false);
       return;
     }
 
+    let isMounted = true;
     setIsSearching(true);
-    const timer = setTimeout(async () => {
+
+    const performSearch = async () => {
       try {
         const query = trimmed.toLowerCase();
         const { data, error } = await supabase
@@ -129,6 +133,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           .limit(8);
 
         if (error) throw error;
+        if (!isMounted) return;
 
         const currentEmails = new Set(selectedCoLeaders.map(c => c.email.toLowerCase()));
         if (user?.email) currentEmails.add(user.email.toLowerCase());
@@ -140,14 +145,18 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
         setSearchResults(filtered);
       } catch (err) {
-        console.error('Error searching students:', err);
+        if (isMounted) console.error('Error searching students:', err);
       } finally {
-        setIsSearching(false);
+        if (isMounted) setIsSearching(false);
       }
-    }, 300);
+    };
 
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedCoLeaders, user, profile]);
+    performSearch();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [debouncedSearchQuery, selectedCoLeaders, user?.id, user?.email, profile?.email]);
 
   const handleAddCoLeader = async (student: CoLeaderMember) => {
     if (!activeSemester?.id) {
@@ -703,7 +712,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 </div>
               )}
 
-              {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+              {debouncedSearchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
                 <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '0.3rem', fontStyle: 'italic' }}>
                   No active chapter members found.
                 </div>
