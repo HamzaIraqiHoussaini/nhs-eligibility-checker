@@ -34,7 +34,6 @@ import {
   UserCheck,
   Lock,
   Star,
-  X,
   Send,
 } from 'lucide-react';
 
@@ -53,7 +52,7 @@ export const MyProjectsView: React.FC = () => {
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<'my_projects' | 'chapter_projects'>('my_projects');
+  const [selectedTab, setSelectedTab] = useState<'my_projects' | 'chapter_projects' | 'annual_projects'>('my_projects');
 
   // Co-leadership invitations state
   const [pendingInvites, setPendingInvites] = useState<ProjectCoLeader[]>([]);
@@ -61,7 +60,7 @@ export const MyProjectsView: React.FC = () => {
   // Annual projects in Semester 2 state
   const [annualProjects, setAnnualProjects] = useState<AnnualProject[]>([]);
   const [myAnnualApp, setMyAnnualApp] = useState<AnnualProjectApplication | null>(null);
-  const [showAnnualAppModal, setShowAnnualAppModal] = useState(false);
+  const [isEditingAnnualApp, setIsEditingAnnualApp] = useState(false);
   const [pick1, setPick1] = useState('');
   const [pick2, setPick2] = useState('');
   const [pick3, setPick3] = useState('');
@@ -240,22 +239,40 @@ export const MyProjectsView: React.FC = () => {
 
     setSubmittingAnnual(true);
     try {
-      const { error } = await supabase.from('annual_project_applications').insert({
-        user_id: user.id,
-        academic_year: activeSemester?.academic_year || '2026-2027',
-        pick_1: pick1,
-        pick_2: pick2 || null,
-        pick_3: pick3 || null,
-        essay: annualEssay.trim(),
-        status: 'pending',
-      });
-      if (error) throw error;
-      setShowAnnualAppModal(false);
-      await alert({
-        title: 'Application Submitted',
-        message: 'Your annual project preferences have been submitted to Chapter Leadership for review!',
-        variant: 'success',
-      });
+      if (myAnnualApp) {
+        const { error } = await supabase
+          .from('annual_project_applications')
+          .update({
+            pick_1: pick1,
+            pick_2: pick2 || null,
+            pick_3: pick3 || null,
+            essay: annualEssay.trim(),
+          })
+          .eq('id', myAnnualApp.id);
+        if (error) throw error;
+        setIsEditingAnnualApp(false);
+        await alert({
+          title: 'Application Updated',
+          message: 'Your annual project preferences have been updated.',
+          variant: 'success',
+        });
+      } else {
+        const { error } = await supabase.from('annual_project_applications').insert({
+          user_id: user.id,
+          academic_year: activeSemester?.academic_year || '2026-2027',
+          pick_1: pick1,
+          pick_2: pick2 || null,
+          pick_3: pick3 || null,
+          essay: annualEssay.trim(),
+          status: 'pending',
+        });
+        if (error) throw error;
+        await alert({
+          title: 'Application Submitted',
+          message: 'Your annual project preferences have been submitted to Chapter Leadership for review!',
+          variant: 'success',
+        });
+      }
       await loadData();
     } catch (err: any) {
       await alert({ title: 'Submission Failed', message: err.message || 'Failed to submit application.', variant: 'danger' });
@@ -548,68 +565,8 @@ export const MyProjectsView: React.FC = () => {
         </div>
       )}
 
-      {/* Annual Projects Banner (Semester 2 & Published by Leadership) */}
-      {(activeSemester?.semester_number === 2 || (activeSemester?.name && activeSemester.name.toLowerCase().includes('semester 2'))) &&
-        activeSemester?.annual_projects_published && (
-        <div
-          style={{
-            backgroundColor: '#FAF5FF',
-            border: '2px solid #D8B4FE',
-            padding: '1.25rem 1.5rem',
-            marginBottom: '1.75rem',
-            boxShadow: '0 4px 12px rgba(126, 34, 206, 0.05)',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ flex: 1, minWidth: '280px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                <Star size={18} color="#7E22CE" />
-                <span style={{ fontWeight: 700, color: '#6B21A8', fontSize: '1.05rem' }}>
-                  Annual Chapter Projects {activeSemester?.academic_year || '2026-2027'} • Selection Live
-                </span>
-                {myAnnualApp ? (
-                  <span className="status-pill" style={{ backgroundColor: '#F3E8FF', color: '#6B21A8', border: '1px solid #E9D5FF', fontSize: '0.7rem' }}>
-                    <CheckCircle2 size={11} /> Application Submitted
-                  </span>
-                ) : (
-                  <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', fontSize: '0.7rem' }}>
-                    <Clock size={11} /> Applications Open
-                  </span>
-                )}
-              </div>
-              <p style={{ fontSize: '0.85rem', color: '#581C87', margin: 0, lineHeight: '1.5' }}>
-                {myAnnualApp ? (
-                  myAnnualApp.status === 'assigned'
-                    ? `Leadership has assigned you to lead: ${annualProjects.find((p) => p.id === myAnnualApp.assigned_project_id)?.title || 'Annual Project'}. It is provisioned below.`
-                    : 'Your choices (#1, #2, #3) have been received. Chapter Leadership will evaluate participation history and finalize lead assignments.'
-                ) : (
-                  'Fill out your top three options. Annual projects are assigned by leadership, do not count against semester limits, and cannot be deleted once assigned.'
-                )}
-              </p>
-            </div>
-
-            <div>
-              <button
-                type="button"
-                className="btn-primary"
-                style={{
-                  backgroundColor: '#7E22CE',
-                  borderColor: '#7E22CE',
-                  color: '#FFFFFF',
-                  padding: '0.55rem 1.25rem',
-                  fontSize: '0.82rem',
-                }}
-                onClick={() => setShowAnnualAppModal(true)}
-              >
-                <Star size={14} /> {myAnnualApp ? 'View My Application' : 'Apply for Annual Project'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <button
           type="button"
           className={`filter-chip ${selectedTab === 'my_projects' ? 'active' : ''}`}
@@ -626,6 +583,42 @@ export const MyProjectsView: React.FC = () => {
         >
           All Chapter Approved Projects ({allApprovedProjects.length})
         </button>
+        {activeSemester?.annual_projects_published && (
+          <button
+            type="button"
+            className={`filter-chip ${selectedTab === 'annual_projects' ? 'active' : ''}`}
+            style={{
+              padding: '0.6rem 1.25rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: selectedTab === 'annual_projects' ? '#7E22CE' : undefined,
+              borderColor: selectedTab === 'annual_projects' ? '#7E22CE' : undefined,
+              color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#7E22CE',
+              fontWeight: 600,
+            }}
+            onClick={() => {
+              setSelectedTab('annual_projects');
+              setIsEditingAnnualApp(false);
+            }}
+          >
+            <Star size={14} /> Annual Projects ({annualProjects.length})
+            {myAnnualApp && (
+              <span
+                style={{
+                  fontSize: '0.68rem',
+                  padding: '0.1rem 0.45rem',
+                  backgroundColor: selectedTab === 'annual_projects' ? 'rgba(255,255,255,0.25)' : '#F3E8FF',
+                  color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#6B21A8',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                }}
+              >
+                {myAnnualApp.status === 'assigned' ? 'Assigned' : 'Applied'}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -920,7 +913,7 @@ export const MyProjectsView: React.FC = () => {
             })}
           </div>
         )
-      ) : (
+      ) : selectedTab === 'chapter_projects' ? (
         /* Chapter Approved Projects */
         allApprovedProjects.length === 0 ? (
           <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -1035,7 +1028,262 @@ export const MyProjectsView: React.FC = () => {
             })}
           </div>
         )
-      )}
+      ) : selectedTab === 'annual_projects' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+            {/* Annual Projects Header Banner */}
+            <div
+              style={{
+                backgroundColor: '#FAF5FF',
+                border: '2px solid #D8B4FE',
+                padding: '1.5rem 1.75rem',
+                boxShadow: '0 4px 14px rgba(126, 34, 206, 0.05)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                <Star size={22} color="#7E22CE" />
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: '#6B21A8', margin: 0 }}>
+                  Annual Projects {activeSemester?.academic_year || '2026-2027'}
+                </h2>
+              </div>
+              <p style={{ fontSize: '0.9rem', color: '#581C87', margin: 0, lineHeight: '1.6', maxWidth: '820px' }}>
+                Fill out your first three options. We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year. Annual projects are assigned by leadership, do not count toward your semester quota, and cannot be deleted once assigned.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.3fr', gap: '1.75rem', alignItems: 'start' }}>
+              {/* Left Column: Annual Projects Proposed by Leadership */}
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: '0 0 0.85rem' }}>
+                  Leadership Project Selections ({annualProjects.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {annualProjects.map((p) => {
+                    const isAssigned = myAnnualApp?.status === 'assigned' && myAnnualApp?.assigned_project_id === p.id;
+                    return (
+                      <div
+                        key={p.id}
+                        className="sharp-card"
+                        style={{
+                          padding: '1rem 1.25rem',
+                          backgroundColor: isAssigned ? '#F0FDF4' : '#FFFFFF',
+                          border: isAssigned ? '2px solid #86EFAC' : '1px solid var(--color-border)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+                            {p.title}
+                          </span>
+                          {isAssigned && (
+                            <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
+                              <CheckCircle2 size={11} /> You Are Leading
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: '1.5' }}>
+                          {p.description || 'Official annual project initiative proposed by CAS NHS leadership.'}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {annualProjects.length === 0 && (
+                    <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                      No active annual projects currently proposed by leadership.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Member Application Form or Submitted Status */}
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.15rem', color: 'var(--color-navy)', margin: '0 0 0.85rem' }}>
+                  {myAnnualApp && !isEditingAnnualApp ? 'Your Submitted Application' : 'Submit Application & Preferences'}
+                </h3>
+
+                {myAnnualApp && !isEditingAnnualApp ? (
+                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+                    {/* Status notification */}
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      {myAnnualApp.status === 'assigned' ? (
+                        <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '1rem 1.25rem', borderRadius: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#166534', fontWeight: 700, fontSize: '0.95rem' }}>
+                            <CheckCircle2 size={18} />
+                            Selected to Lead: {annualProjects.find((p) => p.id === myAnnualApp.assigned_project_id)?.title || 'Annual Project'}
+                          </div>
+                          <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#15803D', lineHeight: '1.5' }}>
+                            Leadership has assigned you to lead this annual project! The proposal is active in your "My Proposals & Led Projects" tab.
+                          </p>
+                          {myAnnualApp.leadership_notes && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: '#166534', fontStyle: 'italic' }}>
+                              Leadership Notes: "{myAnnualApp.leadership_notes}"
+                            </div>
+                          )}
+                        </div>
+                      ) : myAnnualApp.status === 'declined' ? (
+                        <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FECACA', padding: '1rem 1.25rem', borderRadius: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#991B1B', fontWeight: 700, fontSize: '0.95rem' }}>
+                            <XCircle size={18} /> Not Selected This Cycle
+                          </div>
+                          {myAnnualApp.leadership_notes && (
+                            <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#B91C1C' }}>
+                              Notes: {myAnnualApp.leadership_notes}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ backgroundColor: '#FAF5FF', border: '1px solid #E9D5FF', padding: '1rem 1.25rem', borderRadius: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6B21A8', fontWeight: 700, fontSize: '0.95rem' }}>
+                            <Clock size={18} /> Application Under Leadership Review
+                          </div>
+                          <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#7E22CE', lineHeight: '1.5' }}>
+                            Your choices (#1, #2, #3) have been submitted. Leadership is currently reviewing full-year participation to allocate leadership assignments.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Choices summary */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>1st Choice Option</div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                          {annualProjects.find((p) => p.id === myAnnualApp.pick_1)?.title || myAnnualApp.pick_1 || '—'}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>2nd Choice Option</div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                          {annualProjects.find((p) => p.id === myAnnualApp.pick_2)?.title || myAnnualApp.pick_2 || '—'}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>3rd Choice Option</div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                          {annualProjects.find((p) => p.id === myAnnualApp.pick_3)?.title || myAnnualApp.pick_3 || '—'}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                          Why do you deserve to get chosen to lead the projects you picked (#1, #2, #3)?
+                        </div>
+                        <p style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                          {myAnnualApp.essay}
+                        </p>
+                      </div>
+                    </div>
+
+                    {myAnnualApp.status === 'pending' && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: '0.8rem', padding: '0.45rem 1rem' }}
+                          onClick={() => setIsEditingAnnualApp(true)}
+                        >
+                          Edit My Application
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+                    <form onSubmit={handleSubmitAnnualApp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                          1st Choice Annual Project *
+                        </label>
+                        <select
+                          required
+                          value={pick1}
+                          onChange={(e) => setPick1(e.target.value)}
+                          style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
+                        >
+                          <option value="">Select your first choice...</option>
+                          {annualProjects.map((p) => (
+                            <option key={p.id} value={p.id} disabled={p.id === pick2 || p.id === pick3}>
+                              {p.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                          2nd Choice Annual Project (Optional)
+                        </label>
+                        <select
+                          value={pick2}
+                          onChange={(e) => setPick2(e.target.value)}
+                          style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
+                        >
+                          <option value="">Select your second choice...</option>
+                          {annualProjects.map((p) => (
+                            <option key={p.id} value={p.id} disabled={p.id === pick1 || p.id === pick3}>
+                              {p.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                          3rd Choice Annual Project (Optional)
+                        </label>
+                        <select
+                          value={pick3}
+                          onChange={(e) => setPick3(e.target.value)}
+                          style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
+                        >
+                          <option value="">Select your third choice...</option>
+                          {annualProjects.map((p) => (
+                            <option key={p.id} value={p.id} disabled={p.id === pick1 || p.id === pick2}>
+                              {p.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                          Why do you deserve to get chosen to lead the projects you picked (#1, #2, #3)? *
+                        </label>
+                        <textarea
+                          required
+                          rows={4}
+                          placeholder="Highlight your previous participation throughout the year, organization skills, and dedication to executing this project..."
+                          value={annualEssay}
+                          onChange={(e) => setAnnualEssay(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', lineHeight: '1.5' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                          We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year.
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                        {isEditingAnnualApp && (
+                          <button type="button" className="btn-secondary" onClick={() => setIsEditingAnnualApp(false)}>
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          className="btn-primary"
+                          disabled={submittingAnnual || !pick1 || annualEssay.trim().length < 25}
+                          style={{ backgroundColor: '#7E22CE', borderColor: '#7E22CE' }}
+                        >
+                          <Send size={14} /> {submittingAnnual ? 'Submitting...' : isEditingAnnualApp ? 'Save Changes' : 'Submit Application'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
       {/* Project Details Drawer with Comments, Edit & Delete */}
       <ProjectDetailsDrawer
@@ -1126,212 +1374,6 @@ export const MyProjectsView: React.FC = () => {
         </div>
       )}
 
-      {/* Annual Projects Application Modal */}
-      {showAnnualAppModal && (
-        <div className="drawer-backdrop" onClick={() => setShowAnnualAppModal(false)}>
-          <div
-            className="sharp-card"
-            style={{
-              width: '100%',
-              maxWidth: '680px',
-              maxHeight: '90vh',
-              margin: 'auto',
-              backgroundColor: 'var(--color-surface)',
-              padding: '2.5rem',
-              position: 'relative',
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#7E22CE', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
-                  Semester 2 Leadership Selection
-                </div>
-                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: 0 }}>
-                  Annual Projects {activeSemester?.academic_year || '2026-2027'}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAnnualAppModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '1.75rem' }}>
-              Fill out your first three options. We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year.
-            </p>
-
-            {myAnnualApp ? (
-              <div>
-                <div
-                  style={{
-                    backgroundColor: myAnnualApp.status === 'assigned' ? '#F0FDF4' : '#FAF5FF',
-                    border: `1px solid ${myAnnualApp.status === 'assigned' ? '#86EFAC' : '#D8B4FE'}`,
-                    padding: '1.25rem',
-                    marginBottom: '1.5rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    {myAnnualApp.status === 'assigned' ? (
-                      <CheckCircle2 size={18} color="#16A34A" />
-                    ) : (
-                      <Clock size={18} color="#7E22CE" />
-                    )}
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: myAnnualApp.status === 'assigned' ? '#166534' : '#6B21A8' }}>
-                      {myAnnualApp.status === 'assigned'
-                        ? 'Project Officially Assigned'
-                        : myAnnualApp.status === 'declined'
-                        ? 'Application Declined'
-                        : 'Application Under Leadership Review'}
-                    </span>
-                  </div>
-                  {myAnnualApp.status === 'assigned' && (
-                    <div style={{ fontSize: '0.85rem', color: '#166534', marginTop: '0.25rem' }}>
-                      You were selected to lead: <strong>{annualProjects.find((p) => p.id === myAnnualApp.assigned_project_id)?.title || 'Assigned Annual Project'}</strong>.
-                      This project has been added to your Project Hub. As an annual project, it cannot be deleted and does not count toward your semester quota.
-                    </div>
-                  )}
-                  {myAnnualApp.leadership_notes && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                      Leadership notes: "{myAnnualApp.leadership_notes}"
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                  <div className="sharp-card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#F8FAFC' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>1st Choice Preference</div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
-                      {annualProjects.find((p) => p.id === myAnnualApp.pick_1)?.title || myAnnualApp.pick_1 || '—'}
-                    </div>
-                  </div>
-
-                  <div className="sharp-card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#F8FAFC' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>2nd Choice Preference</div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
-                      {annualProjects.find((p) => p.id === myAnnualApp.pick_2)?.title || myAnnualApp.pick_2 || '—'}
-                    </div>
-                  </div>
-
-                  <div className="sharp-card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#F8FAFC' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>3rd Choice Preference</div>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
-                      {annualProjects.find((p) => p.id === myAnnualApp.pick_3)?.title || myAnnualApp.pick_3 || '—'}
-                    </div>
-                  </div>
-
-                  <div className="sharp-card" style={{ padding: '1rem 1.25rem', backgroundColor: '#F8FAFC' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                      Why do you deserve to get chosen to lead the projects you picked (#1, #2, #3)?
-                    </div>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--color-text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>
-                      {myAnnualApp.essay}
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-secondary" onClick={() => setShowAnnualAppModal(false)}>
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitAnnualApp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                    1st Choice Annual Project *
-                  </label>
-                  <select
-                    required
-                    value={pick1}
-                    onChange={(e) => setPick1(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                  >
-                    <option value="">Select your first choice...</option>
-                    {annualProjects.map((p) => (
-                      <option key={p.id} value={p.id} disabled={p.id === pick2 || p.id === pick3}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                    2nd Choice Annual Project (Optional)
-                  </label>
-                  <select
-                    value={pick2}
-                    onChange={(e) => setPick2(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                  >
-                    <option value="">Select your second choice...</option>
-                    {annualProjects.map((p) => (
-                      <option key={p.id} value={p.id} disabled={p.id === pick1 || p.id === pick3}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                    3rd Choice Annual Project (Optional)
-                  </label>
-                  <select
-                    value={pick3}
-                    onChange={(e) => setPick3(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', backgroundColor: '#FFFFFF' }}
-                  >
-                    <option value="">Select your third choice...</option>
-                    {annualProjects.map((p) => (
-                      <option key={p.id} value={p.id} disabled={p.id === pick1 || p.id === pick2}>
-                        {p.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
-                    Why do you deserve to get chosen to lead the projects you picked (#1, #2, #3)? *
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    placeholder="Highlight your previous participation throughout the year, organization skills, and dedication to executing this project..."
-                    value={annualEssay}
-                    onChange={(e) => setAnnualEssay(e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', lineHeight: '1.5' }}
-                  />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                    Leadership takes your full-year participation and track record into account.
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn-secondary" onClick={() => setShowAnnualAppModal(false)}>
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={submittingAnnual || !pick1 || annualEssay.trim().length < 25}
-                    style={{ backgroundColor: '#7E22CE', borderColor: '#7E22CE' }}
-                  >
-                    <Send size={14} /> {submittingAnnual ? 'Submitting...' : 'Submit Application'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
 
     </div>
   );

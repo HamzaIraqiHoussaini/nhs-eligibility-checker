@@ -69,7 +69,7 @@ export const AnnualProjectsManager: React.FC = () => {
         .eq('id', selectedApp.id);
       if (error) throw error;
 
-      // Automatically provision the project proposal in Project Hub
+      // Automatically provision or update the project proposal in Project Hub
       const { data: activeSem } = await supabase
         .from('semesters')
         .select('id')
@@ -80,14 +80,48 @@ export const AnnualProjectsManager: React.FC = () => {
       const applicantName = selectedApp.profiles?.full_name || 'Member';
       const applicantEmail = selectedApp.profiles?.email || '';
 
+      // Check if a proposal ALREADY EXISTS for this annual project (for any member)
       const { data: existingProp } = await supabase
         .from('project_proposals')
-        .select('id')
-        .eq('creator_id', selectedApp.user_id)
+        .select('id, leaders, co_leader_emails, creator_id, creator_name, creator_email')
         .eq('annual_project_id', assignProjectId)
         .maybeSingle();
 
-      if (!existingProp) {
+      if (existingProp) {
+        // Project already exists: add this applicant as an official co-leader!
+        const existingEmails: string[] = existingProp.co_leader_emails || [];
+        const cleanApplicantEmail = applicantEmail.toLowerCase().trim();
+        const updatedEmails = (cleanApplicantEmail && !existingEmails.includes(cleanApplicantEmail))
+          ? [...existingEmails, cleanApplicantEmail]
+          : existingEmails;
+
+        const existingLeaders = existingProp.leaders || existingProp.creator_name || 'Leader';
+        const updatedLeaders = (!existingLeaders.includes(applicantName))
+          ? `${existingLeaders}, ${applicantName}`
+          : existingLeaders;
+
+        await supabase
+          .from('project_proposals')
+          .update({
+            leaders: updatedLeaders,
+            co_leader_emails: updatedEmails,
+          })
+          .eq('id', existingProp.id);
+
+        if (cleanApplicantEmail) {
+          await supabase
+            .from('project_co_leaders')
+            .upsert({
+              project_id: existingProp.id,
+              inviter_id: existingProp.creator_id,
+              inviter_email: existingProp.creator_email,
+              inviter_name: 'Chapter Leadership',
+              co_leader_email: cleanApplicantEmail,
+              status: 'accepted',
+            }, { onConflict: 'project_id,co_leader_email' });
+        }
+      } else {
+        // First leader assigned to this annual project: create initial proposal
         const defaultDate = new Date();
         defaultDate.setDate(defaultDate.getDate() + 45);
         const dateStr = defaultDate.toISOString().split('T')[0];
@@ -116,8 +150,8 @@ export const AnnualProjectsManager: React.FC = () => {
       }
 
       await alert({
-        title: 'Project Assigned',
-        message: `Successfully assigned "${title}" to ${applicantName}. The mandatory proposal has been added to their Project Hub.`,
+        title: 'Leader Assigned',
+        message: `Successfully assigned "${title}" to ${applicantName}. The annual project proposal in Project Hub has been updated with their leadership attribution.`,
         variant: 'success',
       });
 
@@ -292,18 +326,34 @@ export const AnnualProjectsManager: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {projects.map((p) => (
-              <div key={p.id} className="sharp-card" style={{ padding: '0.85rem 1rem', backgroundColor: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', opacity: p.is_active ? 1 : 0.5 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.15rem' }}>{p.title}</div>
-                  {p.description && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>}
+            {projects.map((p) => {
+              const assignedAppsForProject = applications.filter((a) => a.status === 'assigned' && a.assigned_project_id === p.id);
+              const assignedNames = assignedAppsForProject.map((a) => a.profiles?.full_name || a.profiles?.email || 'Member');
+              const interestedCount = applications.filter((a) => a.pick_1 === p.id || a.pick_2 === p.id || a.pick_3 === p.id).length;
+              const firstChoiceCount = applications.filter((a) => a.pick_1 === p.id).length;
+
+              return (
+                <div key={p.id} className="sharp-card" style={{ padding: '0.85rem 1rem', backgroundColor: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', opacity: p.is_active ? 1 : 0.5 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.15rem' }}>{p.title}</div>
+                    {p.description && <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</div>}
+                    {assignedNames.length > 0 ? (
+                      <div style={{ fontSize: '0.72rem', color: '#166534', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '0.2rem 0.45rem', marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '2px', flexWrap: 'wrap' }}>
+                        <CheckCircle2 size={11} /> <strong>Assigned Leaders ({assignedNames.length}):</strong> {assignedNames.join(', ')}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                        No leaders assigned yet {interestedCount > 0 && `• ${interestedCount} interested (${firstChoiceCount} as #1)`}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                    <button onClick={() => handleToggleActive(p)} title={p.is_active ? 'Deactivate' : 'Activate'} style={{ background: 'none', border: '1px solid var(--color-border)', padding: '0.25rem 0.45rem', cursor: 'pointer', fontSize: '0.7rem', color: p.is_active ? 'var(--color-sage-text)' : 'var(--color-text-muted)' }}>{p.is_active ? 'Active' : 'Hidden'}</button>
+                    <button onClick={() => handleDeleteProject(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-terracotta)', padding: '0.25rem' }}><Trash2 size={14} /></button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
-                  <button onClick={() => handleToggleActive(p)} title={p.is_active ? 'Deactivate' : 'Activate'} style={{ background: 'none', border: '1px solid var(--color-border)', padding: '0.25rem 0.45rem', cursor: 'pointer', fontSize: '0.7rem', color: p.is_active ? 'var(--color-sage-text)' : 'var(--color-text-muted)' }}>{p.is_active ? 'Active' : 'Hidden'}</button>
-                  <button onClick={() => handleDeleteProject(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-terracotta)', padding: '0.25rem' }}><Trash2 size={14} /></button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {projects.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', textAlign: 'center', padding: '2rem' }}>No projects yet.</div>}
           </div>
         </div>

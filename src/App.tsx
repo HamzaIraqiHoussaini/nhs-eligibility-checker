@@ -14,7 +14,6 @@ import { MemberRosterManager } from './components/leadership/MemberRosterManager
 import { SemesterSettings } from './components/leadership/SemesterSettings';
 import { AllowlistManager } from './components/leadership/AllowlistManager';
 import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
-import { AnnualProjectsView } from './components/member/AnnualProjectsView';
 import { AnnualProjectsManager } from './components/leadership/AnnualProjectsManager';
 import { PublicHomepage } from './components/public/PublicHomepage';
 import {
@@ -41,10 +40,10 @@ type ActiveTab =
   | 'home'
   | 'dashboard'
   | 'projects'
-  | 'annual_projects'
   | 'screener'
   | 'rules'
   | 'review'
+  | 'annual_projects_desk'
   | 'attendance'
   | 'treasury'
   | 'semesters'
@@ -55,10 +54,10 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
   home: '/',
   dashboard: '/dashboard',
   projects: '/project_hub',
-  annual_projects: '/annual_projects',
   screener: '/screener',
   rules: '/rules',
   review: '/review_desk',
+  annual_projects_desk: '/annual_projects_desk',
   attendance: '/attendance',
   treasury: '/treasury',
   semesters: '/semesters',
@@ -72,8 +71,9 @@ const PATH_TO_TAB: Record<string, ActiveTab> = {
   '/dashboard': 'dashboard',
   '/project_hub': 'projects',
   '/projects': 'projects',
-  '/annual_projects': 'annual_projects',
-  '/yearly_projects': 'annual_projects',
+  '/annual_projects': 'projects', // All member attempts redirect directly to Project Hub
+  '/yearly_projects': 'projects',
+  '/annual_projects_desk': 'annual_projects_desk',
   '/screener': 'screener',
   '/eligibility': 'screener',
   '/rules': 'rules',
@@ -372,8 +372,8 @@ function PortalContent() {
               {isLeadership && isSemester2 && (
                 <button
                   type="button"
-                  className={`stitch-nav-item ${activeTab === 'annual_projects' ? 'active' : ''}`}
-                  onClick={() => navigateTo('annual_projects')}
+                  className={`stitch-nav-item ${activeTab === 'annual_projects_desk' ? 'active' : ''}`}
+                  onClick={() => navigateTo('annual_projects_desk')}
                 >
                   <Star size={16} />
                   <span>Annual Projects Desk</span>
@@ -518,12 +518,8 @@ function PortalContent() {
       <main className="stitch-main-content">
         {activeTab === 'dashboard' && <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />}
         {activeTab === 'projects' && <MyProjectsView />}
-        {activeTab === 'annual_projects' && (
-          (isLeadership || isSupervisor) ? (
-            <AnnualProjectsManager />
-          ) : (
-            <AnnualProjectsView onNavigate={(t) => navigateTo(t as ActiveTab)} />
-          )
+        {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
+          <AnnualProjectsManager />
         )}
         {activeTab === 'rules' && <ChapterRules />}
         {activeTab === 'review' && (isLeadership || isSupervisor) && <TwoStageReviewDesk />}
