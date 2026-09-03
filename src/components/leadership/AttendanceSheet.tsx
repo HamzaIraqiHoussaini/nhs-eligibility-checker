@@ -390,7 +390,7 @@ export const AttendanceSheet: React.FC = () => {
       </div>
 
       {/* Stitch Dual-Pane Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem', alignItems: 'start' }}>
         
         {/* LEFT PANE: Monday Month Browser */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -493,29 +493,34 @@ export const AttendanceSheet: React.FC = () => {
           
           {/* Pane Header */}
           <div style={{
-            padding: '1.25rem 1.5rem',
+            padding: '1.15rem 1.5rem',
             backgroundColor: '#F8FAFC',
             borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            flexWrap: 'wrap',
             gap: '1rem',
           }}>
-            <div>
+            <div style={{ minWidth: 0, flex: '1 1 auto' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Active Record Sheet
               </div>
-              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--color-navy)', margin: '0.15rem 0 0' }}>
+              <h2 style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: '1.35rem',
+                color: 'var(--color-navy)',
+                margin: '0.15rem 0 0',
+                whiteSpace: 'nowrap',
+              }}>
                 {activeDisplay?.fullDate || 'Select a Monday'}
               </h2>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                 onClick={handleClear}
                 title="Reset selections"
               >
@@ -525,7 +530,7 @@ export const AttendanceSheet: React.FC = () => {
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                 onClick={handleMarkAllPresent}
               >
                 <CheckCheck size={14} /> Mark All Present
@@ -534,7 +539,7 @@ export const AttendanceSheet: React.FC = () => {
               <button
                 type="button"
                 className="btn-primary"
-                style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
                 disabled={saving}
                 onClick={handleSaveAttendance}
               >
