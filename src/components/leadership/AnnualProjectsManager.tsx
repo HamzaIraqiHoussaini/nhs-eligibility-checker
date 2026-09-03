@@ -282,15 +282,15 @@ export const AnnualProjectsManager: React.FC = () => {
             gap: '0.5rem',
             fontSize: '0.84rem',
             fontWeight: 600,
-            backgroundColor: isPublished ? '#EDE9FE' : undefined,
-            color: isPublished ? '#6D28D9' : undefined,
-            borderColor: isPublished ? '#C4B5FD' : undefined,
+            backgroundColor: isPublished ? '#F1F5F9' : undefined,
+            color: isPublished ? '#1E293B' : undefined,
+            borderColor: isPublished ? '#94A3B8' : undefined,
           }}
           onClick={handleTogglePublish}
         >
           {isPublished ? (
             <>
-              <CheckCircle2 size={15} color="#6D28D9" />
+              <CheckCircle2 size={15} color="#475569" />
               <span>Selection Pushed to Project Hub (Active)</span>
             </>
           ) : (

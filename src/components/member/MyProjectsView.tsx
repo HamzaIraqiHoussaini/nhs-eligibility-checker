@@ -285,11 +285,19 @@ export const MyProjectsView: React.FC = () => {
     loadData();
   }, [user]);
 
-  // Current semester project count for current user (Yearly projects do not count toward limit)
   const currentSemesterProjects = proposals.filter(
     (p) => activeSemester && p.semester_id === activeSemester.id && !p.is_yearly
   );
   const currentSemesterCount = currentSemesterProjects.length;
+
+  const isSem2 = activeSemester?.semester_number === 2 || (activeSemester?.name && activeSemester.name.toLowerCase().includes('semester 2'));
+  const showAnnualTab = Boolean(isSem2 && activeSemester?.annual_projects_published);
+
+  useEffect(() => {
+    if (!showAnnualTab && selectedTab === 'annual_projects') {
+      setSelectedTab('my_projects');
+    }
+  }, [showAnnualTab, selectedTab]);
 
   const handleMarkCompleted = async () => {
     if (!completingProject) return;
@@ -583,7 +591,7 @@ export const MyProjectsView: React.FC = () => {
         >
           All Chapter Approved Projects ({allApprovedProjects.length})
         </button>
-        {activeSemester?.annual_projects_published && (
+        {showAnnualTab && (
           <button
             type="button"
             className={`filter-chip ${selectedTab === 'annual_projects' ? 'active' : ''}`}
@@ -592,9 +600,9 @@ export const MyProjectsView: React.FC = () => {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              backgroundColor: selectedTab === 'annual_projects' ? '#7E22CE' : undefined,
-              borderColor: selectedTab === 'annual_projects' ? '#7E22CE' : undefined,
-              color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#7E22CE',
+              backgroundColor: selectedTab === 'annual_projects' ? '#475569' : '#F1F5F9',
+              borderColor: selectedTab === 'annual_projects' ? '#334155' : '#CBD5E1',
+              color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#334155',
               fontWeight: 600,
             }}
             onClick={() => {
@@ -602,14 +610,15 @@ export const MyProjectsView: React.FC = () => {
               setIsEditingAnnualApp(false);
             }}
           >
-            <Star size={14} /> Annual Projects ({annualProjects.length})
+            <Star size={14} color={selectedTab === 'annual_projects' ? '#E2E8F0' : '#64748B'} />
+            Annual Projects ({annualProjects.length})
             {myAnnualApp && (
               <span
                 style={{
                   fontSize: '0.68rem',
                   padding: '0.1rem 0.45rem',
-                  backgroundColor: selectedTab === 'annual_projects' ? 'rgba(255,255,255,0.25)' : '#F3E8FF',
-                  color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#6B21A8',
+                  backgroundColor: selectedTab === 'annual_projects' ? 'rgba(255,255,255,0.2)' : '#E2E8F0',
+                  color: selectedTab === 'annual_projects' ? '#FFFFFF' : '#475569',
                   borderRadius: '10px',
                   fontWeight: 700,
                 }}
@@ -1028,24 +1037,25 @@ export const MyProjectsView: React.FC = () => {
             })}
           </div>
         )
-      ) : selectedTab === 'annual_projects' ? (
+      ) : (showAnnualTab && selectedTab === 'annual_projects') ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
             {/* Annual Projects Header Banner */}
             <div
               style={{
-                backgroundColor: '#FAF5FF',
-                border: '2px solid #D8B4FE',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #CBD5E1',
+                borderLeft: '4px solid #64748B',
                 padding: '1.5rem 1.75rem',
-                boxShadow: '0 4px 14px rgba(126, 34, 206, 0.05)',
+                boxShadow: '0 2px 8px rgba(100, 116, 139, 0.06)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
-                <Star size={22} color="#7E22CE" />
-                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: '#6B21A8', margin: 0 }}>
+                <Star size={20} color="#64748B" />
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: '#0F172A', margin: 0 }}>
                   Annual Projects {activeSemester?.academic_year || '2026-2027'}
                 </h2>
               </div>
-              <p style={{ fontSize: '0.9rem', color: '#581C87', margin: 0, lineHeight: '1.6', maxWidth: '820px' }}>
+              <p style={{ fontSize: '0.88rem', color: '#475569', margin: 0, lineHeight: '1.6', maxWidth: '820px' }}>
                 Fill out your first three options. We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year. Annual projects are assigned by leadership, do not count toward your semester quota, and cannot be deleted once assigned.
               </p>
             </div>
@@ -1066,7 +1076,7 @@ export const MyProjectsView: React.FC = () => {
                         style={{
                           padding: '1rem 1.25rem',
                           backgroundColor: isAssigned ? '#F0FDF4' : '#FFFFFF',
-                          border: isAssigned ? '2px solid #86EFAC' : '1px solid var(--color-border)',
+                          border: isAssigned ? '2px solid #86EFAC' : '1px solid #CBD5E1',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
@@ -1100,7 +1110,7 @@ export const MyProjectsView: React.FC = () => {
                 </h3>
 
                 {myAnnualApp && !isEditingAnnualApp ? (
-                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1' }}>
                     {/* Status notification */}
                     <div style={{ marginBottom: '1.25rem' }}>
                       {myAnnualApp.status === 'assigned' ? (
@@ -1130,11 +1140,11 @@ export const MyProjectsView: React.FC = () => {
                           )}
                         </div>
                       ) : (
-                        <div style={{ backgroundColor: '#FAF5FF', border: '1px solid #E9D5FF', padding: '1rem 1.25rem', borderRadius: '2px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6B21A8', fontWeight: 700, fontSize: '0.95rem' }}>
-                            <Clock size={18} /> Application Under Leadership Review
+                        <div style={{ backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', padding: '1rem 1.25rem', borderRadius: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1E293B', fontWeight: 700, fontSize: '0.95rem' }}>
+                            <Clock size={18} color="#64748B" /> Application Under Leadership Review
                           </div>
-                          <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#7E22CE', lineHeight: '1.5' }}>
+                          <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#475569', lineHeight: '1.5' }}>
                             Your choices (#1, #2, #3) have been submitted. Leadership is currently reviewing full-year participation to allocate leadership assignments.
                           </p>
                         </div>
@@ -1143,28 +1153,28 @@ export const MyProjectsView: React.FC = () => {
 
                     {/* Choices summary */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1' }}>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>1st Choice Option</div>
                         <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
                           {annualProjects.find((p) => p.id === myAnnualApp.pick_1)?.title || myAnnualApp.pick_1 || '—'}
                         </div>
                       </div>
 
-                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1' }}>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>2nd Choice Option</div>
                         <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
                           {annualProjects.find((p) => p.id === myAnnualApp.pick_2)?.title || myAnnualApp.pick_2 || '—'}
                         </div>
                       </div>
 
-                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1' }}>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>3rd Choice Option</div>
                         <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
                           {annualProjects.find((p) => p.id === myAnnualApp.pick_3)?.title || myAnnualApp.pick_3 || '—'}
                         </div>
                       </div>
 
-                      <div style={{ padding: '1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
+                      <div style={{ padding: '1rem', backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1' }}>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.4rem' }}>
                           Why do you deserve to get chosen to lead the projects you picked (#1, #2, #3)?
                         </div>
@@ -1188,7 +1198,7 @@ export const MyProjectsView: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
+                  <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1' }}>
                     <form onSubmit={handleSubmitAnnualApp} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem' }}>
@@ -1272,7 +1282,7 @@ export const MyProjectsView: React.FC = () => {
                           type="submit"
                           className="btn-primary"
                           disabled={submittingAnnual || !pick1 || annualEssay.trim().length < 25}
-                          style={{ backgroundColor: '#7E22CE', borderColor: '#7E22CE' }}
+                          style={{ backgroundColor: 'var(--color-navy)', borderColor: 'var(--color-navy)' }}
                         >
                           <Send size={14} /> {submittingAnnual ? 'Submitting...' : isEditingAnnualApp ? 'Save Changes' : 'Submit Application'}
                         </button>
