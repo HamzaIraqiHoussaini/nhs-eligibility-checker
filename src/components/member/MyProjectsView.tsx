@@ -1329,36 +1329,38 @@ export const MyProjectsView: React.FC = () => {
         ) : null}
 
       {/* Project Details Drawer with Comments, Edit & Delete */}
-      <ErrorBoundary
-        fallbackTitle="Unable to Display Project Details"
-        fallbackMessage="An error occurred while loading this project's details. Your data is secure."
-        onReset={() => setSelectedProject(null)}
-      >
-        <ProjectDetailsDrawer
-          project={selectedProject}
-          initialSection={drawerInitialSection}
-          onClose={() => setSelectedProject(null)}
-          onEdit={(proj) => {
-            setEditingProject(proj);
-            setIsFormOpen(true);
-          }}
-          onDeleted={() => {
-            setSelectedProject(null);
-            loadData();
-          }}
-          onUpdated={async () => {
-            await loadData();
-            if (selectedProject) {
-              const { data } = await supabase
-                .from('project_proposals')
-                .select('*')
-                .eq('id', selectedProject.id)
-                .maybeSingle();
-              if (data) setSelectedProject(data as ProjectProposal);
-            }
-          }}
-        />
-      </ErrorBoundary>
+      {selectedProject && (
+        <ErrorBoundary
+          fallbackTitle="Unable to Display Project Details"
+          fallbackMessage="An error occurred while loading this project's details. Your data is secure."
+          onReset={() => setSelectedProject(null)}
+        >
+          <ProjectDetailsDrawer
+            project={selectedProject}
+            initialSection={drawerInitialSection}
+            onClose={() => setSelectedProject(null)}
+            onEdit={(proj) => {
+              setEditingProject(proj);
+              setIsFormOpen(true);
+            }}
+            onDeleted={() => {
+              setSelectedProject(null);
+              loadData();
+            }}
+            onUpdated={async () => {
+              await loadData();
+              if (selectedProject) {
+                const { data } = await supabase
+                  .from('project_proposals')
+                  .select('*')
+                  .eq('id', selectedProject.id)
+                  .maybeSingle();
+                if (data) setSelectedProject(data as ProjectProposal);
+              }
+            }}
+          />
+        </ErrorBoundary>
+      )}
 
       {/* Proposal Modal */}
       <ProjectProposalForm

@@ -59,6 +59,32 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const [updatingVolId, setUpdatingVolId] = useState<string | null>(null);
   const [concludingProject, setConcludingProject] = useState(false);
 
+  // Load volunteers for this project
+  const loadVolunteers = async () => {
+    if (!project?.id) return;
+    setLoadingVolunteers(true);
+    try {
+      const { data, error } = await supabase
+        .from('project_volunteers')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: true });
+      if (!error && data) {
+        setVolunteers(data as ProjectVolunteer[]);
+      }
+    } catch (err) {
+      console.error('Failed to load volunteers:', err);
+    } finally {
+      setLoadingVolunteers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (project?.id) {
+      loadVolunteers();
+    }
+  }, [project?.id]);
+
   useEffect(() => {
     if (initialSection === 'comments' && commentsRef.current) {
       const timer = setTimeout(() => {
@@ -101,32 +127,6 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
         }
       })()
     : [];
-
-  // Load volunteers for this project
-  const loadVolunteers = async () => {
-    if (!project?.id) return;
-    setLoadingVolunteers(true);
-    try {
-      const { data, error } = await supabase
-        .from('project_volunteers')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: true });
-      if (!error && data) {
-        setVolunteers(data as ProjectVolunteer[]);
-      }
-    } catch (err) {
-      console.error('Failed to load volunteers:', err);
-    } finally {
-      setLoadingVolunteers(false);
-    }
-  };
-
-  useEffect(() => {
-    if (project?.id) {
-      loadVolunteers();
-    }
-  }, [project?.id]);
 
   const myVolunteerRecord = volunteers.find(
     (v) => Boolean(
