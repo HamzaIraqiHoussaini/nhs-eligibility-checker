@@ -11,7 +11,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
-import { parseFile, extractGradeLevel } from '../../parser';
+import { parseFile, parseBatchFile, extractGradeLevel, type BatchResult } from '../../parser';
 
 export interface IndividualStudentData {
   studentName: string;
@@ -26,7 +26,15 @@ export interface IndividualStudentData {
   failReasons: string[];
 }
 
-export const IndividualScreener: React.FC = () => {
+interface IndividualScreenerProps {
+  canAuditBatch?: boolean;
+  onBatchDetected?: (result: BatchResult) => void;
+}
+
+export const IndividualScreener: React.FC<IndividualScreenerProps> = ({
+  canAuditBatch = false,
+  onBatchDetected,
+}) => {
   const [activeMode, setActiveMode] = useState<'upload' | 'calculator'>('upload');
   const [isParsing, setIsParsing] = useState(false);
   const [progressMessage, setProgressMessage] = useState('');
@@ -58,6 +66,45 @@ export const IndividualScreener: React.FC = () => {
     setProgressMessage('Reading CAS report card and extracting academic marks...');
 
     try {
+      // Auto-detect for Leadership / Supervisor:
+      if (canAuditBatch && onBatchDetected && file.type === 'application/pdf') {
+        setProgressMessage('Extracting document contents and checking chapter criteria...');
+        const batchRes = await parseBatchFile(file, (_current, _total, status) => {
+          setProgressMessage(status);
+        });
+
+        const totalStudentsFound = batchRes.students.length + batchRes.studentsSkipped;
+        // If there is > 1 student, automatically switch to batch mode!
+        if (batchRes.students.length > 1 || totalStudentsFound > 1) {
+          onBatchDetected(batchRes);
+          return;
+        }
+
+        // If exactly 1 student was found in the batch parse:
+        if (batchRes.students.length === 1) {
+          const singleStudent = batchRes.students[0];
+          const parsed = await parseFile(file);
+          const gradeLevel = singleStudent.gradeLevel || extractGradeLevel(parsed.fullText) || 10;
+          const hlMatches = parsed.fullText.match(/\bHL\b|Higher\s+Level/gi);
+          const hlCount = hlMatches ? Math.floor(hlMatches.length / 2) : 0;
+          const threshold = gradeLevel >= 11 && hlCount >= 4 ? 5.60 : 5.80;
+
+          setResult({
+            studentName: singleStudent.studentName || parsed.studentName || 'Student Candidate',
+            gradeLevel,
+            average: singleStudent.average || parsed.average,
+            threshold,
+            hlCount,
+            hasAEorBE: singleStudent.hasAEorBE,
+            has3OrLower: singleStudent.has3OrLower,
+            isEligible: singleStudent.isEligible,
+            grades: singleStudent.grades?.length ? singleStudent.grades : parsed.grades,
+            failReasons: singleStudent.failReasons || [],
+          });
+          return;
+        }
+      }
+
       const parsed = await parseFile(file);
 
       if (parsed.error) {
@@ -184,13 +231,15 @@ export const IndividualScreener: React.FC = () => {
       <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.3rem 0.75rem', backgroundColor: '#EFF6FF', borderRadius: '20px', fontSize: '0.72rem', color: 'var(--color-oxford)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>
           <GraduationCap size={14} />
-          <span>Individual Student Screener</span>
+          <span>Chapter Academic Screener</span>
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: '0 0 0.5rem', lineHeight: 1.15 }}>
           Academic Eligibility Screener
         </h1>
-        <p style={{ fontSize: '0.95rem', color: '#64748B', maxWidth: '620px', margin: '0 auto', lineHeight: 1.55 }}>
-          Check your individual semester report card or calculate your GPA against Casablanca American School National Honor Society rules.
+        <p style={{ fontSize: '0.95rem', color: '#64748B', maxWidth: '640px', margin: '0 auto', lineHeight: 1.55 }}>
+          {canAuditBatch
+            ? 'Check semester report card PDFs (individual or cohort batch) or calculate your GPA against Casablanca American School National Honor Society rules.'
+            : 'Check your semester report card PDF or calculate your GPA against Casablanca American School National Honor Society rules.'}
         </p>
       </div>
 
@@ -413,10 +462,12 @@ export const IndividualScreener: React.FC = () => {
                   <FileText size={28} color="var(--color-oxford)" />
                 </div>
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                  Drop Your Semester Report Card Here
+                  Drop Semester Report Card Here
                 </h3>
-                <p style={{ fontSize: '0.88rem', color: '#64748B', maxWidth: '420px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
-                  Upload your individual Casablanca American School report card PDF. The system will calculate your cumulative GPA, course exclusions, and conduct status.
+                <p style={{ fontSize: '0.88rem', color: '#64748B', maxWidth: '460px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+                  {canAuditBatch
+                    ? 'Upload an individual report card PDF or multi-student cohort PDF. If multiple students are detected, batch auditor mode is activated automatically.'
+                    : 'Upload your individual Casablanca American School report card PDF. The system will calculate your cumulative GPA, course exclusions, and conduct status.'}
                 </p>
                 <button
                   type="button"

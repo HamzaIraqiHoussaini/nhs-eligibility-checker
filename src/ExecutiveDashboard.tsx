@@ -7,6 +7,7 @@ import {
   Check,
   Search,
   Award,
+  RotateCcw,
 } from 'lucide-react';
 import type { BatchResult, StudentResult } from './parser';
 import { CandidateDrawer } from './CandidateDrawer';
@@ -127,7 +128,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="btn-secondary" onClick={onReset} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+              <RotateCcw size={15} />
+              <span>Upload Another Document</span>
+            </button>
             <button className="btn-secondary" onClick={copyEligibleNames}>
               {copied ? <Check size={16} color="var(--color-sage)" /> : <Copy size={16} />}
               {copied ? 'Names Copied to Clipboard' : `Copy Eligible Names (${eligibleCount})`}
