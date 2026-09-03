@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Lock,
 } from 'lucide-react';
+import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 
 interface PublicHomepageProps {
   onNavigate: (tab: string) => void;
@@ -19,6 +20,8 @@ interface PublicHomepageProps {
 }
 
 export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOpenAuth, user }) => {
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -558,18 +561,48 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               </div>
             </div>
 
-            <div style={{ fontSize: '0.85rem', color: '#94A3B8' }}>
-              Casablanca, Morocco
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalTab('terms');
+                  setIsLegalOpen(true);
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#CBD5E1', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}
+              >
+                Terms of Use
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalTab('privacy');
+                  setIsLegalOpen(true);
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#CBD5E1', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}
+              >
+                Privacy Policy
+              </button>
+              <span>Casablanca, Morocco</span>
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.78rem' }}>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem', marginBottom: '1.25rem', fontSize: '0.74rem', color: '#64748B', lineHeight: 1.55 }}>
+            <strong>Institutional Usage Notice:</strong> By using this portal, you automatically accept our Terms of Use and Privacy Policy. Whichever account performs actions on the platform, the account holder or representative is held strictly accountable. Passcodes must remain secure and any compromise must be reported immediately to Chapter Leadership.
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.78rem' }}>
             <span>© Casablanca American School National Honor Society</span>
             <span>Academic Year 2026–2027</span>
           </div>
         </div>
       </footer>
 
+      {/* Terms & Privacy Compliance Modal */}
+      <TermsAndPrivacyModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        defaultTab={legalTab}
+      />
     </div>
   );
 };

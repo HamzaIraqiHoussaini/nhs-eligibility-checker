@@ -17,6 +17,7 @@ import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedg
 import { AnnualProjectsManager } from './components/leadership/AnnualProjectsManager';
 import { PublicHomepage } from './components/public/PublicHomepage';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { TermsAndPrivacyView } from './components/legal/TermsAndPrivacyView';
 import {
   LayoutDashboard,
   FileText,
@@ -34,6 +35,7 @@ import {
   Key,
   Coins,
   Star,
+  Scale,
 } from 'lucide-react';
 import './index.css';
 
@@ -49,7 +51,8 @@ type ActiveTab =
   | 'treasury'
   | 'semesters'
   | 'allowlist'
-  | 'roster';
+  | 'roster'
+  | 'legal';
 
 const TAB_ROUTES: Record<ActiveTab, string> = {
   home: '/',
@@ -64,6 +67,7 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
   semesters: '/semesters',
   roster: '/members',
   allowlist: '/access_control',
+  legal: '/terms',
 };
 
 const PATH_TO_TAB: Record<string, ActiveTab> = {
@@ -88,6 +92,11 @@ const PATH_TO_TAB: Record<string, ActiveTab> = {
   '/roster': 'roster',
   '/access_control': 'allowlist',
   '/allowlist': 'allowlist',
+  '/terms': 'legal',
+  '/privacy': 'legal',
+  '/terms_of_use': 'legal',
+  '/privacy_policy': 'legal',
+  '/legal': 'legal',
 };
 
 function getTabFromPath(path: string): ActiveTab {
@@ -245,6 +254,40 @@ function PortalContent() {
     );
   }
 
+  // Public Legal Terms & Privacy View (accessible to unauthenticated visitors):
+  if (!user && activeTab === 'legal') {
+    return (
+      <div style={{ minHeight: '100vh', width: '100%', backgroundColor: 'var(--color-surface)' }}>
+        <header style={{ backgroundColor: 'var(--color-navy)', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => navigateTo('home')}>
+              <img src="/cas-logo.png" alt="CAS" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+              <div>
+                <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-serif)' }}>Casablanca American School</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-gold)' }}>National Honor Society Chapter Portal</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+              onClick={() => navigateTo('home')}
+            >
+              Back to Homepage
+            </button>
+          </div>
+        </header>
+
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+          <TermsAndPrivacyView
+            initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+            onBack={() => navigateTo('home')}
+          />
+        </main>
+      </div>
+    );
+  }
+
   // Unauthenticated visitors trying to access other internal portal tabs are prompted to log in:
   if (!user && activeTab !== 'home') {
     return (
@@ -356,6 +399,15 @@ function PortalContent() {
             <span>Rules</span>
           </button>
 
+          <button
+            type="button"
+            className={`stitch-nav-item ${activeTab === 'legal' ? 'active' : ''}`}
+            onClick={() => navigateTo('legal')}
+          >
+            <Scale size={16} />
+            <span>Terms & Privacy</span>
+          </button>
+
           {/* Governance & Councils (Leadership & Supervisors) */}
           {(isLeadership || isSupervisor) && (
             <>
@@ -446,6 +498,16 @@ function PortalContent() {
               <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user.email}
               </div>
+              <div style={{ marginTop: '0.65rem', borderTop: '1px dashed var(--color-border)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+                <button
+                  type="button"
+                  onClick={() => navigateTo('legal')}
+                  style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-oxford)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}
+                >
+                  Terms & Privacy
+                </button>
+                <span style={{ color: '#94A3B8' }}>Account Holder Liable</span>
+              </div>
             </div>
           ) : (
             <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
@@ -534,6 +596,12 @@ function PortalContent() {
           {activeTab === 'semesters' && (isLeadership || isSupervisor) && <SemesterSettings />}
           {activeTab === 'treasury' && (isLeadership || isSupervisor) && <ChapterTreasuryLedger />}
           {activeTab === 'allowlist' && isLeadership && <AllowlistManager />}
+          {activeTab === 'legal' && (
+            <TermsAndPrivacyView
+              initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+              onBack={() => navigateTo('dashboard')}
+            />
+          )}
         </ErrorBoundary>
       </main>
 

@@ -1,7 +1,10 @@
-import React from 'react';
-import { BookOpen, ShieldAlert, GraduationCap, AlertTriangle, XCircle, Award, CheckCircle2, Clock, Users } from 'lucide-react';
+import React, { useState } from 'react';
+import { BookOpen, ShieldAlert, GraduationCap, AlertTriangle, XCircle, Award, CheckCircle2, Clock, Users, Scale, FileText, Lock } from 'lucide-react';
+import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 
 export const ChapterRules: React.FC = () => {
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       <div style={{ marginBottom: '2rem' }}>
@@ -271,7 +274,86 @@ export const ChapterRules: React.FC = () => {
           </div>
         </div>
 
+        {/* Section 6: Digital Portal Governance & Account Holder Accountability */}
+        <div className="sharp-card" style={{ padding: '2rem', borderLeft: '4px solid var(--color-gold)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+            <Scale size={22} color="var(--color-navy)" />
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: 0 }}>
+              6. Digital Portal Governance & Account Holder Accountability
+            </h2>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              padding: '1rem 1.25rem',
+              marginBottom: '1.25rem',
+              borderLeft: '4px solid var(--color-oxford)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
+              <AlertTriangle size={18} color="var(--color-oxford)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.88rem', display: 'block', marginBottom: '0.2rem' }}>
+                  Binding Acceptance Upon Access
+                </strong>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-navy)', lineHeight: 1.55 }}>
+                  By accessing, browsing, logging into, or using any functionality of this platform, members and representatives
+                  automatically accept and are legally and institutionally bound by the official Terms of Use and Privacy Policy.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1rem', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderLeft: '4px solid var(--color-terracotta)' }}>
+              <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.25rem' }}>
+                Strict Personal Liability for Account Activity
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#7F1D1D', lineHeight: 1.55 }}>
+                Whichever account performs any operation on this portal, the assigned account holder or representative will be held solely
+                and strictly accountable. Passwords and chapter access codes must remain secure and confidential. Sharing credentials with
+                other students or third parties is strictly prohibited. In the event of any suspected security compromise or unauthorized
+                access, the account holder must immediately report the incident to Chapter Leadership or Faculty Supervisors.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setLegalModalTab('terms');
+                  setIsLegalModalOpen(true);
+                }}
+                style={{ fontSize: '0.84rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <FileText size={15} /> View Full Terms of Use
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setLegalModalTab('privacy');
+                  setIsLegalModalOpen(true);
+                }}
+                style={{ fontSize: '0.84rem', padding: '0.5rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Lock size={15} /> View Privacy Policy
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+      {/* Terms & Privacy Compliance Modal */}
+      <TermsAndPrivacyModal
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+        defaultTab={legalModalTab}
+      />
     </div>
   );
 };
