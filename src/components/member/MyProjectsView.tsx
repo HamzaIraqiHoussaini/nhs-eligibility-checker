@@ -235,7 +235,7 @@ export const MyProjectsView: React.FC = () => {
       await alert({ title: 'Duplicate Choices', message: 'Please select unique options for each preference.', variant: 'warning' });
       return;
     }
-    if (annualEssay.trim().length < 25) {
+    if (!annualEssay.trim()) {
       await alert({ title: 'Response Required', message: 'Please explain why you deserve to get chosen to lead your selected projects.', variant: 'warning' });
       return;
     }
@@ -250,6 +250,7 @@ export const MyProjectsView: React.FC = () => {
             pick_2: pick2 || null,
             pick_3: pick3 || null,
             essay: annualEssay.trim(),
+            updated_at: new Date().toISOString(),
           })
           .eq('id', myAnnualApp.id);
         if (error) throw error;
@@ -260,15 +261,20 @@ export const MyProjectsView: React.FC = () => {
           variant: 'success',
         });
       } else {
-        const { error } = await supabase.from('annual_project_applications').insert({
-          user_id: user.id,
-          academic_year: activeSemester?.academic_year || '2026-2027',
-          pick_1: pick1,
-          pick_2: pick2 || null,
-          pick_3: pick3 || null,
-          essay: annualEssay.trim(),
-          status: 'pending',
-        });
+        const { error } = await supabase.from('annual_project_applications').upsert(
+          {
+            user_id: user.id,
+            academic_year: activeSemester?.academic_year || '2026-2027',
+            pick_1: pick1,
+            pick_2: pick2 || null,
+            pick_3: pick3 || null,
+            essay: annualEssay.trim(),
+            status: 'pending',
+            submitted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,academic_year' }
+        );
         if (error) throw error;
         await alert({
           title: 'Application Submitted',
@@ -1300,9 +1306,14 @@ export const MyProjectsView: React.FC = () => {
                           onChange={(e) => setAnnualEssay(e.target.value)}
                           style={{ width: '100%', padding: '0.65rem', border: '1px solid var(--color-border)', fontSize: '0.88rem', lineHeight: '1.5' }}
                         />
-                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                          We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year.
-                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem', gap: '1rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                            We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year.
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: annualEssay.trim() ? 'var(--color-oxford)' : 'var(--color-text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {annualEssay.trim().length} characters
+                          </span>
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -1314,8 +1325,13 @@ export const MyProjectsView: React.FC = () => {
                         <button
                           type="submit"
                           className="btn-primary"
-                          disabled={submittingAnnual || !pick1 || annualEssay.trim().length < 25}
-                          style={{ backgroundColor: 'var(--color-navy)', borderColor: 'var(--color-navy)' }}
+                          disabled={submittingAnnual}
+                          style={{
+                            backgroundColor: 'var(--color-navy)',
+                            borderColor: 'var(--color-navy)',
+                            opacity: submittingAnnual ? 0.7 : 1,
+                            cursor: submittingAnnual ? 'not-allowed' : 'pointer',
+                          }}
                         >
                           <Send size={14} /> {submittingAnnual ? 'Submitting...' : isEditingAnnualApp ? 'Save Changes' : 'Submit Application'}
                         </button>
