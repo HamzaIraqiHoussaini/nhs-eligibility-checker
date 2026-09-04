@@ -36,7 +36,7 @@ export const SemesterSettings: React.FC = () => {
 
   // Derived academic year: e.g. typing 2026 -> 2026-2027
   const parsedStartYear = parseInt(startYearInput.trim(), 10);
-  const computedAcademicYear = !isNaN(parsedStartYear) && parsedStartYear > 1900 && parsedStartYear < 2100
+  const computedAcademicYear = !isNaN(parsedStartYear) && parsedStartYear > 1900
     ? `${parsedStartYear}-${parsedStartYear + 1}`
     : startYearInput.trim();
 
@@ -571,8 +571,7 @@ export const SemesterSettings: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.75rem', alignItems: 'center' }}>
                     <input
                       type="number"
-                      min="2000"
-                      max="2099"
+                      min="1900"
                       required
                       placeholder="e.g. 2026"
                       value={startYearInput}
@@ -580,7 +579,7 @@ export const SemesterSettings: React.FC = () => {
                         const val = e.target.value;
                         setStartYearInput(val);
                         const yr = parseInt(val, 10);
-                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                        if (!isNaN(yr) && yr >= 1900) {
                           if (selectedSemNum === 1) {
                             setStartDate(`${yr}-09-01`);
                             setEndDate(`${yr + 1}-01-22`);
@@ -635,7 +634,7 @@ export const SemesterSettings: React.FC = () => {
                       onClick={() => {
                         setSelectedSemNum(1);
                         const yr = parseInt(startYearInput, 10);
-                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                        if (!isNaN(yr) && yr >= 1900) {
                           setStartDate(`${yr}-09-01`);
                           setEndDate(`${yr + 1}-01-22`);
                         }
@@ -658,7 +657,7 @@ export const SemesterSettings: React.FC = () => {
                       onClick={() => {
                         setSelectedSemNum(2);
                         const yr = parseInt(startYearInput, 10);
-                        if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                        if (!isNaN(yr) && yr >= 1900) {
                           setStartDate(`${yr + 1}-01-26`);
                           setEndDate(`${yr + 1}-06-15`);
                         }

@@ -6,8 +6,6 @@ import { CheckCircle2, Clock, Star, FileText, ChevronDown } from 'lucide-react';
 
 import type { AnnualProject, AnnualProjectApplication, Semester } from '../../types/nhs';
 
-const CURRENT_YEAR = '2026-2027';
-
 interface AnnualProjectsViewProps {
   onNavigate?: (tab: string) => void;
 }
@@ -15,6 +13,7 @@ interface AnnualProjectsViewProps {
 export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const { alert } = useConfirm();
+  const [academicYear, setAcademicYear] = useState('2026-2027');
   const [projects, setProjects] = useState<AnnualProject[]>([]);
   const [application, setApplication] = useState<AnnualProjectApplication | null>(null);
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
@@ -31,14 +30,17 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
     if (!user) return;
     setLoading(true);
     try {
-      const [{ data: pData }, { data: appData }, { data: semData }] = await Promise.all([
-        supabase.from('annual_projects').select('*').eq('academic_year', CURRENT_YEAR).eq('is_active', true).order('title'),
-        supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', CURRENT_YEAR).maybeSingle(),
-        supabase.from('semesters').select('*').eq('is_active', true).maybeSingle(),
+      const { data: semData } = await supabase.from('semesters').select('*').eq('is_active', true).maybeSingle();
+      const currentYear = semData?.academic_year || '2026-2027';
+      setAcademicYear(currentYear);
+      if (semData) setActiveSemester(semData as Semester);
+
+      const [{ data: pData }, { data: appData }] = await Promise.all([
+        supabase.from('annual_projects').select('*').eq('academic_year', currentYear).eq('is_active', true).order('title'),
+        supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', currentYear).maybeSingle(),
       ]);
       setProjects((pData as AnnualProject[]) || []);
       setApplication(appData as AnnualProjectApplication | null);
-      if (semData) setActiveSemester(semData as Semester);
     } catch (err) {
       console.error('Failed to load annual projects:', err);
     } finally {
@@ -74,7 +76,7 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
     try {
       const { error } = await supabase.from('annual_project_applications').insert({
         user_id: user.id,
-        academic_year: CURRENT_YEAR,
+        academic_year: academicYear,
         pick_1: pick1 || null,
         pick_2: pick2 || null,
         pick_3: pick3 || null,
@@ -133,7 +135,7 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
           CAS NHS Chapter
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--color-navy)', margin: 0 }}>
-          Annual Projects {CURRENT_YEAR}
+          Annual Projects {academicYear}
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
           Select your top three project preferences and explain why you deserve to lead them. Leadership will review and assign based on your participation throughout the year.
@@ -232,7 +234,7 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
               <FileText size={18} color="var(--color-navy)" />
               <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', margin: 0 }}>
-                Annual Projects Application ({CURRENT_YEAR})
+                Annual Projects Application ({academicYear})
               </h2>
             </div>
             {activeSemester && (

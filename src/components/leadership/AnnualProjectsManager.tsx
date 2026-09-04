@@ -5,10 +5,9 @@ import { CheckCircle2, Clock, ChevronDown, Plus, Trash2, Users } from 'lucide-re
 
 import type { AnnualProject, AnnualProjectApplication } from '../../types/nhs';
 
-const CURRENT_YEAR = '2026-2027';
-
 export const AnnualProjectsManager: React.FC = () => {
   const { confirm, alert } = useConfirm();
+  const [academicYear, setAcademicYear] = useState('2026-2027');
   const [projects, setProjects] = useState<AnnualProject[]>([]);
   const [applications, setApplications] = useState<AnnualProjectApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,16 +26,24 @@ export const AnnualProjectsManager: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: pData }, { data: appData }, { data: semData }] = await Promise.all([
-        supabase.from('annual_projects').select('*').eq('academic_year', CURRENT_YEAR).order('title'),
-        supabase.from('annual_project_applications').select('*, profiles(full_name, email, role, is_restricted)').eq('academic_year', CURRENT_YEAR).order('submitted_at'),
-        supabase.from('semesters').select('id, annual_projects_published').eq('is_active', true).maybeSingle(),
-      ]);
-      setProjects((pData as AnnualProject[]) || []);
-      setApplications((appData as AnnualProjectApplication[]) || []);
+      const { data: semData } = await supabase
+        .from('semesters')
+        .select('id, annual_projects_published, academic_year')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const activeYear = semData?.academic_year || '2026-2027';
+      setAcademicYear(activeYear);
       if (semData) {
         setIsPublished(!!semData.annual_projects_published);
       }
+
+      const [{ data: pData }, { data: appData }] = await Promise.all([
+        supabase.from('annual_projects').select('*').eq('academic_year', activeYear).order('title'),
+        supabase.from('annual_project_applications').select('*, profiles(full_name, email, role, is_restricted)').eq('academic_year', activeYear).order('submitted_at'),
+      ]);
+      setProjects((pData as AnnualProject[]) || []);
+      setApplications((appData as AnnualProjectApplication[]) || []);
     } finally {
       setLoading(false);
     }
@@ -211,7 +218,7 @@ export const AnnualProjectsManager: React.FC = () => {
     if (!newTitle.trim()) return;
     setAddingProject(true);
     try {
-      const { error } = await supabase.from('annual_projects').insert({ title: newTitle.trim(), description: newDesc.trim() || null, academic_year: CURRENT_YEAR });
+      const { error } = await supabase.from('annual_projects').insert({ title: newTitle.trim(), description: newDesc.trim() || null, academic_year: academicYear });
       if (error) throw error;
       setNewTitle('');
       setNewDesc('');
@@ -322,7 +329,7 @@ export const AnnualProjectsManager: React.FC = () => {
         <div>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>Leadership Desk</div>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--color-navy)', margin: 0 }}>Annual Projects Desk</h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {CURRENT_YEAR} annual project list, push selection to members, and assign project leads.</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {academicYear} annual project list, push selection to members, and assign project leads.</p>
         </div>
 
         <button

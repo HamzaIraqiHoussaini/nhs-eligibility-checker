@@ -340,7 +340,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
                 const val = e.target.value;
                 setCustomStartYear(val);
                 const yr = parseInt(val, 10);
-                if (!isNaN(yr) && yr >= 2000 && yr <= 2099) {
+                if (!isNaN(yr) && yr >= 1900) {
                   const targetYear = `${yr}-${yr + 1}`;
                   if (!availableYears.includes(targetYear)) {
                     setAvailableYears((prev) => Array.from(new Set([...prev, targetYear])).sort());
