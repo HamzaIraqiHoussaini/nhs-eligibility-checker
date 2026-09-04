@@ -35,6 +35,7 @@ import {
   Key,
   Coins,
   Star,
+  Award,
 } from 'lucide-react';
 import './index.css';
 
@@ -104,7 +105,7 @@ function getTabFromPath(path: string): ActiveTab {
 }
 
 function PortalContent() {
-  const { user, profile, role, isLeadership, isSupervisor, isRestricted, signOut } = useAuth();
+  const { user, profile, role, isLeadership, isSupervisor, isRestricted, isGraduated, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => getTabFromPath(window.location.pathname));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -571,8 +572,12 @@ function PortalContent() {
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               
-              {/* Standing Badge - only show when on probation or restricted */}
-              {isRestricted ? (
+              {/* Standing Badge - only show when on probation, restricted, or graduated */}
+              {isGraduated ? (
+                <span className="status-pill" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', fontSize: '0.72rem', border: '1px solid #DDD6FE' }}>
+                  <Award size={12} /> Graduate Honors
+                </span>
+              ) : isRestricted ? (
                 <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
                   <ShieldAlert size={12} /> Restricted
                 </span>
@@ -641,6 +646,10 @@ function PortalContent() {
               )}
               {activeTab === 'rules' && <ChapterRules />}
               {activeTab === 'review' && isLeadership && <TwoStageReviewDesk />}
+              {activeTab === 'review' && !isLeadership && (
+                // Non-leadership members who navigate directly to /review_desk are sent to dashboard
+                <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />
+              )}
               {activeTab === 'attendance' && isLeadership && <AttendanceSheet />}
               {activeTab === 'roster' && isLeadership && <MemberRosterManager />}
               {activeTab === 'semesters' && isLeadership && <SemesterSettings />}

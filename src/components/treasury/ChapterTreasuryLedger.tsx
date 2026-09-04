@@ -8,9 +8,9 @@ import { Coins, Trash2, X, ArrowRightLeft, TrendingUp, TrendingDown } from 'luci
 const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '2028-2029'];
 
 export const ChapterTreasuryLedger: React.FC = () => {
-  const { isLeadership, isSupervisor } = useAuth();
+  const { isLeadership } = useAuth();
   const { confirm, alert } = useConfirm();
-  const canManage = isLeadership || isSupervisor;
+  const canManage = isLeadership;
 
   const [availableYears, setAvailableYears] = useState<string[]>(ACADEMIC_YEARS);
   const [selectedYear, setSelectedYear] = useState('2025-2026');

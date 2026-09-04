@@ -255,6 +255,9 @@ export const MemberRosterManager: React.FC = () => {
     }
   };
 
+  const isGraduatedMember = (m: Profile) => m.role === 'graduate' || m.role === 'past_leadership' || m.role === 'past_member';
+  const isRestrictedMember = (m: Profile) => m.is_restricted === true || m.role === 'kicked_out';
+
   const filteredMembers = useMemo(() => members.filter((m) => {
     if (appliedQuery.trim()) {
       const query = appliedQuery.toLowerCase();
@@ -262,13 +265,13 @@ export const MemberRosterManager: React.FC = () => {
         return false;
       }
     }
-    // Dismissed filter: strictly only restricted members
-    if (statusFilter === 'restricted') return m.is_restricted;
-    // Graduates filter: graduate members and past leadership
-    if (statusFilter === 'graduates') return m.role === 'graduate' || m.role === 'past_leadership';
+    // Dismissed filter: strictly restricted or kicked out members
+    if (statusFilter === 'restricted') return isRestrictedMember(m);
+    // Graduates filter: graduate members, past leadership, and past members
+    if (statusFilter === 'graduates') return isGraduatedMember(m);
 
     // For all other active member filters: exclude dismissed and graduates
-    if (m.is_restricted || m.role === 'graduate' || m.role === 'past_leadership') return false;
+    if (isRestrictedMember(m) || isGraduatedMember(m)) return false;
 
     if (statusFilter === 'all') return true;
     if (statusFilter === 'good') return !m.is_on_probation;
@@ -277,9 +280,9 @@ export const MemberRosterManager: React.FC = () => {
     return true;
   }), [members, appliedQuery, statusFilter, participationMap]);
 
-  const activeMembersCount = useMemo(() => members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length, [members]);
-  const graduatesCount = useMemo(() => members.filter((m) => m.role === 'graduate' || m.role === 'past_leadership').length, [members]);
-  const deficitCount = useMemo(() => members.filter((m) => !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership' && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length, [members, participationMap]);
+  const activeMembersCount = useMemo(() => members.filter((m) => !isRestrictedMember(m) && !isGraduatedMember(m)).length, [members]);
+  const graduatesCount = useMemo(() => members.filter((m) => isGraduatedMember(m)).length, [members]);
+  const deficitCount = useMemo(() => members.filter((m) => !isRestrictedMember(m) && !isGraduatedMember(m) && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length, [members, participationMap]);
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -311,13 +314,13 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'good' ? 'active' : ''}`}
             onClick={() => setStatusFilter('good')}
           >
-            Good Standing ({members.filter((m) => !m.is_on_probation && !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length})
+            Good Standing ({members.filter((m) => !m.is_on_probation && !isRestrictedMember(m) && !isGraduatedMember(m)).length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'probation' ? 'active' : ''}`}
             onClick={() => setStatusFilter('probation')}
           >
-            On Probation ({members.filter((m) => m.is_on_probation && !m.is_restricted && m.role !== 'graduate' && m.role !== 'past_leadership').length})
+            On Probation ({members.filter((m) => m.is_on_probation && !isRestrictedMember(m) && !isGraduatedMember(m)).length})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'quota_deficit' ? 'active' : ''}`}
@@ -336,7 +339,7 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'restricted' ? 'active' : ''}`}
             onClick={() => setStatusFilter('restricted')}
           >
-            Dismissed / Restricted ({members.filter((m) => m.is_restricted).length})
+            Dismissed / Restricted ({members.filter((m) => isRestrictedMember(m)).length})
           </button>
         </div>
 
@@ -484,7 +487,7 @@ export const MemberRosterManager: React.FC = () => {
                       <span style={{ color: 'var(--color-oxford)', fontWeight: 600, fontSize: '0.82rem' }}>
                         Faculty Advisor
                       </span>
-                    ) : isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
+                    ) : isLeadership && !isRestrictedMember(member) && !isGraduatedMember(member) ? (
                       <select
                         value={member.grade_level || 11}
                         onChange={(e) => handleUpdateGrade(member, Number(e.target.value))}
@@ -540,13 +543,13 @@ export const MemberRosterManager: React.FC = () => {
                       <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
                         <Award size={12} /> Past Leadership
                       </span>
-                    ) : member.role === 'graduate' ? (
+                    ) : member.role === 'graduate' || member.role === 'past_member' ? (
                       <span className="status-pill eligible" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
                         <Award size={12} /> NHS Graduate
                       </span>
-                    ) : member.is_restricted ? (
+                    ) : member.is_restricted || member.role === 'kicked_out' ? (
                       <span className="status-pill ineligible">
-                        <ShieldAlert size={12} /> Dismissed (2 Probations)
+                        <ShieldAlert size={12} /> Dismissed / Restricted
                       </span>
                     ) : member.is_on_probation ? (
                       <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
@@ -561,11 +564,11 @@ export const MemberRosterManager: React.FC = () => {
                   <td>
                     {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor (Exempt)</span>
-                    ) : member.role === 'graduate' || member.role === 'past_leadership' ? (
+                    ) : isGraduatedMember(member) ? (
                       <span style={{ fontSize: '0.75rem', color: '#6D28D9', fontWeight: 600 }}>Graduated (Exempt)</span>
                     ) : member.role === 'leadership' ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Leadership)</span>
-                    ) : member.is_restricted ? (
+                    ) : isRestrictedMember(member) ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
                     ) : part.meetsQuota ? (
                       <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
@@ -586,7 +589,7 @@ export const MemberRosterManager: React.FC = () => {
                         <Eye size={12} /> Profile
                       </button>
 
-                      {isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' && (
+                      {isLeadership && !isRestrictedMember(member) && !isGraduatedMember(member) && (
                         member.is_on_probation ? (
                           <>
                             <button

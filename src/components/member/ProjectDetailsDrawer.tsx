@@ -25,6 +25,8 @@ import {
   Check,
   CheckCheck,
   FileText,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface ProjectDetailsDrawerProps {
@@ -141,6 +143,35 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   // Non-leader: Apply to Volunteer
   const handleApplyVolunteer = async () => {
     if (!user || !project) return;
+
+    const isGraduated = profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member';
+    if (isGraduated) {
+      await alert({
+        title: 'Action Unavailable',
+        message: 'Graduated members have completed active service requirements and are exempt from volunteer quotas.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (profile?.is_restricted || profile?.role === 'kicked_out') {
+      await alert({
+        title: 'Action Prohibited',
+        message: 'Restricted members cannot apply for project volunteer positions.',
+        variant: 'danger',
+      });
+      return;
+    }
+
+    if (profile?.role === 'supervisor' || profile?.role === 'past_supervisor') {
+      await alert({
+        title: 'Faculty Role',
+        message: 'Supervisors oversee project operations and do not fulfill student volunteer quotas.',
+        variant: 'info',
+      });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Apply to Volunteer',
       message: `Submit your application to volunteer for "${project.project_title}" on ${project.event_date}?`,
@@ -808,7 +839,34 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               {/* NON-LEADER VIEW: Application / Standing */}
               {!isProjectLeader && (
                 <div style={{ marginBottom: '1.5rem' }}>
-                  {!myVolunteerRecord ? (
+                  {profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member' ? (
+                    <div style={{ backgroundColor: '#F5F3FF', border: '1px solid #DDD6FE', padding: '1.25rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#5B21B6', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                        <Award size={16} /> Honors Graduate Exemption
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#6D28D9', margin: 0 }}>
+                        You have completed your active chapter service requirements and are exempt from volunteer quotas.
+                      </p>
+                    </div>
+                  ) : profile?.is_restricted || profile?.role === 'kicked_out' ? (
+                    <div style={{ backgroundColor: 'var(--color-terracotta-bg)', border: '1px solid #FECACA', padding: '1.25rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-terracotta-text)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                        <ShieldAlert size={16} /> Account Inactive / Restricted
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#991B1B', margin: 0 }}>
+                        This account is inactive or restricted and cannot apply for project volunteer roles.
+                      </p>
+                    </div>
+                  ) : profile?.role === 'supervisor' || profile?.role === 'past_supervisor' ? (
+                    <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '1.25rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                        <ShieldCheck size={16} /> Faculty Supervisor
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#15803D', margin: 0 }}>
+                        Supervisors oversee chapter projects and rosters. Volunteer quotas apply only to active student members.
+                      </p>
+                    </div>
+                  ) : !myVolunteerRecord ? (
                     <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
                         Apply to Volunteer on this Project

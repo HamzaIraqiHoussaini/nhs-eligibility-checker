@@ -35,7 +35,8 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   }, [member?.grade_level]);
 
   const handleUpdateGrade = async (newGrade: number) => {
-    if (!member || member.role === 'supervisor' || member.role === 'past_supervisor') return;
+    if (!isLeadership || !member || member.role === 'supervisor' || member.role === 'past_supervisor') return;
+    if (member.is_restricted || member.role === 'graduate' || member.role === 'past_leadership' || member.role === 'past_member' || member.role === 'kicked_out') return;
     setCurrentGrade(newGrade);
     try {
       const { error } = await supabase
@@ -156,7 +157,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
               <span style={{ margin: '0 0.5rem' }}>•</span>
               {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
                 <span style={{ color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor</span>
-              ) : isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' ? (
+              ) : isLeadership && !member.is_restricted && member.role !== 'graduate' && member.role !== 'past_leadership' && member.role !== 'past_member' && member.role !== 'kicked_out' ? (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span style={{ color: 'var(--color-text-muted)' }}>Grade:</span>
                   <select
@@ -219,7 +220,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                 </div>
               </div>
             </div>
-          ) : member.role === 'graduate' ? (
+          ) : member.role === 'graduate' || member.role === 'past_member' ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EDE9FE', border: '1px solid #DDD6FE', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <Award size={24} color="#6D28D9" />
               <div>
@@ -231,7 +232,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                 </div>
               </div>
             </div>
-          ) : member.is_restricted ? (
+          ) : member.is_restricted || member.role === 'kicked_out' ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: 'var(--color-terracotta-bg)', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <ShieldAlert size={24} color="var(--color-terracotta)" />
               <div>
@@ -239,7 +240,7 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   Chapter Dismissed • Account Restricted
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#991B1B' }}>
-                  Accumulated 2 probations. Violates chapter rules.
+                  {member.restricted_reason || 'Accumulated 2 probations. Account restricted.'}
                 </div>
               </div>
             </div>
@@ -305,8 +306,8 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                   </span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: meetsQuota ? '#065F46' : '#78350F', display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                  <span>Projects Led: <strong>{semLed} / 1 min</strong> {semLed >= 1 ? '✓' : '(Incomplete)'}</span>
-                  <span>Times Volunteered: <strong>{semesterVolCount} / 2 min</strong> {semesterVolCount >= 2 ? '✓' : '(Incomplete)'}</span>
+                  <span>Projects Led: <strong>{semLed} / 1 min</strong> {semLed >= 1 ? '(Satisfied)' : '(Incomplete)'}</span>
+                  <span>Times Volunteered: <strong>{semesterVolCount} / 2 min</strong> {semesterVolCount >= 2 ? '(Satisfied)' : '(Incomplete)'}</span>
                 </div>
                 {!meetsQuota && (
                   <div style={{ fontSize: '0.72rem', color: '#92400E', marginTop: '0.4rem', fontStyle: 'italic' }}>

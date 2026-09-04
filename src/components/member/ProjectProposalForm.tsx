@@ -11,6 +11,8 @@ interface CoLeaderMember {
   full_name: string;
   email: string;
   grade_level?: number | null;
+  role?: string;
+  is_restricted?: boolean;
 }
 
 interface ProjectProposalFormProps {
@@ -73,7 +75,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       if (initialData.co_leader_emails && initialData.co_leader_emails.length > 0) {
         supabase
           .from('profiles')
-          .select('id, full_name, email, grade_level')
+          .select('id, full_name, email, grade_level, role, is_restricted')
           .in('email', initialData.co_leader_emails)
           .then(({ data }) => {
             if (data && data.length > 0) {
@@ -126,11 +128,11 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         const query = trimmed.toLowerCase();
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, full_name, email, grade_level, role')
-          .eq('role', 'member')
+          .select('id, full_name, email, grade_level, role, is_restricted')
+          .in('role', ['member', 'leadership'])
           .neq('id', user?.id || '')
           .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
-          .limit(8);
+          .limit(10);
 
         if (error) throw error;
         if (!isMounted) return;
@@ -139,9 +141,13 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         if (user?.email) currentEmails.add(user.email.toLowerCase());
         if (profile?.email) currentEmails.add(profile.email.toLowerCase());
 
-        const filtered = (data || []).filter(
-          m => m.email && !currentEmails.has(m.email.toLowerCase())
-        ) as CoLeaderMember[];
+        const filtered = (data || []).filter(m => {
+          if (!m.email || currentEmails.has(m.email.toLowerCase())) return false;
+          const isGraduated = m.role === 'graduate' || m.role === 'past_leadership' || m.role === 'past_member';
+          const isKickedOut = m.is_restricted === true || m.role === 'kicked_out';
+          const isSupervisor = m.role === 'supervisor' || m.role === 'past_supervisor';
+          return !isGraduated && !isKickedOut && !isSupervisor;
+        }) as CoLeaderMember[];
 
         setSearchResults(filtered);
       } catch (err) {
@@ -159,6 +165,37 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   }, [debouncedSearchQuery, selectedCoLeaders, user?.id, user?.email, profile?.email]);
 
   const handleAddCoLeader = async (student: CoLeaderMember) => {
+    // 1. Guard against graduated alumni
+    const isGraduated = student.role === 'graduate' || student.role === 'past_leadership' || student.role === 'past_member';
+    if (isGraduated) {
+      await alert({
+        title: 'Alumnus Member Ineligible',
+        message: `${student.full_name} has completed active chapter service and graduated with honors. Graduated members cannot be selected as project co-leaders.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
+    // 2. Guard against kicked out or restricted members
+    if (student.is_restricted || student.role === 'kicked_out') {
+      await alert({
+        title: 'Member Ineligible',
+        message: `${student.full_name} is no longer an active chapter member and cannot be selected as a project co-leader.`,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    // 3. Guard against faculty supervisors
+    if (student.role === 'supervisor' || student.role === 'past_supervisor') {
+      await alert({
+        title: 'Supervisor Ineligible',
+        message: `${student.full_name} is a faculty advisor and cannot be assigned as a student project co-leader.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
     if (!activeSemester?.id) {
       await alert({
         title: 'Active Semester Required',
@@ -228,6 +265,25 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
   const handleSave = async (isSubmitting: boolean) => {
     if (!user || !profile) return;
+
+    const isCurrentUserGraduated = profile.role === 'graduate' || profile.role === 'past_leadership' || profile.role === 'past_member';
+    if (isCurrentUserGraduated) {
+      await alert({
+        title: 'Action Prohibited',
+        message: 'Honors alumni and graduated members have completed active service and cannot create or submit project proposals.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (profile.is_restricted || profile.role === 'kicked_out') {
+      await alert({
+        title: 'Account Restricted',
+        message: 'Your account is restricted. You cannot create or submit project proposals.',
+        variant: 'danger',
+      });
+      return;
+    }
 
     if (isLimitReached) {
       setErrorMsg('Semester Project Limit Reached: Members are permitted a maximum of 2 projects per semester (4 projects per year).');

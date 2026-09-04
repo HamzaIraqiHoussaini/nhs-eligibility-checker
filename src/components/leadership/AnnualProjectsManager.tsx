@@ -29,7 +29,7 @@ export const AnnualProjectsManager: React.FC = () => {
     try {
       const [{ data: pData }, { data: appData }, { data: semData }] = await Promise.all([
         supabase.from('annual_projects').select('*').eq('academic_year', CURRENT_YEAR).order('title'),
-        supabase.from('annual_project_applications').select('*, profiles(full_name, email)').eq('academic_year', CURRENT_YEAR).order('submitted_at'),
+        supabase.from('annual_project_applications').select('*, profiles(full_name, email, role, is_restricted)').eq('academic_year', CURRENT_YEAR).order('submitted_at'),
         supabase.from('semesters').select('id, annual_projects_published').eq('is_active', true).maybeSingle(),
       ]);
       setProjects((pData as AnnualProject[]) || []);
@@ -54,6 +54,26 @@ export const AnnualProjectsManager: React.FC = () => {
 
   const handleAssign = async () => {
     if (!selectedApp || !assignProjectId) return;
+
+    const isGraduated = selectedApp.profiles?.role === 'graduate' || selectedApp.profiles?.role === 'past_leadership' || selectedApp.profiles?.role === 'past_member';
+    if (isGraduated) {
+      await alert({
+        title: 'Assignment Ineligible',
+        message: 'Graduated members have completed active chapter service and cannot be assigned as annual project leaders.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (selectedApp.profiles?.is_restricted || selectedApp.profiles?.role === 'kicked_out') {
+      await alert({
+        title: 'Assignment Prohibited',
+        message: 'Restricted members cannot be assigned as annual project leaders.',
+        variant: 'danger',
+      });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Assign Annual Project',
       message: `Assign "${projectTitle(assignProjectId)}" to ${selectedApp.profiles?.full_name || selectedApp.user_id}?`,

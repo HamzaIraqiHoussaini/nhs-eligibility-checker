@@ -184,7 +184,7 @@ export interface AnnualProjectApplication {
   leadership_notes: string | null;
   submitted_at: string;
   updated_at?: string;
-  profiles?: { full_name: string; email: string };
+  profiles?: { full_name: string; email: string; role?: UserRole; is_restricted?: boolean };
 }
 
 export interface ProjectCoLeader {

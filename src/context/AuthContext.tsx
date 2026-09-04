@@ -12,6 +12,7 @@ interface AuthContextType {
   isSupervisor: boolean;
   isMember: boolean;
   isRestricted: boolean;
+  isGraduated: boolean;
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -85,7 +86,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isLeadership = role === 'leadership';
   const isSupervisor = role === 'supervisor';
   const isMember = role === 'member';
-  const isRestricted = Boolean(profile?.is_restricted);
+  const isRestricted = Boolean(profile?.is_restricted || profile?.role === 'kicked_out');
+  const isGraduated = Boolean(profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member');
 
   return (
     <AuthContext.Provider
@@ -98,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSupervisor,
         isMember,
         isRestricted,
+        isGraduated,
         loading,
         refreshProfile,
         signOut,

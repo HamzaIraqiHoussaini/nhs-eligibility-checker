@@ -81,19 +81,27 @@ export const AttendanceSheet: React.FC = () => {
       const fetchedMeetings = (mData as Meeting[]) || [];
       setMeetings(fetchedMeetings);
 
-      // 2. Fetch all members
+      // 2. Fetch all members (exclude graduated, kicked out/restricted, and supervisors)
       const { data: pData } = await supabase
         .from('profiles')
         .select('*')
         .order('full_name', { ascending: true });
-      setMembers((pData as Profile[]) || []);
 
-      // 3. Compute attendance summaries for all meetings
+      const allProfiles = (pData as Profile[]) || [];
+      const activeMembers = allProfiles.filter((m) => {
+        const isGraduated = m.role === 'graduate' || m.role === 'past_leadership' || m.role === 'past_member';
+        const isKickedOut = m.is_restricted === true || m.role === 'kicked_out';
+        const isSupervisor = m.role === 'supervisor' || m.role === 'past_supervisor';
+        return !isGraduated && !isKickedOut && !isSupervisor;
+      });
+      setMembers(activeMembers);
+
+      // 3. Compute attendance summaries for all meetings (scoped strictly to active members)
       if (fetchedMeetings.length > 0) {
         const meetingIds = fetchedMeetings.map((m) => m.id);
         const { data: aData } = await supabase
           .from('meeting_attendance')
-          .select('meeting_id, status')
+          .select('meeting_id, user_id, status')
           .in('meeting_id', meetingIds);
 
         const summaryMap: Record<string, MeetingSummary> = {};
@@ -101,7 +109,10 @@ export const AttendanceSheet: React.FC = () => {
           summaryMap[m.meeting_date] = { present: 0, absent: 0, excused: 0, total: 0 };
         });
 
+        const activeMemberIdSet = new Set(activeMembers.map((m) => m.id));
+
         aData?.forEach((row: any) => {
+          if (!activeMemberIdSet.has(row.user_id)) return;
           const meeting = fetchedMeetings.find((m) => m.id === row.meeting_id);
           if (meeting) {
             const sum = summaryMap[meeting.meeting_date];
@@ -272,14 +283,21 @@ export const AttendanceSheet: React.FC = () => {
 
         // 2 or more unexcused absences in the semester triggers chapter probation
         if (unexcusedCount >= 2 && !member.is_on_probation && !member.is_restricted) {
+          const newCount = Math.max(1, (member.probation_count || 0) + 1);
+          const willBeRestricted = newCount >= 2;
           await supabase
             .from('profiles')
             .update({
               is_on_probation: true,
-              probation_count: Math.max(1, (member.probation_count || 0) + 1),
+              probation_count: newCount,
               probation_reason: 'attendance',
               probation_notes: `Automated rule trigger: Accumulated ${unexcusedCount} unexcused meeting absences in ${activeSem?.name || 'current semester'}.`,
               probation_updated_at: new Date().toISOString(),
+              is_restricted: willBeRestricted,
+              role: willBeRestricted ? 'kicked_out' : member.role,
+              restricted_reason: willBeRestricted
+                ? 'Dismissed from CAS NHS: Accumulated 2 probations. Account restricted.'
+                : member.restricted_reason,
             })
             .eq('id', member.id);
         } else if (unexcusedCount < 2 && member.is_on_probation && member.probation_reason === 'attendance') {

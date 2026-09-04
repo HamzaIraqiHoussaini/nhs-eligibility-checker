@@ -110,7 +110,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
     loadStats();
   }, [user]);
 
-  const isRestricted = profile?.is_restricted;
+  const isRestricted = profile?.is_restricted || profile?.role === 'kicked_out';
+  const isGraduated = profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member';
   const isOnProbation = profile?.is_on_probation;
   const isLeadership = profile?.role === 'leadership';
   const isSupervisor = profile?.role === 'supervisor';
@@ -136,7 +137,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       </div>
 
       {/* GRADUATE HONORS BANNER */}
-      {profile?.role === 'graduate' ? (
+      {isGraduated ? (
         <div style={{
           padding: '1.5rem',
           backgroundColor: '#EDE9FE',
@@ -149,10 +150,12 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           <Award size={36} color="#6D28D9" style={{ flexShrink: 0 }} />
           <div>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: '#5B21B6' }}>
-              National Honor Society Graduate • Honors Conferred
+              {profile?.role === 'past_leadership' ? 'National Honor Society Past Leadership • Service Concluded' : 'National Honor Society Graduate • Honors Conferred'}
             </div>
             <p style={{ fontSize: '0.88rem', color: '#6D28D9', margin: '0.4rem 0 0' }}>
-              Congratulations! You have completed your active National Honor Society service requirements and officially graduated with chapter honors.
+              {profile?.role === 'past_leadership'
+                ? 'Thank you for your dedicated executive leadership service. You have completed your active chapter tenure.'
+                : 'Congratulations! You have completed your active National Honor Society service requirements and officially graduated with chapter honors.'}
             </p>
           </div>
         </div>
@@ -218,7 +221,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       ) : null}
 
       {/* SEMESTER PARTICIPATION STANDING BANNER */}
-      {!isLeadership && !isSupervisor && profile?.role !== 'graduate' && profile?.role !== 'past_leadership' ? (
+      {!isLeadership && !isSupervisor && !isGraduated && !isRestricted ? (
         <div
           className="sharp-card"
           style={{
@@ -263,7 +266,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
 
             <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer in at least 2 Projects / Sem</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>2. Volunteer at least 2 Projects / Sem</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 700, color: semesterVolunteered >= 2 ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
                   {semesterVolunteered} / 2 Volunteered
                 </div>
@@ -320,13 +323,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         <div className="kpi-card">
           <div className="kpi-label">Projects Led</div>
           <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} proposed)</span></div>
-          <div className="kpi-subtext">{profile?.role === 'graduate' || profile?.role === 'past_leadership' ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
+          <div className="kpi-subtext">{isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
         </div>
 
         <div className="kpi-card">
           <div className="kpi-label">Times Volunteered</div>
           <div className="kpi-value">{semesterVolunteered} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({volunteerCount} total)</span></div>
-          <div className="kpi-subtext">{profile?.role === 'graduate' || profile?.role === 'past_leadership' ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
+          <div className="kpi-subtext">{isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
         </div>
 
         <div className="kpi-card">
@@ -337,7 +340,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="kpi-subtext">
-            {profile?.role === 'graduate' || profile?.role === 'past_leadership'
+            {isGraduated
               ? 'Archived • Attendance exempt'
               : `${attendanceStats.absences} absences (${attendanceStats.absences >= 2 ? 'Probation Triggered' : `${2 - attendanceStats.absences} left before probation`})`}
           </div>

@@ -45,7 +45,7 @@ function projectHasMonetaryCosts(project: ProjectProposal): boolean {
 }
 
 export const MyProjectsView: React.FC = () => {
-  const { user, isRestricted } = useAuth();
+  const { user, isRestricted, isGraduated } = useAuth();
   const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [allApprovedProjects, setAllApprovedProjects] = useState<ProjectProposal[]>([]);
@@ -178,6 +178,24 @@ export const MyProjectsView: React.FC = () => {
   };
 
   const handleAcceptInvite = async (inviteId: string) => {
+    if (isGraduated) {
+      await alert({
+        title: 'Action Ineligible',
+        message: 'Graduated members have completed active chapter service and cannot accept active project co-leadership invitations.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (isRestricted) {
+      await alert({
+        title: 'Account Restricted',
+        message: 'Restricted members cannot accept project co-leadership invitations.',
+        variant: 'danger',
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase.rpc('accept_co_leader_invite', { p_invite_id: inviteId });
       if (error) throw error;
