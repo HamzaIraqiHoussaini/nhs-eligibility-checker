@@ -132,7 +132,7 @@ export interface Meeting {
   created_at: string;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'excused';
+export type AttendanceStatus = 'present' | 'absent' | 'excused' | 'tardy';
 
 export interface MeetingAttendance {
   id: string;
@@ -213,6 +213,8 @@ export interface ChapterRulesConfig {
   required_projects_led: number;
   no_projects_led_required: boolean;
   max_projects_per_semester: number;
+  tardies_per_absence: number;
+  absences_for_probation: number;
   academic_rules_summary?: string | null;
   participation_rules_summary?: string | null;
   probation_rules_summary?: string | null;

@@ -17,6 +17,7 @@ import {
   ArrowDown,
   Layers,
   FileText,
+  CalendarCheck,
 } from 'lucide-react';
 import { useChapterRules, DEFAULT_CHAPTER_RULES } from '../../hooks/useChapterRules';
 import { useAuth } from '../../context/AuthContext';
@@ -423,6 +424,100 @@ export const RulesManagementDesk: React.FC = () => {
             </div>
           </div>
 
+          {/* Card 4: Unexcused Absences for Probation */}
+          <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                  Attendance Governance
+                </span>
+                <CalendarCheck size={16} color="var(--color-terracotta)" />
+              </div>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                Absences for Probation
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 1rem', lineHeight: 1.45 }}>
+                Number of unexcused meeting absences in a single semester that automatically triggers chapter probation.
+              </p>
+            </div>
+
+            <div style={{ paddingTop: '0.85rem', borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '1.4rem' }}>
+                <label htmlFor="absences_for_probation_input" style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  Absences threshold:
+                </label>
+                <input
+                  id="absences_for_probation_input"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.absences_for_probation ?? 2}
+                  onChange={(e) => handleChange('absences_for_probation', Math.max(1, parseInt(e.target.value, 10) || 2))}
+                  style={{
+                    width: '75px',
+                    padding: '0.4rem 0.6rem',
+                    border: '1px solid var(--color-border)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    color: 'var(--color-navy)',
+                  }}
+                />
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>absences</span>
+              </div>
+              <div style={{ marginTop: '0.65rem', fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
+                *Default chapter rule is 2 unexcused absences per semester.
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: Tardies to Unexcused Absence Conversion */}
+          <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                  Attendance Conversion
+                </span>
+                <Clock size={16} color="var(--color-gold)" />
+              </div>
+              <h3 style={{ fontSize: '1.05rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                Tardies per Absence
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: '0 0 1rem', lineHeight: 1.45 }}>
+                Number of recorded meeting tardies that convert into one (1) unexcused meeting absence.
+              </p>
+            </div>
+
+            <div style={{ paddingTop: '0.85rem', borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '1.4rem' }}>
+                <label htmlFor="tardies_per_absence_input" style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  Conversion ratio:
+                </label>
+                <input
+                  id="tardies_per_absence_input"
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.tardies_per_absence ?? 3}
+                  onChange={(e) => handleChange('tardies_per_absence', Math.max(1, parseInt(e.target.value, 10) || 3))}
+                  style={{
+                    width: '75px',
+                    padding: '0.4rem 0.6rem',
+                    border: '1px solid var(--color-border)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    color: 'var(--color-navy)',
+                  }}
+                />
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>tardies = 1 absence</span>
+              </div>
+              <div style={{ marginTop: '0.65rem', fontSize: '0.74rem', color: 'var(--color-text-muted)' }}>
+                *Default rule is 3 tardies = 1 unexcused absence.
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* Live Preview Bar */}
@@ -438,6 +533,9 @@ export const RulesManagementDesk: React.FC = () => {
               </li>
               <li>
                 <strong>Volunteering Quota:</strong> {formData.no_volunteering_required ? 'Waived (No volunteering required this term)' : `Must volunteer in at least ${formData.required_volunteering} initiative(s)`}
+              </li>
+              <li>
+                <strong>Meeting Attendance Rules:</strong> {formData.absences_for_probation ?? 2} unexcused absence{(formData.absences_for_probation ?? 2) === 1 ? '' : 's'} trigger automatic probation (Every {formData.tardies_per_absence ?? 3} tardies = 1 unexcused absence).
               </li>
               {formData.no_projects_led_required && formData.no_volunteering_required && (
                 <li style={{ color: 'var(--color-sage-text)', fontWeight: 600 }}>

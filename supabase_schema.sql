@@ -124,7 +124,7 @@ create table if not exists public.meeting_attendance (
   id uuid default gen_random_uuid() primary key,
   meeting_id uuid references public.meetings(id) on delete cascade not null,
   user_id uuid references public.profiles(id) on delete cascade not null,
-  status text not null check (status in ('present', 'absent', 'excused')),
+  status text not null check (status in ('present', 'absent', 'excused', 'tardy')),
   notes text,
   created_at timestamp with time zone default now(),
   unique (meeting_id, user_id)
@@ -132,58 +132,100 @@ create table if not exists public.meeting_attendance (
 
 -- ==============================================================================
 -- AUTOMATED ATTENDANCE -> PROBATION -> DISMISSAL TRIGGER
--- 2 Absences -> Automatic Probation
+-- Effective Absences = direct absences + floor(tardies / tardies_per_absence)
+-- Threshold reached -> Automatic Probation
 -- 2 Probations -> Automatic Dismissal & Restricted Account
 -- ==============================================================================
 create or replace function public.check_attendance_and_probation()
 returns trigger as $$
 declare
+  v_user_id uuid := coalesce(NEW.user_id, OLD.user_id);
   v_absences integer;
+  v_tardies integer;
+  v_effective_absences integer;
+  v_tardies_per_absence integer := 3;
+  v_absences_for_probation integer := 2;
   v_current_probation_count integer;
+  v_is_on_probation boolean;
+  v_probation_reason text;
 begin
-  -- Count total unexcused absences for the student
+  -- Fetch active chapter rules thresholds
+  select 
+    coalesce(tardies_per_absence, 3),
+    coalesce(absences_for_probation, 2)
+  into v_tardies_per_absence, v_absences_for_probation
+  from public.chapter_rules
+  where id = 'current';
+
+  if v_tardies_per_absence is null or v_tardies_per_absence <= 0 then
+    v_tardies_per_absence := 3;
+  end if;
+  if v_absences_for_probation is null or v_absences_for_probation <= 0 then
+    v_absences_for_probation := 2;
+  end if;
+
+  -- Count total unexcused absences and tardies for the student
   select count(*) into v_absences
   from public.meeting_attendance
-  where user_id = NEW.user_id and status = 'absent';
+  where user_id = v_user_id and status = 'absent';
 
-  -- Get current probation count
-  select probation_count into v_current_probation_count
+  select count(*) into v_tardies
+  from public.meeting_attendance
+  where user_id = v_user_id and status = 'tardy';
+
+  -- Calculate effective unexcused absences
+  v_effective_absences := v_absences + floor(v_tardies / v_tardies_per_absence);
+
+  -- Get current profile standing
+  select is_on_probation, probation_count, probation_reason
+  into v_is_on_probation, v_current_probation_count, v_probation_reason
   from public.profiles
-  where id = NEW.user_id;
+  where id = v_user_id;
 
-  -- 2 Absences rule: Trigger probation if absences reach 2
-  if v_absences >= 2 then
+  -- Absences threshold reached: trigger probation if not already on probation
+  if v_effective_absences >= v_absences_for_probation then
     update public.profiles
     set 
       is_on_probation = true,
       probation_count = coalesce(probation_count, 0) + 1,
       probation_reason = 'attendance',
-      probation_notes = coalesce(probation_notes, '') || ' [Auto: Reached 2 unexcused meeting absences on ' || current_date || ']',
+      probation_notes = coalesce(probation_notes, '') || ' [Auto: Reached ' || v_effective_absences || ' unexcused meeting absences (' || v_absences || ' absences, ' || v_tardies || ' tardies; threshold: ' || v_absences_for_probation || ') on ' || current_date || ']',
       probation_updated_at = now()
-    where id = NEW.user_id and (is_on_probation = false or probation_reason is null);
+    where id = v_user_id and (is_on_probation = false or probation_reason is null);
+  elsif v_effective_absences < v_absences_for_probation and v_is_on_probation and v_probation_reason = 'attendance' then
+    -- Restored below threshold: restore good standing
+    update public.profiles
+    set
+      is_on_probation = false,
+      probation_count = greatest(0, coalesce(probation_count, 1) - 1),
+      probation_reason = null,
+      probation_notes = null,
+      probation_updated_at = now()
+    where id = v_user_id;
   end if;
 
   -- 2 Probations rule: Trigger Dismissal and Account Restriction
   select probation_count into v_current_probation_count
   from public.profiles
-  where id = NEW.user_id;
+  where id = v_user_id;
 
   if v_current_probation_count >= 2 then
     update public.profiles
     set 
+      role = 'kicked_out',
       is_restricted = true,
       is_on_probation = true,
       restricted_reason = 'Dismissed from CAS NHS: Accumulated 2 probations. Account restricted.'
-    where id = NEW.user_id;
+    where id = v_user_id;
   end if;
 
-  return NEW;
+  return coalesce(NEW, OLD);
 end;
 $$ language plpgsql security definer;
 
 drop trigger if exists tr_check_attendance on public.meeting_attendance;
 create trigger tr_check_attendance
-after insert or update on public.meeting_attendance
+after insert or update or delete on public.meeting_attendance
 for each row execute function public.check_attendance_and_probation();
 
 -- ==============================================================================
@@ -1135,6 +1177,8 @@ create table if not exists public.chapter_rules (
   required_projects_led integer not null default 1,
   no_projects_led_required boolean not null default false,
   max_projects_per_semester integer not null default 2,
+  tardies_per_absence integer not null default 3,
+  absences_for_probation integer not null default 2,
   academic_rules_summary text default 'Grade 10: 5.80+ average across academic courses (excluding PE & Design Tech). Grade 11-12: 5.80+ average across assessed IB courses (5.60+ for 4 IB HL candidates). Conduct: Zero Approaching Expectations (AE) or Beginning Expectations (BE) marks.',
   participation_rules_summary text default 'Members are required to lead approved projects and volunteer in chapter initiatives per semester according to active quotas. At least one project per year must be service-based.',
   probation_rules_summary text default 'Probation is triggered by: academic deficiency below GPA standards; conduct flags (AE/BE in more than 1 course); unexcused meeting absences (2 absences); or semester participation deficit.',

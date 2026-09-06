@@ -12,6 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
+import { useChapterRules } from '../../hooks/useChapterRules';
 
 interface PublicHomepageProps {
   onNavigate: (tab: string) => void;
@@ -20,6 +21,7 @@ interface PublicHomepageProps {
 }
 
 export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOpenAuth, user }) => {
+  const { rules } = useChapterRules();
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
   const scrollToSection = (id: string) => {
@@ -521,7 +523,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               4. Meeting Attendance
             </strong>
             <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
-              Attend all general chapter meetings. More than 1 unexcused absence in a semester results in probation.
+              Attend all general chapter meetings. Accumulating {rules.absences_for_probation || 2} unexcused absences ({rules.tardies_per_absence || 3} tardies = 1 absence) in a semester results in chapter probation.
             </p>
           </div>
 

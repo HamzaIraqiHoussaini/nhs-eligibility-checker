@@ -228,11 +228,16 @@ export const ChapterRules: React.FC<ChapterRulesProps> = ({ onNavigate }) => {
             </div>
 
             <div style={{ padding: '1.1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--color-navy)', marginBottom: '0.35rem' }}>4. Meeting Absences (2 Absences)</div>
+              <div style={{ fontWeight: 700, color: 'var(--color-navy)', marginBottom: '0.35rem' }}>
+                4. Meeting Absences & Tardies ({rules.absences_for_probation || 2} Absences)
+              </div>
               <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Having <strong>two unexcused absences</strong> in a semester.
+                Accumulating <strong>{rules.absences_for_probation || 2} unexcused absence{(rules.absences_for_probation || 2) === 1 ? '' : 's'}</strong> in a single semester.
+                <div style={{ marginTop: '0.4rem', color: 'var(--color-text-primary)', fontSize: '0.8rem' }}>
+                  Every <strong>{rules.tardies_per_absence || 3} tardies</strong> count as one (1) unexcused absence.
+                </div>
                 <div style={{ marginTop: '0.4rem', color: 'var(--color-terracotta)', fontWeight: 600, fontSize: '0.78rem' }}>
-                  *Crucial rule: Being 5 minutes late to a meeting constitutes an absence.
+                  *Crucial rule: Arriving late to an official chapter meeting is recorded as a tardy.
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useChapterRules } from '../../hooks/useChapterRules';
 import type { Meeting, Profile, AttendanceStatus } from '../../types/nhs';
 import {
   Calendar as CalendarIcon,
@@ -46,6 +47,7 @@ function formatMondayDisplay(dateStr: string): { dayNum: string; monthShort: str
 
 interface MeetingSummary {
   present: number;
+  tardy: number;
   absent: number;
   excused: number;
   total: number;
@@ -54,6 +56,7 @@ interface MeetingSummary {
 export const AttendanceSheet: React.FC = () => {
   const { user } = useAuth();
   const { alert } = useConfirm();
+  const { rules } = useChapterRules();
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -106,7 +109,7 @@ export const AttendanceSheet: React.FC = () => {
 
         const summaryMap: Record<string, MeetingSummary> = {};
         fetchedMeetings.forEach((m) => {
-          summaryMap[m.meeting_date] = { present: 0, absent: 0, excused: 0, total: 0 };
+          summaryMap[m.meeting_date] = { present: 0, tardy: 0, absent: 0, excused: 0, total: 0 };
         });
 
         const activeMemberIdSet = new Set(activeMembers.map((m) => m.id));
@@ -119,6 +122,7 @@ export const AttendanceSheet: React.FC = () => {
             if (sum) {
               sum.total++;
               if (row.status === 'present') sum.present++;
+              else if (row.status === 'tardy') sum.tardy++;
               else if (row.status === 'absent') sum.absent++;
               else if (row.status === 'excused') sum.excused++;
             }
@@ -280,9 +284,13 @@ export const AttendanceSheet: React.FC = () => {
 
         const { data: memberAtt } = await query;
         const unexcusedCount = (memberAtt || []).filter((r) => r.status === 'absent').length;
+        const tardyCount = (memberAtt || []).filter((r) => r.status === 'tardy').length;
+        const tardiesPerAbsence = rules.tardies_per_absence || 3;
+        const absencesForProbation = rules.absences_for_probation || 2;
+        const effectiveAbsences = unexcusedCount + Math.floor(tardyCount / tardiesPerAbsence);
 
-        // 2 or more unexcused absences in the semester triggers chapter probation
-        if (unexcusedCount >= 2 && !member.is_on_probation && !member.is_restricted) {
+        // Effective absences threshold in semester triggers chapter probation
+        if (effectiveAbsences >= absencesForProbation && !member.is_on_probation && !member.is_restricted) {
           const newCount = Math.max(1, (member.probation_count || 0) + 1);
           const willBeRestricted = newCount >= 2;
           await supabase
@@ -291,7 +299,7 @@ export const AttendanceSheet: React.FC = () => {
               is_on_probation: true,
               probation_count: newCount,
               probation_reason: 'attendance',
-              probation_notes: `Automated rule trigger: Accumulated ${unexcusedCount} unexcused meeting absences in ${activeSem?.name || 'current semester'}.`,
+              probation_notes: `Automated rule trigger: Accumulated ${effectiveAbsences} unexcused meeting absences (${unexcusedCount} absences, ${tardyCount} tardies; threshold: ${absencesForProbation}) in ${activeSem?.name || 'current semester'}.`,
               probation_updated_at: new Date().toISOString(),
               is_restricted: willBeRestricted,
               role: willBeRestricted ? 'kicked_out' : member.role,
@@ -300,8 +308,8 @@ export const AttendanceSheet: React.FC = () => {
                 : member.restricted_reason,
             })
             .eq('id', member.id);
-        } else if (unexcusedCount < 2 && member.is_on_probation && member.probation_reason === 'attendance') {
-          // If absences dropped below 2 and member was on probation due to attendance, restore to Good Standing!
+        } else if (effectiveAbsences < absencesForProbation && member.is_on_probation && member.probation_reason === 'attendance') {
+          // If effective absences dropped below threshold and member was on probation due to attendance, restore to Good Standing!
           await supabase
             .from('profiles')
             .update({
@@ -402,7 +410,7 @@ export const AttendanceSheet: React.FC = () => {
             Chapter Rules Reminder
           </strong>
           <span style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-            Accumulation of two (2) unexcused absences within a single semester constitutes grounds for automatic probationary status. <strong>Being 5 minutes late to a meeting constitutes an absence.</strong> Accumulating two probations results in chapter dismissal and account restriction.
+            Accumulation of {rules.absences_for_probation || 2} unexcused absence{(rules.absences_for_probation || 2) === 1 ? '' : 's'} within a single semester constitutes grounds for automatic probationary status. <strong>Every {rules.tardies_per_absence || 3} tardies count as 1 unexcused absence.</strong> Accumulating two probations results in chapter dismissal and account restriction.
           </span>
         </div>
       </div>
@@ -490,9 +498,16 @@ export const AttendanceSheet: React.FC = () => {
 
                     <div>
                       {hasRecordedAttendance ? (
-                        <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.45rem' }}>
-                          Filed
-                        </span>
+                        <div style={{ textAlign: 'right' }}>
+                          <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.45rem' }}>
+                            Filed
+                          </span>
+                          {summary && (
+                            <div style={{ fontSize: '0.66rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                              {summary.present}P{summary.tardy > 0 ? ` • ${summary.tardy}T` : ''} • {summary.absent}A
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.68rem', padding: '0.2rem 0.45rem' }}>
                           Pending
@@ -580,15 +595,16 @@ export const AttendanceSheet: React.FC = () => {
                   <th style={{ padding: '0.75rem 1.25rem' }}>Inducted Member</th>
                   <th style={{ padding: '0.75rem 1.25rem' }}>Standing</th>
                   <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Check-in Status</th>
-                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Present</th>
-                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Absent</th>
-                  <th style={{ padding: '0.75rem 1.25rem', textAlign: 'center' }}>Excused</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Present</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tardy</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Absent</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Excused</th>
                 </tr>
               </thead>
               <tbody>
                 {members.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                       No active members found on chapter roll.
                     </td>
                   </tr>
@@ -624,6 +640,10 @@ export const AttendanceSheet: React.FC = () => {
                             <span className="status-pill eligible" style={{ fontSize: '0.7rem' }}>
                               Present
                             </span>
+                          ) : status === 'tardy' ? (
+                            <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', fontSize: '0.7rem' }}>
+                              Tardy
+                            </span>
                           ) : status === 'absent' ? (
                             <span className="status-pill ineligible" style={{ fontSize: '0.7rem' }}>
                               Absent
@@ -640,7 +660,7 @@ export const AttendanceSheet: React.FC = () => {
                         </td>
 
                         {/* Present Radio */}
-                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1rem' }}>
                           <button
                             type="button"
                             onClick={() => handleStatusChange(member.id, 'present')}
@@ -658,8 +678,27 @@ export const AttendanceSheet: React.FC = () => {
                           </button>
                         </td>
 
+                        {/* Tardy Radio */}
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(member.id, 'tardy')}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: status === 'tardy' ? '2px solid var(--color-gold)' : '1px solid var(--color-border)',
+                              backgroundColor: status === 'tardy' ? '#FEF3C7' : '#FFFFFF',
+                              color: status === 'tardy' ? '#B45309' : 'var(--color-text-muted)',
+                            }}
+                          >
+                            Tardy
+                          </button>
+                        </td>
+
                         {/* Absent Radio */}
-                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1rem' }}>
                           <button
                             type="button"
                             onClick={() => handleStatusChange(member.id, 'absent')}
@@ -678,7 +717,7 @@ export const AttendanceSheet: React.FC = () => {
                         </td>
 
                         {/* Excused Radio */}
-                        <td style={{ textAlign: 'center', padding: '0.75rem 1.25rem' }}>
+                        <td style={{ textAlign: 'center', padding: '0.75rem 1rem' }}>
                           <button
                             type="button"
                             onClick={() => handleStatusChange(member.id, 'excused')}

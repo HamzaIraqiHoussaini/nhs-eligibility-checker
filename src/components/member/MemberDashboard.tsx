@@ -13,7 +13,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
   const { rules } = useChapterRules();
   const [projectCount, setProjectCount] = useState(0);
   const [volunteerCount, setVolunteerCount] = useState(0);
-  const [attendanceStats, setAttendanceStats] = useState({ attended: 0, total: 0, absences: 0 });
+  const [attendanceStats, setAttendanceStats] = useState({ attended: 0, total: 0, absences: 0, tardies: 0 });
   const [semesterProjectsLed, setSemesterProjectsLed] = useState(0);
   const [semesterVolunteered, setSemesterVolunteered] = useState(0);
   const [activeSemesterName, setActiveSemesterName] = useState('Current Semester');
@@ -95,7 +95,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         const meetingIds = (semMeetings || []).map((m: any) => m.id);
 
         if (meetingIds.length === 0) {
-          setAttendanceStats({ attended: 0, total: 0, absences: 0 });
+          setAttendanceStats({ attended: 0, total: 0, absences: 0, tardies: 0 });
           return;
         }
         attQuery = attQuery.in('meeting_id', meetingIds);
@@ -104,8 +104,9 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       const { data: attData } = await attQuery;
       if (attData) {
         const attended = attData.filter(a => a.status === 'present').length;
+        const tardies = attData.filter(a => a.status === 'tardy').length;
         const absences = attData.filter(a => a.status === 'absent').length;
-        setAttendanceStats({ attended, total: attData.length, absences });
+        setAttendanceStats({ attended, total: attData.length, absences, tardies });
       }
     };
 
@@ -117,6 +118,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
   const isOnProbation = profile?.is_on_probation;
   const isLeadership = profile?.role === 'leadership';
   const isSupervisor = profile?.role === 'supervisor';
+
+  const tardiesPerAbsence = rules.tardies_per_absence || 3;
+  const absencesForProbation = rules.absences_for_probation || 2;
+  const effectiveAbsences = attendanceStats.absences + Math.floor(attendanceStats.tardies / tardiesPerAbsence);
+  const remainingBeforeProbation = Math.max(0, absencesForProbation - effectiveAbsences);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
@@ -207,7 +213,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
                 : profile?.probation_reason === 'behavior'
                 ? 'Conduct & Effort (Received AE or BE marks on report card)'
                 : profile?.probation_reason === 'attendance'
-                ? 'Attendance Violation (Accumulated 2 unexcused meeting absences)'
+                ? `Attendance Violation (Accumulated ${rules.absences_for_probation || 2} unexcused meeting absences)`
                 : 'Trimester Inactivity (No NHS activity logged in current trimester)'}
             </p>
             {profile?.probation_notes && (
@@ -358,13 +364,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           <div className="kpi-label">Meeting Attendance</div>
           <div className="kpi-value">
             {attendanceStats.total > 0
-              ? `${Math.round((attendanceStats.attended / attendanceStats.total) * 100)}%`
+              ? `${Math.round(((attendanceStats.attended + attendanceStats.tardies) / attendanceStats.total) * 100)}%`
               : '100%'}
           </div>
           <div className="kpi-subtext">
             {isGraduated
               ? 'Archived • Attendance exempt'
-              : `${attendanceStats.absences} absences (${attendanceStats.absences >= 2 ? 'Probation Triggered' : `${2 - attendanceStats.absences} left before probation`})`}
+              : `${attendanceStats.absences} absent, ${attendanceStats.tardies} tardy (${effectiveAbsences >= absencesForProbation ? 'Probation Triggered' : `${remainingBeforeProbation} left before probation`})`}
           </div>
         </div>
 

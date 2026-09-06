@@ -145,7 +145,11 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
   const pendingProposals = allProposals.filter(p => p.status !== 'approved' && p.status !== 'completed');
 
   const attendedCount = attendanceRecords.filter(a => a.status === 'present').length;
+  const tardyCount = attendanceRecords.filter(a => a.status === 'tardy').length;
   const absenceCount = attendanceRecords.filter(a => a.status === 'absent').length;
+  const tardiesPerAbsence = rules.tardies_per_absence || 3;
+  const absencesForProbation = rules.absences_for_probation || 2;
+  const effectiveAbsences = absenceCount + Math.floor(tardyCount / tardiesPerAbsence);
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
@@ -474,12 +478,13 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
           {/* Section 3: Attendance Breakdown */}
           <section>
             <div className="drawer-section-title">
-              Meeting Attendance Record ({attendedCount} Attended / {attendanceRecords.length} Total)
+              Meeting Attendance Record ({attendedCount} Present, {tardyCount} Tardy / {attendanceRecords.length} Total)
             </div>
             <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.82rem' }}>
               <div><strong>Present:</strong> {attendedCount} meetings</div>
-              <div style={{ color: absenceCount > 0 ? 'var(--color-terracotta)' : 'inherit' }}>
-                <strong>Unexcused Absences:</strong> {absenceCount} {absenceCount >= 2 ? '(Triggered Probation)' : ''}
+              <div><strong>Tardies:</strong> {tardyCount} meetings (Every {tardiesPerAbsence} tardies = 1 unexcused absence)</div>
+              <div style={{ color: effectiveAbsences > 0 ? 'var(--color-terracotta)' : 'inherit', marginTop: '0.25rem' }}>
+                <strong>Effective Absences:</strong> {effectiveAbsences} ({absenceCount} unexcused + {Math.floor(tardyCount / tardiesPerAbsence)} from tardies) {effectiveAbsences >= absencesForProbation ? '(Triggered Probation)' : `(${Math.max(0, absencesForProbation - effectiveAbsences)} left before probation)`}
               </div>
             </div>
           </section>

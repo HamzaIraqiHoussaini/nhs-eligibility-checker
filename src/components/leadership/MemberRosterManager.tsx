@@ -711,7 +711,7 @@ export const MemberRosterManager: React.FC = () => {
                 >
                   <option value="grades">Grades (Fell below required 5.8 / 5.6 average)</option>
                   <option value="behavior">Behavior / Conduct (AEs or BEs in more than one class)</option>
-                  <option value="attendance">Attendance (2 unexcused meeting absences — 5m late = absent)</option>
+                  <option value="attendance">Attendance ({rules.absences_for_probation || 2} unexcused meeting absences — {rules.tardies_per_absence || 3} tardies = 1 absence)</option>
                   <option value="inactivity">Participation Deficit (Failed to lead 1 project & volunteer twice in semester)</option>
                 </select>
               </div>

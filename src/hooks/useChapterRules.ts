@@ -9,6 +9,8 @@ export const DEFAULT_CHAPTER_RULES: ChapterRulesConfig = {
   required_projects_led: 1,
   no_projects_led_required: false,
   max_projects_per_semester: 2,
+  tardies_per_absence: 3,
+  absences_for_probation: 2,
   academic_rules_summary: 'Grade 10: 5.80+ average across academic courses (excluding PE & Design Tech). Grade 11-12: 5.80+ average across assessed IB courses (5.60+ for 4 IB HL candidates). Conduct: Zero Approaching Expectations (AE) or Beginning Expectations (BE) marks.',
   participation_rules_summary: 'Members are required to lead approved projects and volunteer in chapter initiatives per semester according to active quotas. At least one project per year must be service-based.',
   probation_rules_summary: 'Probation is triggered by: academic deficiency below GPA standards; conduct flags (AE/BE in more than 1 course); unexcused meeting absences (2 absences); or semester participation deficit.',
@@ -44,6 +46,8 @@ export const useChapterRules = () => {
           required_projects_led: Number(data.required_projects_led ?? 1),
           no_projects_led_required: Boolean(data.no_projects_led_required),
           max_projects_per_semester: Number(data.max_projects_per_semester ?? 2),
+          tardies_per_absence: Number(data.tardies_per_absence ?? 3),
+          absences_for_probation: Number(data.absences_for_probation ?? 2),
           academic_rules_summary: data.academic_rules_summary ?? DEFAULT_CHAPTER_RULES.academic_rules_summary,
           participation_rules_summary: data.participation_rules_summary ?? DEFAULT_CHAPTER_RULES.participation_rules_summary,
           probation_rules_summary: data.probation_rules_summary ?? DEFAULT_CHAPTER_RULES.probation_rules_summary,
@@ -100,6 +104,8 @@ export const useChapterRules = () => {
           required_projects_led: Number(data.required_projects_led ?? prev.required_projects_led),
           no_projects_led_required: Boolean(data.no_projects_led_required),
           max_projects_per_semester: Number(data.max_projects_per_semester ?? prev.max_projects_per_semester),
+          tardies_per_absence: Number(data.tardies_per_absence ?? prev.tardies_per_absence),
+          absences_for_probation: Number(data.absences_for_probation ?? prev.absences_for_probation),
         }));
       }
 
