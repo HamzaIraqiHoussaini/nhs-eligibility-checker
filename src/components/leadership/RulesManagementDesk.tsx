@@ -11,11 +11,17 @@ import {
   Users,
   BookOpen,
   Check,
+  Plus,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  Layers,
+  FileText,
 } from 'lucide-react';
 import { useChapterRules, DEFAULT_CHAPTER_RULES } from '../../hooks/useChapterRules';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import type { ChapterRulesConfig } from '../../types/nhs';
+import type { ChapterRulesConfig, CustomRuleSection } from '../../types/nhs';
 
 export const RulesManagementDesk: React.FC = () => {
   const { user } = useAuth();
@@ -40,6 +46,47 @@ export const RulesManagementDesk: React.FC = () => {
       setHasChanges(true);
       return updated;
     });
+  };
+
+  const handleAddSection = () => {
+    const currentSections = formData.custom_sections || [];
+    const newSection: CustomRuleSection = {
+      id: `sec_${Date.now()}`,
+      title: `Rule Section ${6 + currentSections.length + 1}`,
+      content: '',
+    };
+    handleChange('custom_sections', [...currentSections, newSection]);
+  };
+
+  const handleUpdateSection = (id: string, field: 'title' | 'content', value: string) => {
+    const updated = (formData.custom_sections || []).map((sec) =>
+      sec.id === id ? { ...sec, [field]: value } : sec
+    );
+    handleChange('custom_sections', updated);
+  };
+
+  const handleDeleteSection = async (id: string, title: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Rule Section',
+      message: `Are you sure you want to remove "${title || 'this section'}"? This section will no longer appear on the Chapter Rules page upon saving.`,
+      confirmText: 'Delete Section',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    const updated = (formData.custom_sections || []).filter((sec) => sec.id !== id);
+    handleChange('custom_sections', updated);
+  };
+
+  const handleMoveSection = (index: number, direction: 'up' | 'down') => {
+    const list = [...(formData.custom_sections || [])];
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+
+    const temp = list[index];
+    list[index] = list[targetIdx];
+    list[targetIdx] = temp;
+    handleChange('custom_sections', list);
   };
 
   const handleSave = async (e?: React.FormEvent) => {
@@ -551,13 +598,177 @@ export const RulesManagementDesk: React.FC = () => {
 
         </div>
 
-        {/* Bottom Save Bar */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)', gap: '0.75rem', alignItems: 'center' }}>
-          {rules.updated_at && (
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginRight: 'auto' }}>
+      </div>
+
+      {/* SECTION 3: DYNAMIC CUSTOM RULE SECTIONS */}
+      <div className="sharp-card" style={{ padding: '1.75rem', marginBottom: '2rem', borderTop: '4px solid var(--color-gold)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <Layers size={20} color="var(--color-gold-text)" />
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: 'var(--color-navy)', margin: 0 }}>
+                Custom Rule Sections
+              </h2>
+              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                Add custom numbered sections that will be rendered directly on the official Chapter Rules page.
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleAddSection}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.84rem', padding: '0.5rem 1rem' }}
+          >
+            <Plus size={15} /> Add New Section
+          </button>
+        </div>
+
+        {(!formData.custom_sections || formData.custom_sections.length === 0) ? (
+          <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', border: '2px dashed var(--color-border)', backgroundColor: '#F8FAFC' }}>
+            <FileText size={28} color="var(--color-text-muted)" style={{ margin: '0 auto 0.65rem' }} />
+            <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--color-navy)' }}>No Custom Sections Added Yet</div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', maxWidth: '500px', margin: '0.35rem auto 1rem' }}>
+              Add custom sections to incorporate policies such as Attendance Demerits, Community Service Partners, Officer Transition Rules, or Graduation Regalia Criteria.
+            </p>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleAddSection}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.82rem' }}
+            >
+              <Plus size={14} /> Add First Section
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {formData.custom_sections.map((section, idx) => (
+              <div
+                key={section.id}
+                style={{
+                  padding: '1.25rem',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: '#FFFFFF',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', paddingBottom: '0.65rem', borderBottom: '1px solid #F1F5F9' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="grade-badge" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', fontWeight: 700 }}>
+                      Section {6 + idx + 1}
+                    </span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-navy)' }}>
+                      {section.title || `Untitled Section ${idx + 1}`}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <button
+                      type="button"
+                      className="btn-inspect"
+                      disabled={idx === 0}
+                      onClick={() => handleMoveSection(idx, 'up')}
+                      title="Move section up"
+                      style={{ padding: '0.3rem 0.5rem', opacity: idx === 0 ? 0.35 : 1 }}
+                    >
+                      <ArrowUp size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-inspect"
+                      disabled={idx === (formData.custom_sections?.length || 0) - 1}
+                      onClick={() => handleMoveSection(idx, 'down')}
+                      title="Move section down"
+                      style={{ padding: '0.3rem 0.5rem', opacity: idx === (formData.custom_sections?.length || 0) - 1 ? 0.35 : 1 }}
+                    >
+                      <ArrowDown size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-inspect"
+                      onClick={() => handleDeleteSection(section.id, section.title)}
+                      title="Delete section"
+                      style={{ padding: '0.3rem 0.5rem', color: 'var(--color-terracotta)', borderColor: '#FECACA' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                      Section Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Officer Elections & Executive Board Qualifications"
+                      value={section.title}
+                      onChange={(e) => handleUpdateSection(section.id, 'title', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.75rem',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        color: 'var(--color-navy)',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                      Section Content & Rules Text
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder="Enter the rules, guidelines, eligibility criteria, or procedures for this section..."
+                      value={section.content}
+                      onChange={(e) => handleUpdateSection(section.id, 'content', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 0.75rem',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '0.85rem',
+                        lineHeight: 1.5,
+                        color: 'var(--color-text-primary)',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Global Bottom Save Bar */}
+      <div className="sharp-card" style={{ padding: '1.25rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#FFFFFF' }}>
+        <div>
+          {rules.updated_at ? (
+            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
               Last saved: {new Date(rules.updated_at).toLocaleString()}
             </span>
+          ) : (
+            <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+              Chapter default constitution active
+            </span>
           )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleRestoreDefaults}
+            style={{ fontSize: '0.82rem', padding: '0.55rem 1rem' }}
+          >
+            <RotateCcw size={14} /> Restore Defaults
+          </button>
 
           <button
             type="button"
@@ -577,7 +788,6 @@ export const RulesManagementDesk: React.FC = () => {
             {saving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Rules & Quotas'}
           </button>
         </div>
-
       </div>
 
     </div>

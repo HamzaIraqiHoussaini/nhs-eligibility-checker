@@ -200,6 +200,12 @@ export interface ProjectCoLeader {
   project?: ProjectProposal;
 }
 
+export interface CustomRuleSection {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface ChapterRulesConfig {
   id: string;
   required_volunteering: number;
@@ -212,9 +218,11 @@ export interface ChapterRulesConfig {
   probation_rules_summary?: string | null;
   dismissal_rules_summary?: string | null;
   custom_bylaws?: string | null;
+  custom_sections?: CustomRuleSection[] | null;
   updated_by?: string | null;
   updated_at?: string | null;
 }
+
 
 
 

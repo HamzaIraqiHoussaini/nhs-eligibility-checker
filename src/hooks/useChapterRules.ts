@@ -14,6 +14,7 @@ export const DEFAULT_CHAPTER_RULES: ChapterRulesConfig = {
   probation_rules_summary: 'Probation is triggered by: academic deficiency below GPA standards; conduct flags (AE/BE in more than 1 course); unexcused meeting absences (2 absences); or semester participation deficit.',
   dismissal_rules_summary: 'Grounds for immediate dismissal and restricted account status: incurring multiple probations (more than once); major code of conduct or academic integrity violations (cheating, plagiarism, substance possession).',
   custom_bylaws: '',
+  custom_sections: [],
 };
 
 export const useChapterRules = () => {
@@ -48,6 +49,7 @@ export const useChapterRules = () => {
           probation_rules_summary: data.probation_rules_summary ?? DEFAULT_CHAPTER_RULES.probation_rules_summary,
           dismissal_rules_summary: data.dismissal_rules_summary ?? DEFAULT_CHAPTER_RULES.dismissal_rules_summary,
           custom_bylaws: data.custom_bylaws ?? '',
+          custom_sections: Array.isArray(data.custom_sections) ? data.custom_sections : [],
           updated_by: data.updated_by,
           updated_at: data.updated_at,
         });

@@ -1140,6 +1140,7 @@ create table if not exists public.chapter_rules (
   probation_rules_summary text default 'Probation is triggered by: academic deficiency below GPA standards; conduct flags (AE/BE in more than 1 course); unexcused meeting absences (2 absences); or semester participation deficit.',
   dismissal_rules_summary text default 'Grounds for immediate dismissal and restricted account status: incurring multiple probations (more than once); major code of conduct or academic integrity violations (cheating, plagiarism, substance possession).',
   custom_bylaws text default '',
+  custom_sections jsonb default '[]'::jsonb,
   updated_by uuid references public.profiles(id),
   updated_at timestamp with time zone default now()
 );

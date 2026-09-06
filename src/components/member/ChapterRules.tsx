@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ShieldAlert, GraduationCap, AlertTriangle, XCircle, Award, CheckCircle2, Clock, Users, Scale, FileText, Lock } from 'lucide-react';
+import { BookOpen, ShieldAlert, GraduationCap, AlertTriangle, XCircle, Award, CheckCircle2, Clock, Users, Scale, FileText, Lock, Bookmark } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { useAuth } from '../../context/AuthContext';
@@ -411,6 +411,54 @@ export const ChapterRules: React.FC<ChapterRulesProps> = ({ onNavigate }) => {
               {rules.custom_bylaws}
             </div>
           </div>
+        )}
+
+        {/* Custom Dynamic Rule Sections added by Chapter Leadership */}
+        {rules.custom_sections && rules.custom_sections.length > 0 && (
+          rules.custom_sections.map((sec, idx) => {
+            const hasCustomBylaws = Boolean(rules.custom_bylaws && rules.custom_bylaws.trim());
+            const sectionNumber = 6 + (hasCustomBylaws ? 1 : 0) + idx + 1;
+            return (
+              <div
+                key={sec.id || idx}
+                className="sharp-card"
+                style={{ padding: '2rem', borderLeft: '4px solid var(--color-gold)' }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    marginBottom: '1.25rem',
+                    borderBottom: '1px solid var(--color-border)',
+                    paddingBottom: '0.75rem',
+                  }}
+                >
+                  <Bookmark size={22} color="var(--color-gold)" />
+                  <h2
+                    style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '1.5rem',
+                      color: 'var(--color-navy)',
+                      margin: 0,
+                    }}
+                  >
+                    {sectionNumber}. {sec.title || `Chapter Policy Section ${idx + 1}`}
+                  </h2>
+                </div>
+                <div
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.6,
+                    fontSize: '0.88rem',
+                    color: 'var(--color-text-primary)',
+                  }}
+                >
+                  {sec.content}
+                </div>
+              </div>
+            );
+          })
         )}
 
       </div>
