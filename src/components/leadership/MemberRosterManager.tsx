@@ -6,12 +6,14 @@ import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
 import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useChapterRules } from '../../hooks/useChapterRules';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
 export const MemberRosterManager: React.FC = () => {
   const { user, isLeadership } = useAuth();
   const { confirm, alert } = useConfirm();
+  const { rules } = useChapterRules();
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   const [members, setMembers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,16 +79,31 @@ export const MemberRosterManager: React.FC = () => {
         semVolunteers = (vData || []).filter((v: any) => v.attended === true || v.status === 'confirmed');
       }
 
+      // Fetch active chapter rules & quotas
+      const { data: rulesData } = await supabase
+        .from('chapter_rules')
+        .select('*')
+        .eq('id', 'current')
+        .maybeSingle();
+
+      const reqProjectsLed = Number(rulesData?.required_projects_led ?? 1);
+      const noProjectsLedReq = Boolean(rulesData?.no_projects_led_required);
+      const reqVolunteering = Number(rulesData?.required_volunteering ?? 2);
+      const noVolunteeringReq = Boolean(rulesData?.no_volunteering_required);
+
       const map: Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }> = {};
       for (const m of mems) {
         const ledCount = semApprovedLedProposals.filter((p: any) =>
           p.creator_id === m.id || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.includes(m.email))
         ).length;
         const volCount = semVolunteers.filter((v: any) => v.user_id === m.id).length;
+        const meetsProjects = noProjectsLedReq || ledCount >= reqProjectsLed;
+        const meetsVolunteering = noVolunteeringReq || volCount >= reqVolunteering;
+
         map[m.id] = {
           ledCount,
           volCount,
-          meetsQuota: ledCount >= 1 && volCount >= 2,
+          meetsQuota: meetsProjects && meetsVolunteering,
         };
       }
       setParticipationMap(map);
@@ -570,13 +587,17 @@ export const MemberRosterManager: React.FC = () => {
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Leadership)</span>
                     ) : isRestrictedMember(member) ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
+                    ) : (rules.no_projects_led_required && rules.no_volunteering_required) ? (
+                      <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                        <CheckCircle2 size={11} /> Waived (Quota Exempt)
+                      </span>
                     ) : part.meetsQuota ? (
                       <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
-                        <CheckCircle2 size={11} /> Met ({part.ledCount}L • {part.volCount}V)
+                        <CheckCircle2 size={11} /> Met ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}V`})
                       </span>
                     ) : (
-                      <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} title="Must lead >= 1 project and volunteer >= 2 projects per semester">
-                        <AlertTriangle size={11} /> Deficit ({part.ledCount}/1L • {part.volCount}/2V)
+                      <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} title={`Must lead >= ${rules.required_projects_led} project(s) and volunteer in >= ${rules.required_volunteering} initiative(s) per semester`}>
+                        <AlertTriangle size={11} /> Deficit ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}/${rules.required_projects_led}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}/${rules.required_volunteering}V`})
                       </span>
                     )}
                   </td>
@@ -617,7 +638,11 @@ export const MemberRosterManager: React.FC = () => {
                               onClick={() => {
                                 setProbationTarget(member);
                                 setProbationReason(part.meetsQuota ? 'grades' : 'inactivity');
-                                setProbationNotes(part.meetsQuota ? '' : `Semester participation deficit: Has only led ${part.ledCount}/1 project and volunteered in ${part.volCount}/2 projects in ${activeSemester?.name || 'current semester'}.`);
+                                setProbationNotes(
+                                  part.meetsQuota
+                                    ? ''
+                                    : `Semester participation deficit in ${activeSemester?.name || 'current semester'}: Member has ${rules.no_projects_led_required ? '' : `led ${part.ledCount}/${rules.required_projects_led} project(s)`}${!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}${rules.no_volunteering_required ? '' : `volunteered in ${part.volCount}/${rules.required_volunteering} initiative(s)`}.`
+                                );
                               }}
                               title="Place member on Chapter Probation #1"
                             >

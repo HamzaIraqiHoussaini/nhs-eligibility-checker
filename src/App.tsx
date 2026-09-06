@@ -15,6 +15,7 @@ import { SemesterSettings } from './components/leadership/SemesterSettings';
 import { AllowlistManager } from './components/leadership/AllowlistManager';
 import { ChapterTreasuryLedger } from './components/treasury/ChapterTreasuryLedger';
 import { AnnualProjectsManager } from './components/leadership/AnnualProjectsManager';
+import { RulesManagementDesk } from './components/leadership/RulesManagementDesk';
 import { PublicHomepage } from './components/public/PublicHomepage';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { TermsAndPrivacyView } from './components/legal/TermsAndPrivacyView';
@@ -36,6 +37,7 @@ import {
   Coins,
   Star,
   Award,
+  Scale,
 } from 'lucide-react';
 import './index.css';
 
@@ -45,6 +47,7 @@ type ActiveTab =
   | 'projects'
   | 'screener'
   | 'rules'
+  | 'rules_management'
   | 'review'
   | 'annual_projects_desk'
   | 'attendance'
@@ -60,6 +63,7 @@ const TAB_ROUTES: Record<ActiveTab, string> = {
   projects: '/project_hub',
   screener: '/screener',
   rules: '/rules',
+  rules_management: '/rules_management',
   review: '/review_desk',
   annual_projects_desk: '/annual_projects_desk',
   attendance: '/attendance',
@@ -83,6 +87,9 @@ const PATH_TO_TAB: Record<string, ActiveTab> = {
   '/eligibility': 'screener',
   '/rules': 'rules',
   '/bylaws': 'rules',
+  '/rules_management': 'rules_management',
+  '/rules/manage': 'rules_management',
+  '/governance/rules': 'rules_management',
   '/review': 'review',
   '/review_desk': 'review',
   '/attendance': 'attendance',
@@ -500,6 +507,15 @@ function PortalContent() {
 
                   <button
                     type="button"
+                    className={`stitch-nav-item ${activeTab === 'rules_management' ? 'active' : ''}`}
+                    onClick={() => navigateTo('rules_management')}
+                  >
+                    <Scale size={16} />
+                    <span>Rules & Policies</span>
+                  </button>
+
+                  <button
+                    type="button"
                     className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
                     onClick={() => navigateTo('roster')}
                   >
@@ -644,7 +660,8 @@ function PortalContent() {
               {activeTab === 'annual_projects_desk' && isLeadership && isSemester2 && (
                 <AnnualProjectsManager />
               )}
-              {activeTab === 'rules' && <ChapterRules />}
+              {activeTab === 'rules' && <ChapterRules onNavigate={(t) => navigateTo(t as ActiveTab)} />}
+              {activeTab === 'rules_management' && isLeadership && <RulesManagementDesk />}
               {activeTab === 'review' && isLeadership && <TwoStageReviewDesk />}
               {activeTab === 'review' && !isLeadership && (
                 // Non-leadership members who navigate directly to /review_desk are sent to dashboard

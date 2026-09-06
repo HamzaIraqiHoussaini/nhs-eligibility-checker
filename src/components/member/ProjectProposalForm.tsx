@@ -5,6 +5,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal, ProposalStatus } from '../../types/nhs';
 import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save, Clock } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useChapterRules } from '../../hooks/useChapterRules';
 
 interface CoLeaderMember {
   id: string;
@@ -34,6 +35,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 }) => {
   const { user, profile } = useAuth();
   const { alert } = useConfirm();
+  const { rules } = useChapterRules();
   const isEditing = Boolean(initialData);
 
   const [projectTitle, setProjectTitle] = useState(initialData?.project_title || '');
@@ -244,8 +246,9 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
 
   if (!isOpen) return null;
 
-  // Maximum 2 projects per semester rule enforcement (only for new proposals)
-  const isLimitReached = !isEditing && currentMemberProjectCount >= 2;
+  // Maximum projects per semester rule enforcement (only for new proposals)
+  const maxAllowed = rules.max_projects_per_semester || 2;
+  const isLimitReached = !isEditing && currentMemberProjectCount >= maxAllowed;
 
   const handleArrayChange = (setter: React.Dispatch<React.SetStateAction<string[]>>, index: number, value: string) => {
     setter(prev => {
@@ -286,7 +289,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
     }
 
     if (isLimitReached) {
-      setErrorMsg('Semester Project Limit Reached: Members are permitted a maximum of 2 projects per semester (4 projects per year).');
+      setErrorMsg(`Semester Project Limit Reached: Chapter rules limit members to a maximum of ${maxAllowed} project(s) per semester.`);
       return;
     }
 
@@ -561,7 +564,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             }}
           >
             <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: '-2px' }} />
-            <strong>Proposal Limit Exceeded:</strong> Chapter rules limit each member to a maximum of 2 projects per semester (4 projects per year). You cannot submit additional proposals for this term.
+            <strong>Proposal Limit Exceeded:</strong> Chapter rules limit each member to a maximum of {maxAllowed} project(s) per semester. You cannot submit additional proposals for this term.
           </div>
         )}
 

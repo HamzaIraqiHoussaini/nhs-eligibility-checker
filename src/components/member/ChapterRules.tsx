@@ -1,22 +1,51 @@
 import React, { useState } from 'react';
 import { BookOpen, ShieldAlert, GraduationCap, AlertTriangle, XCircle, Award, CheckCircle2, Clock, Users, Scale, FileText, Lock } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
+import { useChapterRules } from '../../hooks/useChapterRules';
+import { useAuth } from '../../context/AuthContext';
 
-export const ChapterRules: React.FC = () => {
+interface ChapterRulesProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const ChapterRules: React.FC<ChapterRulesProps> = ({ onNavigate }) => {
+  const { isLeadership } = useAuth();
+  const { rules } = useChapterRules();
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-gold-text)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          <BookOpen size={16} /> Official Chapter Rules
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-gold-text)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+            <BookOpen size={16} /> Official Chapter Rules
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
+            CAS National Honor Society Rules
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', marginTop: '0.35rem' }}>
+            Official academic requirements, participation quotas, probation rules, and dismissal criteria for the Casablanca American School Chapter.
+          </p>
         </div>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-          CAS National Honor Society Rules
-        </h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem', marginTop: '0.35rem' }}>
-          Official academic requirements, participation quotas, probation rules, and dismissal criteria for the Casablanca American School Chapter.
-        </p>
+
+        {isLeadership && onNavigate && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => onNavigate('rules_management')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              padding: '0.6rem 1.15rem',
+            }}
+          >
+            <Scale size={15} />
+            <span>Manage Rules & Quotas</span>
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -110,31 +139,45 @@ export const ChapterRules: React.FC = () => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <CheckCircle2 size={16} color="var(--color-sage)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Lead at Least 1 Project / Semester</strong>
+                <CheckCircle2 size={16} color={rules.no_projects_led_required ? 'var(--color-text-muted)' : 'var(--color-sage)'} />
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+                  {rules.no_projects_led_required
+                    ? 'Projects Led: Waived for Active Term'
+                    : `Lead at Least ${rules.required_projects_led} Project${rules.required_projects_led > 1 ? 's' : ''} / Semester`}
+                </strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                All members are required to propose and lead at least <strong>one approved project per semester</strong>.
+                {rules.no_projects_led_required
+                  ? 'Chapter Leadership has determined that no projects led are required for this semester. All members receive an automatic exemption.'
+                  : `All members are required to propose and lead at least ${rules.required_projects_led} approved project${rules.required_projects_led > 1 ? 's' : ''} per semester.`}
               </p>
             </div>
 
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                <Users size={16} color="var(--color-oxford)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Volunteer in at Least 2 Projects / Semester</strong>
+                <Users size={16} color={rules.no_volunteering_required ? 'var(--color-text-muted)' : 'var(--color-oxford)'} />
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+                  {rules.no_volunteering_required
+                    ? 'Volunteering: Waived for Active Term'
+                    : `Volunteer in at Least ${rules.required_volunteering} Initiative${rules.required_volunteering > 1 ? 's' : ''} / Semester`}
+                </strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                All members are required to volunteer in at least <strong>2 projects a semester</strong> (excluding their yearly project).
+                {rules.no_volunteering_required
+                  ? 'Chapter Leadership has determined that no volunteering initiatives are required for this semester. All members receive an automatic exemption.'
+                  : `All members are required to volunteer in at least ${rules.required_volunteering} project${rules.required_volunteering > 1 ? 's' : ''} a semester (excluding their yearly project).`}
               </p>
             </div>
 
             <div style={{ padding: '1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', gridColumn: '1 / -1' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <Clock size={16} color="var(--color-gold)" />
-                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>Project Cap: Max 2 Projects / Semester (4 Projects / Year)</strong>
+                <strong style={{ color: 'var(--color-navy)', fontSize: '0.95rem' }}>
+                  Project Cap: Max {rules.max_projects_per_semester} Projects / Semester
+                </strong>
               </div>
               <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                A member may lead a maximum of <strong>2 projects per semester</strong>, totaling a maximum cap of <strong>4 projects per year</strong>. At least one of them <strong>has to be service-based</strong> (including yearly projects).
+                A member may lead a maximum of <strong>{rules.max_projects_per_semester} projects per semester</strong>. At least one of them <strong>has to be service-based</strong> (including yearly projects).
               </p>
             </div>
           </div>
@@ -171,7 +214,16 @@ export const ChapterRules: React.FC = () => {
             <div style={{ padding: '1.1rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
               <div style={{ fontWeight: 700, color: '#92400E', marginBottom: '0.35rem' }}>3. Semester Inactivity & Project Deficit</div>
               <div style={{ fontSize: '0.82rem', color: '#78350F', lineHeight: 1.5 }}>
-                <strong>Not participating in any NHS activity for an entire semester, AND not leading an NHS project for an entire semester</strong> (Failing to lead at least 1 project and volunteer in at least 2 projects).
+                {rules.no_projects_led_required && rules.no_volunteering_required ? (
+                  <span>Semester participation quotas are currently waived by chapter leadership for this term.</span>
+                ) : (
+                  <span>
+                    <strong>Not participating in active chapter requirements for an entire semester</strong>{' '}
+                    (Failing to {rules.no_projects_led_required ? 'fulfill active requirements' : `lead at least ${rules.required_projects_led} project(s)`}
+                    {!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}
+                    {rules.no_volunteering_required ? '' : `volunteer in at least ${rules.required_volunteering} project(s)`}).
+                  </span>
+                )}
               </div>
             </div>
 
@@ -345,6 +397,21 @@ export const ChapterRules: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Section 7: Custom Executive Bylaws (when present) */}
+        {rules.custom_bylaws && rules.custom_bylaws.trim() && (
+          <div className="sharp-card" style={{ padding: '2rem', borderLeft: '4px solid var(--color-oxford)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+              <Scale size={22} color="var(--color-oxford)" />
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: 0 }}>
+                7. Executive Amendments & Active Chapter Bylaws
+              </h2>
+            </div>
+            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
+              {rules.custom_bylaws}
+            </div>
+          </div>
+        )}
 
       </div>
 

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance, Semester } from '../../types/nhs';
 import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award, ShieldCheck } from 'lucide-react';
+import { useChapterRules } from '../../hooks/useChapterRules';
 
 interface MemberProfileDrawerProps {
   member: Profile | null;
@@ -12,6 +13,7 @@ interface MemberProfileDrawerProps {
 
 export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member, onClose, onUpdated }) => {
   const { isLeadership } = useAuth();
+  const { rules } = useChapterRules();
   const [currentGrade, setCurrentGrade] = useState<number | null>(member?.grade_level || null);
   const [allProposals, setAllProposals] = useState<ProjectProposal[]>([]);
   const [volunteerHistory, setVolunteerHistory] = useState<ProjectVolunteer[]>([]);
@@ -293,7 +295,9 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
             const semLed = activeSemester
               ? ledProjects.filter(p => p.semester_id === activeSemester.id || (Boolean(p.event_date) && p.event_date! >= activeSemester.start_date && p.event_date! <= activeSemester.end_date)).length
               : ledProjects.length;
-            const meetsQuota = semLed >= 1 && semesterVolCount >= 2;
+            const meetsProjects = rules.no_projects_led_required || semLed >= rules.required_projects_led;
+            const meetsVolunteering = rules.no_volunteering_required || semesterVolCount >= rules.required_volunteering;
+            const meetsQuota = meetsProjects && meetsVolunteering;
 
             return (
               <div style={{ padding: '1rem', backgroundColor: meetsQuota ? 'var(--color-sage-bg)' : '#FFFBEB', border: meetsQuota ? '1px solid #A7F3D0' : '1px solid #FDE68A' }}>
@@ -302,16 +306,32 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
                     Semester Participation Audit ({activeSemester?.name || 'Active Semester'})
                   </strong>
                   <span className="grade-badge" style={{ backgroundColor: meetsQuota ? 'var(--color-sage)' : 'var(--color-gold)', color: '#FFFFFF', fontSize: '0.68rem' }}>
-                    {meetsQuota ? 'Quota Satisfied' : 'Quota Unfulfilled'}
+                    {rules.no_projects_led_required && rules.no_volunteering_required
+                      ? 'Quota Waived'
+                      : meetsQuota
+                      ? 'Quota Satisfied'
+                      : 'Quota Unfulfilled'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: meetsQuota ? '#065F46' : '#78350F', display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                  <span>Projects Led: <strong>{semLed} / 1 min</strong> {semLed >= 1 ? '(Satisfied)' : '(Incomplete)'}</span>
-                  <span>Times Volunteered: <strong>{semesterVolCount} / 2 min</strong> {semesterVolCount >= 2 ? '(Satisfied)' : '(Incomplete)'}</span>
+                  <span>
+                    Projects Led:{' '}
+                    <strong>
+                      {rules.no_projects_led_required ? 'Waived (Exempt)' : `${semLed} / ${rules.required_projects_led} min`}
+                    </strong>{' '}
+                    {meetsProjects ? '(Satisfied)' : '(Incomplete)'}
+                  </span>
+                  <span>
+                    Times Volunteered:{' '}
+                    <strong>
+                      {rules.no_volunteering_required ? 'Waived (Exempt)' : `${semesterVolCount} / ${rules.required_volunteering} min`}
+                    </strong>{' '}
+                    {meetsVolunteering ? '(Satisfied)' : '(Incomplete)'}
+                  </span>
                 </div>
                 {!meetsQuota && (
                   <div style={{ fontSize: '0.72rem', color: '#92400E', marginTop: '0.4rem', fontStyle: 'italic' }}>
-                    *Rule: Members failing to lead at least 1 project and volunteer twice in a semester trigger Chapter Probation.
+                    *Rule: Members failing to satisfy semester participation requirements ({!rules.no_projects_led_required ? `lead at least ${rules.required_projects_led} project(s)` : ''}{!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}{!rules.no_volunteering_required ? `volunteer in at least ${rules.required_volunteering} initiative(s)` : ''}) trigger Chapter Probation.
                   </div>
                 )}
               </div>

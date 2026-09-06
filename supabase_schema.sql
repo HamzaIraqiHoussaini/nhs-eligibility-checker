@@ -1123,5 +1123,72 @@ BEFORE DELETE ON public.annual_projects
 FOR EACH ROW
 EXECUTE FUNCTION public.handle_annual_project_deleted();
 
+-- ==============================================================================
+-- 14. Chapter Rules & Quotas Table
+-- Allows leadership to configure participation quotas (volunteering & projects led)
+-- and customize chapter bylaws / rules text.
+-- ==============================================================================
+create table if not exists public.chapter_rules (
+  id text primary key default 'current',
+  required_volunteering integer not null default 2,
+  no_volunteering_required boolean not null default false,
+  required_projects_led integer not null default 1,
+  no_projects_led_required boolean not null default false,
+  max_projects_per_semester integer not null default 2,
+  academic_rules_summary text default 'Grade 10: 5.80+ average across academic courses (excluding PE & Design Tech). Grade 11-12: 5.80+ average across assessed IB courses (5.60+ for 4 IB HL candidates). Conduct: Zero Approaching Expectations (AE) or Beginning Expectations (BE) marks.',
+  participation_rules_summary text default 'Members are required to lead approved projects and volunteer in chapter initiatives per semester according to active quotas. At least one project per year must be service-based.',
+  probation_rules_summary text default 'Probation is triggered by: academic deficiency below GPA standards; conduct flags (AE/BE in more than 1 course); unexcused meeting absences (2 absences); or semester participation deficit.',
+  dismissal_rules_summary text default 'Grounds for immediate dismissal and restricted account status: incurring multiple probations (more than once); major code of conduct or academic integrity violations (cheating, plagiarism, substance possession).',
+  custom_bylaws text default '',
+  updated_by uuid references public.profiles(id),
+  updated_at timestamp with time zone default now()
+);
+
+alter table public.chapter_rules enable row level security;
+
+create policy "Anyone can read chapter rules"
+  on public.chapter_rules
+  for select
+  using (true);
+
+create policy "Leadership can update chapter rules"
+  on public.chapter_rules
+  for update
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+      and profiles.role in ('leadership', 'supervisor')
+    )
+  );
+
+create policy "Leadership can insert chapter rules"
+  on public.chapter_rules
+  for insert
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+      and profiles.role in ('leadership', 'supervisor')
+    )
+  );
+
+insert into public.chapter_rules (
+  id,
+  required_volunteering,
+  no_volunteering_required,
+  required_projects_led,
+  no_projects_led_required,
+  max_projects_per_semester
+) values (
+  'current',
+  2,
+  false,
+  1,
+  false,
+  2
+) on conflict (id) do nothing;
+
+
 
 

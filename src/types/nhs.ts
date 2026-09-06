@@ -200,4 +200,21 @@ export interface ProjectCoLeader {
   project?: ProjectProposal;
 }
 
+export interface ChapterRulesConfig {
+  id: string;
+  required_volunteering: number;
+  no_volunteering_required: boolean;
+  required_projects_led: number;
+  no_projects_led_required: boolean;
+  max_projects_per_semester: number;
+  academic_rules_summary?: string | null;
+  participation_rules_summary?: string | null;
+  probation_rules_summary?: string | null;
+  dismissal_rules_summary?: string | null;
+  custom_bylaws?: string | null;
+  updated_by?: string | null;
+  updated_at?: string | null;
+}
+
+
 
