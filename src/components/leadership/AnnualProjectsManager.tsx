@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useConfirm } from '../../context/ConfirmContext';
 import { CheckCircle2, Clock, ChevronDown, Plus, Trash2, Users } from 'lucide-react';
 
-import type { AnnualProject, AnnualProjectApplication } from '../../types/nhs';
+import { type AnnualProject, type AnnualProjectApplication, getNextAcademicYear } from '../../types/nhs';
 
 export const AnnualProjectsManager: React.FC = () => {
   const { confirm, alert } = useConfirm();
@@ -28,19 +28,20 @@ export const AnnualProjectsManager: React.FC = () => {
     try {
       const { data: semData } = await supabase
         .from('semesters')
-        .select('id, annual_projects_published, academic_year')
+        .select('id, annual_projects_published, academic_year, semester_number, name')
         .eq('is_active', true)
         .maybeSingle();
 
-      const activeYear = semData?.academic_year || '2026-2027';
-      setAcademicYear(activeYear);
+      const isSem2 = semData?.semester_number === 2 || (semData?.name && semData.name.toLowerCase().includes('semester 2'));
+      const targetYear = isSem2 ? getNextAcademicYear(semData?.academic_year) : (semData?.academic_year || '2026-2027');
+      setAcademicYear(targetYear);
       if (semData) {
         setIsPublished(!!semData.annual_projects_published);
       }
 
       const [{ data: pData }, { data: appData }] = await Promise.all([
-        supabase.from('annual_projects').select('*').eq('academic_year', activeYear).order('title'),
-        supabase.from('annual_project_applications').select('*, profiles(full_name, email, role, is_restricted)').eq('academic_year', activeYear).order('submitted_at'),
+        supabase.from('annual_projects').select('*').eq('academic_year', targetYear).order('title'),
+        supabase.from('annual_project_applications').select('*, profiles(full_name, email, role, is_restricted)').eq('academic_year', targetYear).order('submitted_at'),
       ]);
       setProjects((pData as AnnualProject[]) || []);
       setApplications((appData as AnnualProjectApplication[]) || []);
@@ -96,23 +97,55 @@ export const AnnualProjectsManager: React.FC = () => {
         .eq('id', selectedApp.id);
       if (error) throw error;
 
-      // Automatically provision or update the project proposal in Project Hub
-      const { data: activeSem } = await supabase
+      // Automatically provision or update the project proposal in Project Hub for upcoming Semester 1
+      let targetSemesterId: string | null = null;
+      const { data: targetSem } = await supabase
         .from('semesters')
-        .select('id')
-        .eq('is_active', true)
+        .select('id, name, academic_year, semester_number')
+        .eq('academic_year', academicYear)
+        .eq('semester_number', 1)
         .maybeSingle();
+
+      if (targetSem) {
+        targetSemesterId = targetSem.id;
+      } else {
+        const parts = academicYear.split('-').map((p) => parseInt(p.trim(), 10));
+        const startY = !isNaN(parts[0]) && parts[0] > 1900 ? parts[0] : 2026;
+        const endY = !isNaN(parts[1]) && parts[1] > 1900 ? parts[1] : 2027;
+
+        const { data: createdSem, error: createError } = await supabase
+          .from('semesters')
+          .insert({
+            name: `Semester 1 (${academicYear})`,
+            academic_year: academicYear,
+            semester_number: 1,
+            start_date: `${startY}-09-01`,
+            end_date: `${endY}-01-31`,
+            is_active: false,
+          })
+          .select('id')
+          .single();
+
+        if (!createError && createdSem) {
+          targetSemesterId = createdSem.id;
+        }
+      }
 
       const title = projectTitle(assignProjectId);
       const applicantName = selectedApp.profiles?.full_name || 'Member';
       const applicantEmail = selectedApp.profiles?.email || '';
 
-      // Check if a proposal ALREADY EXISTS for this annual project (for any member)
-      const { data: existingProp } = await supabase
+      // Check if a proposal ALREADY EXISTS for this annual project in this target semester
+      let query = supabase
         .from('project_proposals')
         .select('id, leaders, co_leader_emails, creator_id, creator_name, creator_email')
-        .eq('annual_project_id', assignProjectId)
-        .maybeSingle();
+        .eq('annual_project_id', assignProjectId);
+
+      if (targetSemesterId) {
+        query = query.eq('semester_id', targetSemesterId);
+      }
+
+      const { data: existingProp } = await query.maybeSingle();
 
       if (existingProp) {
         // Project already exists: add this applicant as an official co-leader!
@@ -148,13 +181,12 @@ export const AnnualProjectsManager: React.FC = () => {
             }, { onConflict: 'project_id,co_leader_email' });
         }
       } else {
-        // First leader assigned to this annual project: create initial proposal
-        const defaultDate = new Date();
-        defaultDate.setDate(defaultDate.getDate() + 45);
-        const dateStr = defaultDate.toISOString().split('T')[0];
+        const parts = academicYear.split('-').map((p) => parseInt(p.trim(), 10));
+        const startY = !isNaN(parts[0]) && parts[0] > 1900 ? parts[0] : 2026;
+        const defaultDate = `${startY}-10-15`;
 
         await supabase.from('project_proposals').insert({
-          semester_id: activeSem?.id || null,
+          semester_id: targetSemesterId,
           creator_id: selectedApp.user_id,
           creator_name: applicantName,
           creator_email: applicantEmail,
@@ -162,7 +194,7 @@ export const AnnualProjectsManager: React.FC = () => {
           leaders: applicantName,
           co_leader_emails: [],
           advisor_name: 'Chapter Advisor',
-          event_date: dateStr,
+          event_date: defaultDate,
           location: 'Casablanca American School',
           background: selectedApp.essay || 'Assigned Annual Project by Chapter Leadership.',
           objectives: ['Execute assigned chapter annual project in accordance with NHS pillars.'],
@@ -170,15 +202,15 @@ export const AnnualProjectsManager: React.FC = () => {
           costs: ['To be determined'],
           needs_from_school: ['Classroom / Facility reservation'],
           volunteers_needed: 4,
-          status: 'pending_leadership',
+          status: 'approved',
           is_yearly: true,
           annual_project_id: assignProjectId,
         });
       }
 
       await alert({
-        title: 'Leader Assigned',
-        message: `Successfully assigned "${title}" to ${applicantName}. The annual project proposal in Project Hub has been updated with their leadership attribution.`,
+        title: 'Leader Assigned for Semester 1',
+        message: `Successfully assigned "${title}" to ${applicantName}. This annual project is assigned for Semester 1 (${academicYear}) and will appear in Project Hub once Semester 1 begins.`,
         variant: 'success',
       });
 
@@ -256,6 +288,12 @@ export const AnnualProjectsManager: React.FC = () => {
         })
         .eq('assigned_project_id', project.id);
 
+      // Clean up any provisioned project proposals generated for this annual project
+      await supabase
+        .from('project_proposals')
+        .delete()
+        .eq('annual_project_id', project.id);
+
       // Delete the annual project from the database
       const { error } = await supabase.from('annual_projects').delete().eq('id', project.id);
       if (error) throw error;
@@ -329,7 +367,7 @@ export const AnnualProjectsManager: React.FC = () => {
         <div>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>Leadership Desk</div>
           <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--color-navy)', margin: 0 }}>Annual Projects Desk</h1>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {academicYear} annual project list, push selection to members, and assign project leads.</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>Manage the {academicYear} annual project list, push selection to members during Semester 2, and assign confirmed project leads for Semester 1 ({academicYear}).</p>
         </div>
 
         <button
@@ -454,7 +492,7 @@ export const AnnualProjectsManager: React.FC = () => {
 
                 {app.status === 'assigned' && app.assigned_project_id && (
                   <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--color-sage-text)', fontWeight: 600 }}>
-                    Assigned: {projectTitle(app.assigned_project_id)}
+                    Assigned: {projectTitle(app.assigned_project_id)} (Semester 1 • {academicYear})
                   </div>
                 )}
 

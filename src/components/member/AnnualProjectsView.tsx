@@ -4,7 +4,12 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { CheckCircle2, Clock, Star, FileText, ChevronDown } from 'lucide-react';
 
-import type { AnnualProject, AnnualProjectApplication, Semester } from '../../types/nhs';
+import {
+  type AnnualProject,
+  type AnnualProjectApplication,
+  type Semester,
+  getNextAcademicYear,
+} from '../../types/nhs';
 
 interface AnnualProjectsViewProps {
   onNavigate?: (tab: string) => void;
@@ -31,13 +36,14 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
     setLoading(true);
     try {
       const { data: semData } = await supabase.from('semesters').select('*').eq('is_active', true).maybeSingle();
-      const currentYear = semData?.academic_year || '2026-2027';
-      setAcademicYear(currentYear);
+      const isSem2 = semData?.semester_number === 2 || (semData?.name && semData.name.toLowerCase().includes('semester 2'));
+      const targetYear = isSem2 ? getNextAcademicYear(semData?.academic_year) : (semData?.academic_year || '2026-2027');
+      setAcademicYear(targetYear);
       if (semData) setActiveSemester(semData as Semester);
 
       const [{ data: pData }, { data: appData }] = await Promise.all([
-        supabase.from('annual_projects').select('*').eq('academic_year', currentYear).eq('is_active', true).order('title'),
-        supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', currentYear).maybeSingle(),
+        supabase.from('annual_projects').select('*').eq('academic_year', targetYear).eq('is_active', true).order('title'),
+        supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', targetYear).maybeSingle(),
       ]);
       setProjects((pData as AnnualProject[]) || []);
       setApplication(appData as AnnualProjectApplication | null);
@@ -195,7 +201,7 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
                   </div>
                 )}
                 <div style={{ fontSize: '0.82rem', color: '#065F46', marginBottom: '1rem', lineHeight: 1.5 }}>
-                  This yearly project has been assigned to you. A corresponding proposal has been created in your <strong>Project Hub</strong>. It is mandatory to fill in the proposal details and it does not count toward your semester project limit.
+                  This annual project has been assigned to you for Semester 1 ({academicYear}). It will automatically appear in your <strong>Project Hub</strong> once Semester 1 begins.
                 </div>
                 <button
                   type="button"
@@ -210,7 +216,7 @@ export const AnnualProjectsView: React.FC<AnnualProjectsViewProps> = ({ onNaviga
                     }
                   }}
                 >
-                  <FileText size={14} /> Open Proposal in Project Hub
+                  <FileText size={14} /> Open Project Hub
                 </button>
               </div>
             )}

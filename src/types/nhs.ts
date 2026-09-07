@@ -48,6 +48,20 @@ export interface Semester {
   created_at: string;
 }
 
+export function getNextAcademicYear(yearStr?: string | null): string {
+  if (!yearStr) return '2026-2027';
+  const parts = yearStr.split('-').map((p) => parseInt(p.trim(), 10));
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return `${parts[0] + 1}-${parts[1] + 1}`;
+  }
+  const match = yearStr.match(/(\d{4})/);
+  if (match) {
+    const y = parseInt(match[1], 10);
+    return `${y + 1}-${y + 2}`;
+  }
+  return '2026-2027';
+}
+
 export type ProposalStatus =
   | 'draft'
   | 'pending_leadership'

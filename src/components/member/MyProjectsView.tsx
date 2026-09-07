@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
-import type {
-  ProjectProposal,
-  Semester,
-  ProjectVolunteer,
-  ProjectCoLeader,
-  AnnualProject,
-  AnnualProjectApplication,
+import {
+  type ProjectProposal,
+  type Semester,
+  type ProjectVolunteer,
+  type ProjectCoLeader,
+  type AnnualProject,
+  type AnnualProjectApplication,
+  getNextAcademicYear,
 } from '../../types/nhs';
 import { ProjectProposalForm } from './ProjectProposalForm';
 import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
@@ -84,13 +85,34 @@ export const MyProjectsView: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch active semester
-      const { data: semData } = await supabase
-        .from('semesters')
-        .select('*')
-        .eq('is_active', true)
-        .maybeSingle();
+      // 1. Fetch active semester and all semesters to identify future semesters
+      const [{ data: semData }, { data: allSemsData }] = await Promise.all([
+        supabase
+          .from('semesters')
+          .select('*')
+          .eq('is_active', true)
+          .maybeSingle(),
+        supabase
+          .from('semesters')
+          .select('id, academic_year, semester_number, start_date'),
+      ]);
       if (semData) setActiveSemester(semData as Semester);
+
+      // Build set of future semester IDs so annual projects assigned for upcoming Semester 1
+      // do not appear in the active Semester 2 project hub before Semester 1 begins.
+      const futureSemesterIds = new Set<string>();
+      if (allSemsData && semData) {
+        for (const s of allSemsData) {
+          if (s.id === semData.id) continue;
+          if (s.academic_year && semData.academic_year && s.academic_year > semData.academic_year) {
+            futureSemesterIds.add(s.id);
+          } else if (s.academic_year === semData.academic_year && (s.semester_number || 0) > (semData.semester_number || 0)) {
+            futureSemesterIds.add(s.id);
+          } else if (s.start_date && semData.start_date && new Date(s.start_date).getTime() > new Date(semData.start_date).getTime()) {
+            futureSemesterIds.add(s.id);
+          }
+        }
+      }
 
       if (user) {
         // 2. Fetch my proposals — two safe parameterized queries merged client-side
@@ -107,23 +129,33 @@ export const MyProjectsView: React.FC = () => {
             .contains('co_leader_emails', [user.email])
             .order('created_at', { ascending: false }),
         ]);
-        // Merge and deduplicate by id
+        // Merge and deduplicate by id, filtering out future annual projects
         const seen = new Set<string>();
         const merged: ProjectProposal[] = [];
         for (const row of [...(byCreator || []), ...(byCoLeader || [])]) {
-          if (!seen.has(row.id)) { seen.add(row.id); merged.push(row as ProjectProposal); }
+          const isFutureAnnual = (row.is_yearly || row.annual_project_id) && row.semester_id && futureSemesterIds.has(row.semester_id);
+          if (!isFutureAnnual && !seen.has(row.id)) {
+            seen.add(row.id);
+            merged.push(row as ProjectProposal);
+          }
         }
         merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setProposals(merged);
       }
 
-      // 3. Fetch all approved chapter projects
+      // 3. Fetch all approved chapter projects (filtering out future annual projects)
       const { data: approvedData } = await supabase
         .from('project_proposals')
         .select('*')
         .in('status', ['approved', 'completed'])
         .order('event_date', { ascending: true });
-      if (approvedData) setAllApprovedProjects(approvedData as ProjectProposal[]);
+      if (approvedData) {
+        const filteredApproved = (approvedData as ProjectProposal[]).filter((p) => {
+          const isFutureAnnual = (p.is_yearly || p.annual_project_id) && p.semester_id && futureSemesterIds.has(p.semester_id);
+          return !isFutureAnnual;
+        });
+        setAllApprovedProjects(filteredApproved);
+      }
 
       // 4. Fetch volunteers for chapter projects
       const { data: vData } = await supabase
@@ -149,11 +181,12 @@ export const MyProjectsView: React.FC = () => {
 
       // 6. Annual Projects: Check if Semester 2 AND published by leadership
       const isSem2 = semData?.semester_number === 2 || (semData?.name && semData.name.toLowerCase().includes('semester 2'));
+      const targetAnnualYear = isSem2 ? getNextAcademicYear(semData?.academic_year) : (semData?.academic_year || '2026-2027');
       if (isSem2 && semData?.annual_projects_published) {
         const [{ data: apData }, { data: appData }] = await Promise.all([
-          supabase.from('annual_projects').select('*').eq('is_active', true).order('title'),
+          supabase.from('annual_projects').select('*').eq('is_active', true).eq('academic_year', targetAnnualYear).order('title'),
           user
-            ? supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', semData.academic_year || '2026-2027').maybeSingle()
+            ? supabase.from('annual_project_applications').select('*').eq('user_id', user.id).eq('academic_year', targetAnnualYear).maybeSingle()
             : Promise.resolve({ data: null }),
         ]);
         setAnnualProjects((apData as AnnualProject[]) || []);
@@ -279,10 +312,11 @@ export const MyProjectsView: React.FC = () => {
           variant: 'success',
         });
       } else {
+        const targetAnnualYear = isSem2 ? getNextAcademicYear(activeSemester?.academic_year) : (activeSemester?.academic_year || '2026-2027');
         const { error } = await supabase.from('annual_project_applications').upsert(
           {
             user_id: user.id,
-            academic_year: activeSemester?.academic_year || '2026-2027',
+            academic_year: targetAnnualYear,
             pick_1: pick1,
             pick_2: pick2 || null,
             pick_3: pick3 || null,
@@ -318,6 +352,7 @@ export const MyProjectsView: React.FC = () => {
   const currentSemesterCount = currentSemesterProjects.length;
 
   const isSem2 = activeSemester?.semester_number === 2 || (activeSemester?.name && activeSemester.name.toLowerCase().includes('semester 2'));
+  const targetAnnualYear = isSem2 ? getNextAcademicYear(activeSemester?.academic_year) : (activeSemester?.academic_year || '2026-2027');
   const showAnnualTab = Boolean(isSem2 && activeSemester?.annual_projects_published);
 
   useEffect(() => {
@@ -1109,11 +1144,11 @@ export const MyProjectsView: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
                 <Star size={20} color="#64748B" />
                 <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', color: '#0F172A', margin: 0 }}>
-                  Annual Projects {activeSemester?.academic_year || '2026-2027'}
+                  Annual Projects {targetAnnualYear}
                 </h2>
               </div>
               <p style={{ fontSize: '0.88rem', color: '#475569', margin: 0, lineHeight: '1.6', maxWidth: '820px' }}>
-                Fill out your first three options. We do not guarantee you will get what you picked for. We will take into consideration your participation throughout the year. Annual projects are assigned by leadership, do not count toward your semester quota, and cannot be deleted once assigned.
+                Fill out your top 3 preferences for the upcoming academic year ({targetAnnualYear}). Leadership will review your participation throughout the year and confirm project assignments. Annual projects are assigned for Semester 1 ({targetAnnualYear}), do not count toward your semester quota, and cannot be deleted once assigned.
               </p>
             </div>
 
@@ -1177,7 +1212,7 @@ export const MyProjectsView: React.FC = () => {
                             Selected to Lead: {annualProjects.find((p) => p.id === myAnnualApp.assigned_project_id)?.title || 'Annual Project'}
                           </div>
                           <p style={{ margin: '0.4rem 0 0', fontSize: '0.82rem', color: '#15803D', lineHeight: '1.5' }}>
-                            Leadership has assigned you to lead this annual project! The proposal is active in your "My Proposals & Led Projects" tab.
+                            Leadership has assigned you to lead this annual project for Semester 1 ({targetAnnualYear})! It will automatically appear in your Project Hub once Semester 1 begins.
                           </p>
                           {myAnnualApp.leadership_notes && (
                             <div style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: '#166534', fontStyle: 'italic' }}>
