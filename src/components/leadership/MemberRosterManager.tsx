@@ -302,7 +302,7 @@ export const MemberRosterManager: React.FC = () => {
   const deficitCount = useMemo(() => members.filter((m) => !isRestrictedMember(m) && !isGraduatedMember(m) && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length, [members, participationMap]);
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
+    <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
@@ -460,16 +460,16 @@ export const MemberRosterManager: React.FC = () => {
 
       {/* Roster Table */}
       <div className="sharp-card" style={{ overflow: 'hidden' }}>
-        <div className="table-responsive">
-          <table className="roster-table">
+        <div className="table-responsive" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="roster-table" style={{ width: '100%', minWidth: '960px' }}>
             <thead>
               <tr>
-                <th>Member</th>
-                <th>Grade Level</th>
-                <th>Role</th>
-                <th>Chapter Standing</th>
-                <th>Semester Participation</th>
-                <th>Actions</th>
+                <th style={{ minWidth: '180px' }}>Member</th>
+                <th style={{ minWidth: '110px' }}>Grade Level</th>
+                <th style={{ minWidth: '110px' }}>Role</th>
+                <th style={{ minWidth: '140px' }}>Chapter Standing</th>
+                <th style={{ minWidth: '170px' }}>Semester Participation</th>
+                <th style={{ textAlign: 'right', minWidth: '240px', paddingRight: '1.25rem', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -601,8 +601,8 @@ export const MemberRosterManager: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '1.25rem' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', justifyContent: 'flex-end' }}>
                       <button
                         className="btn-inspect"
                         onClick={() => setSelectedMember(member)}

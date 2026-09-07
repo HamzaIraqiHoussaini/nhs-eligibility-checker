@@ -93,8 +93,15 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ result, 
       s.failReasons.join('; '),
     ]);
 
+    const sanitizeCSVCell = (val: unknown): string => {
+      const str = (val ?? '').toString();
+      // Neutralize CSV Formula Injection (CWE-1236): prefix leading formula trigger characters
+      const safeStr = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      return `"${safeStr.replace(/"/g, '""')}"`;
+    };
+
     const csvContent = [headers, ...rows]
-      .map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+      .map(row => row.map(sanitizeCSVCell).join(','))
       .join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

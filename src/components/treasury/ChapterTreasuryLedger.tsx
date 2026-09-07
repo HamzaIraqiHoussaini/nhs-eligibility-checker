@@ -294,7 +294,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
       <div style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderLeft: '4px solid var(--color-navy)',
+        borderRadius: '10px',
         padding: '1.25rem 1.5rem',
         marginBottom: '1.5rem',
         display: 'flex',
@@ -570,7 +570,7 @@ export const ChapterTreasuryLedger: React.FC = () => {
 
           {/* Stitch Feature: Pending Reimbursements Queue */}
           {expenseEntries.filter((e) => e.reimbursed === 'NO').length > 0 && (
-            <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '4px solid var(--color-gold)', padding: '1rem 1.25rem' }}>
+            <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '1rem 1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Pending Reimbursement Queue ({expenseEntries.filter((e) => e.reimbursed === 'NO').length})

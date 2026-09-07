@@ -125,42 +125,31 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
   const remainingBeforeProbation = Math.max(0, absencesForProbation - effectiveAbsences);
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
+    <div className="max-w-5xl mx-auto py-4 sm:py-6 pb-16 font-sans">
       
       {/* Welcome Banner */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-          Casablanca American School • National Honor Society
-        </div>
-        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: '0.25rem 0 0' }}>
+      <div className="mb-8">
+        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
           Welcome, {profile?.full_name || 'NHS Member'}
         </h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
+        <p className="text-sm text-slate-600 mt-1.5">
           {profile?.role === 'supervisor' || profile?.role === 'past_supervisor' ? (
-            <span>Chapter Faculty Advisor • Role: <strong style={{ textTransform: 'capitalize' }}>Faculty Supervisor</strong></span>
+            <span>Chapter Faculty Advisor • Role: <strong className="capitalize text-slate-800">Faculty Supervisor</strong></span>
           ) : (
-            <span>Member Portal: Grade {profile?.grade_level || 11} • Role: <strong style={{ textTransform: 'capitalize' }}>{profile?.role}</strong></span>
+            <span>Member Portal: Grade {profile?.grade_level || 11} • Role: <strong className="capitalize text-slate-800">{profile?.role}</strong></span>
           )}
         </p>
       </div>
 
       {/* GRADUATE HONORS BANNER */}
       {isGraduated ? (
-        <div style={{
-          padding: '1.5rem',
-          backgroundColor: '#EDE9FE',
-          border: '2px solid #A78BFA',
-          marginBottom: '2rem',
-          display: 'flex',
-          gap: '1.25rem',
-          alignItems: 'center',
-        }}>
-          <Award size={36} color="#6D28D9" style={{ flexShrink: 0 }} />
+        <div className="p-6 bg-[#ede9fe] border border-[#a78bfa] rounded-xl mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center shadow-card">
+          <Award size={36} className="text-[#6d28d9] flex-shrink-0" />
           <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: '#5B21B6' }}>
+            <div className="font-serif text-xl font-bold text-[#5b21b6]">
               {profile?.role === 'past_leadership' ? 'National Honor Society Past Leadership • Service Concluded' : 'National Honor Society Graduate • Honors Conferred'}
             </div>
-            <p style={{ fontSize: '0.88rem', color: '#6D28D9', margin: '0.4rem 0 0' }}>
+            <p className="text-sm text-[#6d28d9] mt-1">
               {profile?.role === 'past_leadership'
                 ? 'Thank you for your dedicated executive leadership service. You have completed your active chapter tenure.'
                 : 'Congratulations! You have completed your active National Honor Society service requirements and officially graduated with chapter honors.'}
@@ -168,45 +157,29 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
           </div>
         </div>
       ) : isRestricted ? (
-        <div style={{
-          padding: '1.5rem',
-          backgroundColor: 'var(--color-terracotta-bg)',
-          border: '2px solid var(--color-terracotta)',
-          marginBottom: '2rem',
-          display: 'flex',
-          gap: '1.25rem',
-          alignItems: 'flex-start',
-        }}>
-          <ShieldAlert size={36} color="var(--color-terracotta)" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div className="p-6 bg-[#ffdad6]/40 border border-[#ba1a1a] rounded-xl mb-8 flex flex-col sm:flex-row gap-4 items-start shadow-card">
+          <ShieldAlert size={36} className="text-[#ba1a1a] flex-shrink-0 mt-0.5" />
           <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 700, color: 'var(--color-terracotta-text)' }}>
+            <div className="font-serif text-xl font-bold text-[#93000a]">
               Membership Dismissed • Account Restricted
             </div>
-            <p style={{ fontSize: '0.88rem', color: 'var(--color-terracotta-text)', margin: '0.5rem 0' }}>
+            <p className="text-sm text-[#93000a] my-2">
               {profile?.restricted_reason || 'You have accumulated two probations, which violates official CAS NHS Chapter rules. Membership privileges and project proposal submissions are now locked.'}
             </p>
-            <div style={{ fontSize: '0.78rem', color: '#7F1D1D' }}>
+            <div className="text-xs text-red-900 font-medium">
               Please schedule a meeting with the Chapter Faculty Advisor or Chapter Leadership regarding your status.
             </div>
           </div>
         </div>
       ) : isOnProbation ? (
         /* PROBATION ALERT BANNER */
-        <div style={{
-          padding: '1.5rem',
-          backgroundColor: '#FFFBEB',
-          border: '2px solid var(--color-gold)',
-          marginBottom: '2rem',
-          display: 'flex',
-          gap: '1.25rem',
-          alignItems: 'flex-start',
-        }}>
-          <AlertTriangle size={36} color="var(--color-gold)" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div className="p-6 bg-[#fffbeb] border border-[#ead59b] rounded-xl mb-8 flex flex-col sm:flex-row gap-4 items-start shadow-card">
+          <AlertTriangle size={36} className="text-[#c59b27] flex-shrink-0 mt-0.5" />
           <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.35rem', fontWeight: 700, color: 'var(--color-gold-text)' }}>
+            <div className="font-serif text-xl font-bold text-[#8c6d1f]">
               Chapter Standing: On Active Probation (Probation #{profile?.probation_count || 1})
             </div>
-            <p style={{ fontSize: '0.88rem', color: '#78350F', margin: '0.5rem 0' }}>
+            <p className="text-sm text-[#78350f] my-2">
               <strong>Reason:</strong>{' '}
               {profile?.probation_reason === 'grades'
                 ? 'Academic Standard (Report card average fell below required threshold)'
@@ -217,11 +190,11 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
                 : 'Trimester Inactivity (No NHS activity logged in current trimester)'}
             </p>
             {profile?.probation_notes && (
-              <div style={{ fontSize: '0.82rem', color: '#92400E', padding: '0.5rem 0.75rem', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', marginBottom: '0.5rem' }}>
+              <div className="text-xs text-[#8c6d1f] p-2.5 bg-[#fcf8ed] border border-[#ead59b] rounded-md mb-2">
                 <strong>Leadership Note:</strong> {profile.probation_notes}
               </div>
             )}
-            <div style={{ fontSize: '0.78rem', color: '#92400E' }}>
+            <div className="text-xs text-[#8c6d1f] font-medium">
               <strong>Warning:</strong> Accumulating a 2nd probation will result in immediate chapter dismissal. Work with leadership to return to good standing.
             </div>
           </div>
@@ -235,208 +208,208 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
         const isOverallQuotaSatisfied = isProjectsSatisfied && isVolunteeringSatisfied;
 
         return (
-          <div
-            className="sharp-card"
-            style={{
-              padding: '1.25rem 1.5rem',
-              marginBottom: '2rem',
-              borderLeft: isOverallQuotaSatisfied ? '4px solid var(--color-sage)' : '4px solid var(--color-gold)',
-              backgroundColor: '#FFFFFF',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+          <div className="p-6 mb-8 rounded-xl bg-white border border-slate-200/90 shadow-card">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                  Chapter Rules • {activeSemesterName} Participation
-                </div>
-                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0.2rem 0 0' }}>
-                  Semester Project & Volunteering Quota
+                <h3 className="font-serif text-xl font-bold text-[#0a1e3f]">
+                  {activeSemesterName} Project & Volunteering Quota
                 </h3>
               </div>
-              <span
-                className={`status-pill ${isOverallQuotaSatisfied ? 'eligible' : ''}`}
-                style={!isOverallQuotaSatisfied ? { backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.75rem' } : { fontSize: '0.75rem' }}
-              >
-                {isOverallQuotaSatisfied ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-                {rules.no_projects_led_required && rules.no_volunteering_required
-                  ? 'Participation Quota Waived'
-                  : isOverallQuotaSatisfied
-                  ? 'Semester Quota Satisfied'
-                  : 'Action Required This Semester'}
-              </span>
+              <div>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                    isOverallQuotaSatisfied
+                      ? 'bg-[#ecfdf5] text-[#065f46] border border-[#a7f3d0]'
+                      : 'bg-[#fcf8ed] text-[#8c6d1f] border border-[#ead59b]'
+                  }`}
+                >
+                  {isOverallQuotaSatisfied ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                  {rules.no_projects_led_required && rules.no_volunteering_required
+                    ? 'Participation Quota Waived'
+                    : isOverallQuotaSatisfied
+                    ? 'Semester Quota Satisfied'
+                    : 'Action Required This Semester'}
+                </span>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
               {/* Projects Led Quota Box */}
-              <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="p-4 bg-[#fbfbfa] border border-slate-200/80 rounded-lg flex items-center justify-between">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {rules.no_projects_led_required ? '1. Projects Led Requirement' : `1. Lead at least ${rules.required_projects_led} Project(s) / Sem`}
+                  <div className="text-xs text-slate-500">
+                    {rules.no_projects_led_required ? 'Projects Led' : `Lead at least ${rules.required_projects_led} Project(s) / Sem`}
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 700, color: isProjectsSatisfied ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                  <div className={`text-lg font-bold mt-1 ${isProjectsSatisfied ? 'text-[#059669]' : 'text-[#0a1e3f]'}`}>
                     {rules.no_projects_led_required ? 'Waived (0 required)' : `${semesterProjectsLed} / ${rules.required_projects_led} Led`}
                   </div>
                 </div>
-                {rules.no_projects_led_required ? (
-                  <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Waived</span>
-                ) : isProjectsSatisfied ? (
-                  <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
-                ) : (
-                  <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
-                )}
+                <div>
+                  {rules.no_projects_led_required ? (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#ecfdf5] text-[#065f46]">Waived</span>
+                  ) : isProjectsSatisfied ? (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#ecfdf5] text-[#065f46]">Complete</span>
+                  ) : (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#fcf8ed] text-[#8c6d1f]">Pending</span>
+                  )}
+                </div>
               </div>
 
               {/* Volunteering Quota Box */}
-              <div style={{ padding: '0.85rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="p-4 bg-[#fbfbfa] border border-slate-200/80 rounded-lg flex items-center justify-between">
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    {rules.no_volunteering_required ? '2. Volunteering Requirement' : `2. Volunteer at least ${rules.required_volunteering} Initiative(s) / Sem`}
+                  <div className="text-xs text-slate-500">
+                    {rules.no_volunteering_required ? 'Volunteering' : `Volunteer at least ${rules.required_volunteering} Initiative(s) / Sem`}
                   </div>
-                  <div style={{ fontSize: '1.15rem', fontWeight: 700, color: isVolunteeringSatisfied ? 'var(--color-sage-text)' : 'var(--color-navy)', marginTop: '2px' }}>
+                  <div className={`text-lg font-bold mt-1 ${isVolunteeringSatisfied ? 'text-[#059669]' : 'text-[#0a1e3f]'}`}>
                     {rules.no_volunteering_required ? 'Waived (0 required)' : `${semesterVolunteered} / ${rules.required_volunteering} Volunteered`}
                   </div>
                 </div>
-                {rules.no_volunteering_required ? (
-                  <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Waived</span>
-                ) : isVolunteeringSatisfied ? (
-                  <span className="grade-badge" style={{ backgroundColor: 'var(--color-sage-bg)', color: 'var(--color-sage-text)' }}>Complete</span>
-                ) : (
-                  <span className="grade-badge" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>Pending</span>
-                )}
+                <div>
+                  {rules.no_volunteering_required ? (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#ecfdf5] text-[#065f46]">Waived</span>
+                  ) : isVolunteeringSatisfied ? (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#ecfdf5] text-[#065f46]">Complete</span>
+                  ) : (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded bg-[#fcf8ed] text-[#8c6d1f]">Pending</span>
+                  )}
+                </div>
               </div>
             </div>
 
             {!isOverallQuotaSatisfied && (
-              <div style={{ marginTop: '0.85rem', fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4, padding: '0.5rem 0.75rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A' }}>
+              <div className="mt-4 p-3.5 bg-[#fcf8ed] border border-[#ead59b] rounded-lg text-xs text-[#8c6d1f] leading-relaxed">
                 <strong>Chapter Rule:</strong> Failing to satisfy semester participation requirements ({!rules.no_projects_led_required ? `lead at least ${rules.required_projects_led} project(s)` : ''}{!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}{!rules.no_volunteering_required ? `volunteer in at least ${rules.required_volunteering} initiative(s)` : ''}) constitutes grounds for Chapter Probation.
               </div>
             )}
           </div>
         );
       })() : (
-        <div
-          className="sharp-card"
-          style={{
-            padding: '1.25rem 1.5rem',
-            marginBottom: '2rem',
-            borderLeft: '4px solid var(--color-navy)',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="p-6 mb-8 rounded-xl bg-white border border-slate-200/90 shadow-card">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                Chapter Governance • {activeSemesterName}
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+              <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-1">
                 Executive Leadership Core
               </h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+              <p className="text-xs sm:text-sm text-slate-600">
                 Leadership oversees chapter administration and governance. Chapter leadership is not required to lead or volunteer in projects and is exempt from project participation quotas.
               </p>
             </div>
-            <span
-              className="status-pill eligible"
-              style={{ fontSize: '0.75rem', backgroundColor: '#EFF6FF', color: 'var(--color-oxford)', border: '1px solid #BFDBFE' }}
-            >
-              <CheckCircle2 size={13} />
-              <span>Exempt from Project Quotas</span>
-            </span>
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#fcf8ed] text-[#8c6d1f] border border-[#ead59b]">
+                <CheckCircle2 size={13} />
+                <span>Exempt from Project Quotas</span>
+              </span>
+            </div>
           </div>
         </div>
       )}
 
       {/* Statistics Grid */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-label">Projects Led</div>
-          <div className="kpi-value">{semesterProjectsLed} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({projectCount} proposed)</span></div>
-          <div className="kpi-subtext">{isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="p-5 bg-white border border-slate-200/90 rounded-xl shadow-card">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">Projects Led</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#0a1e3f]">
+            {semesterProjectsLed} <span className="text-xs text-slate-500 font-normal">({projectCount} proposed)</span>
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            {isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}
+          </div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Times Volunteered</div>
-          <div className="kpi-value">{semesterVolunteered} <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', fontWeight: 400 }}>({volunteerCount} total)</span></div>
-          <div className="kpi-subtext">{isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}</div>
+        <div className="p-5 bg-white border border-slate-200/90 rounded-xl shadow-card">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">Times Volunteered</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#0a1e3f]">
+            {semesterVolunteered} <span className="text-xs text-slate-500 font-normal">({volunteerCount} total)</span>
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            {isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}
+          </div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Meeting Attendance</div>
-          <div className="kpi-value">
+        <div className="p-5 bg-white border border-slate-200/90 rounded-xl shadow-card">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">Meeting Attendance</div>
+          <div className="text-2xl sm:text-3xl font-bold text-[#0a1e3f]">
             {attendanceStats.total > 0
               ? `${Math.round(((attendanceStats.attended + attendanceStats.tardies) / attendanceStats.total) * 100)}%`
               : '100%'}
           </div>
-          <div className="kpi-subtext">
+          <div className="text-xs text-slate-500 mt-1">
             {isGraduated
               ? 'Archived • Attendance exempt'
               : `${attendanceStats.absences} absent, ${attendanceStats.tardies} tardy (${effectiveAbsences >= absencesForProbation ? 'Probation Triggered' : `${remainingBeforeProbation} left before probation`})`}
           </div>
         </div>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Chapter Project Cap</div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+        <div className="p-5 bg-white border border-slate-200/90 rounded-xl shadow-card">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">Chapter Project Cap</div>
+          <div className="font-serif text-2xl sm:text-3xl font-bold text-[#0a1e3f]">
             Max 2 / Sem
           </div>
-          <div className="kpi-subtext">Yearly projects exempt from cap</div>
+          <div className="text-xs text-slate-500 mt-1">
+            Yearly projects exempt from cap
+          </div>
         </div>
       </div>
 
       {/* Quick Navigation Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
-        
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div
-          className="sharp-card"
-          style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.15s ease' }}
+          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
           onClick={() => onNavigate('projects')}
         >
-          <FileText size={24} color="var(--color-oxford)" style={{ marginBottom: '0.75rem' }} />
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.4rem' }}>
+          <div className="w-10 h-10 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-3 border border-slate-200">
+            <FileText size={20} className="text-[#0a1e3f]" />
+          </div>
+          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
             Submit Project Proposal
           </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+          <p className="text-xs text-slate-600 leading-relaxed mb-4">
             Propose a student-led competition, workshop, or community service initiative using the official CAS template.
           </p>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-oxford)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            Open Project Hub <ArrowRight size={14} />
+          <div className="text-xs text-[#0a1e3f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+            <span>Open Project Hub</span>
+            <ArrowRight size={14} />
           </div>
         </div>
 
         <div
-          className="sharp-card"
-          style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.15s ease' }}
+          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
           onClick={() => onNavigate('screener')}
         >
-          <CheckCircle2 size={24} color="var(--color-sage)" style={{ marginBottom: '0.75rem' }} />
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.4rem' }}>
+          <div className="w-10 h-10 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-3 border border-[#a7f3d0]">
+            <CheckCircle2 size={20} className="text-[#059669]" />
+          </div>
+          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
             Verify My Report Card
           </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+          <p className="text-xs text-slate-600 leading-relaxed mb-4">
             Upload your individual CAS report card (PDF/image) to audit your GPA, check for AE/BE flags, and verify good standing.
           </p>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-sage)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            Run Individual Audit <ArrowRight size={14} />
+          <div className="text-xs text-[#059669] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+            <span>Run Individual Audit</span>
+            <ArrowRight size={14} />
           </div>
         </div>
 
         <div
-          className="sharp-card"
-          style={{ padding: '1.5rem', cursor: 'pointer', transition: 'transform 0.15s ease' }}
+          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
           onClick={() => onNavigate('rules')}
         >
-          <Award size={24} color="var(--color-gold)" style={{ marginBottom: '0.75rem' }} />
-          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.4rem' }}>
+          <div className="w-10 h-10 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-3 border border-[#ead59b]">
+            <Award size={20} className="text-[#c59b27]" />
+          </div>
+          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
             Chapter Rules
           </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+          <p className="text-xs text-slate-600 leading-relaxed mb-4">
             Review Grade 10 vs 11/12 criteria, 4 IB HL exemptions, Senior rules, probation triggers, and dismissal guidelines.
           </p>
-          <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-            View Rules <ArrowRight size={14} />
+          <div className="text-xs text-[#8c6d1f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+            <span>View Rules</span>
+            <ArrowRight size={14} />
           </div>
         </div>
-
       </div>
 
     </div>

@@ -397,7 +397,7 @@ export const AttendanceSheet: React.FC = () => {
       <div style={{
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        borderLeft: '4px solid var(--color-terracotta)',
+        borderRadius: '8px',
         padding: '1rem 1.25rem',
         marginBottom: '1.75rem',
         display: 'flex',

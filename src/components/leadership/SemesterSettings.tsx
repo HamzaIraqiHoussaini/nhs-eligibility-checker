@@ -381,7 +381,7 @@ export const SemesterSettings: React.FC = () => {
           </div>
 
           {activeSemester ? (
-            <div className="sharp-card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--color-sage)' }}>
+            <div className="sharp-card" style={{ padding: '1.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                 <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
                   <Check size={12} /> Active Semester Window

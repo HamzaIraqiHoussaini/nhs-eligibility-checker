@@ -61,8 +61,14 @@ export const BatchResultDisplay: React.FC<BatchResultDisplayProps> = ({ result, 
       s.failReasons.join('; '),
     ]);
 
+    const sanitizeCSVCell = (val: unknown): string => {
+      const str = (val ?? '').toString();
+      const safeStr = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      return `"${safeStr.replace(/"/g, '""')}"`;
+    };
+
     const csv = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .map(row => row.map(sanitizeCSVCell).join(','))
       .join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });

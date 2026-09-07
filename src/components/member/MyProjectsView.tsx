@@ -450,10 +450,31 @@ export const MyProjectsView: React.FC = () => {
   };
 
   const handleUploadReceipt = async (project: ProjectProposal, file: File) => {
+    // Defensive check: limit receipt file size to 15MB
+    if (file.size > 15 * 1024 * 1024) {
+      await alert({
+        title: 'File Too Large',
+        message: 'Receipt file exceeds the 15MB limit. Please upload a smaller image or compressed PDF.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const rawExt = (file.name.split('.').pop() || '').toLowerCase();
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+    if (!allowedExts.includes(rawExt)) {
+      await alert({
+        title: 'Invalid File Type',
+        message: 'Please upload an accepted document format: PDF, PNG, JPEG, or WebP.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     setUploadingReceiptId(project.id);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${project.id}_${Date.now()}.${fileExt}`;
+      const sanitizedExt = rawExt.replace(/[^a-z0-9]/g, '');
+      const fileName = `${project.id}_${Date.now()}.${sanitizedExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('project-receipts')
@@ -860,7 +881,7 @@ export const MyProjectsView: React.FC = () => {
 
                     {/* PROOF OF PURCHASE (RECEIPT) SECTION FOR COMPLETED PROJECTS WITH MONETARY COSTS */}
                     {isCompleted && hasCosts && (
-                      <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderLeft: '4px solid var(--color-gold)' }}>
+                      <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
                           <Receipt size={16} color="var(--color-gold-text)" />
                           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
@@ -1136,7 +1157,7 @@ export const MyProjectsView: React.FC = () => {
               style={{
                 backgroundColor: '#F8FAFC',
                 border: '1px solid #CBD5E1',
-                borderLeft: '4px solid #64748B',
+                borderRadius: '10px',
                 padding: '1.5rem 1.75rem',
                 boxShadow: '0 2px 8px rgba(100, 116, 139, 0.06)',
               }}

@@ -167,9 +167,9 @@ export const TermsAndPrivacyModal: React.FC<TermsAndPrivacyModalProps> = ({
             style={{
               backgroundColor: '#EFF6FF',
               border: '1px solid #BFDBFE',
+              borderRadius: '8px',
               padding: '1rem 1.25rem',
               marginBottom: '1.75rem',
-              borderLeft: '4px solid var(--color-oxford)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
@@ -202,9 +202,9 @@ export const TermsAndPrivacyModal: React.FC<TermsAndPrivacyModalProps> = ({
                   style={{
                     backgroundColor: '#FEF2F2',
                     border: '1px solid #FECACA',
+                    borderRadius: '8px',
                     padding: '1rem 1.25rem',
                     marginBottom: '0.75rem',
-                    borderLeft: '4px solid var(--color-terracotta)',
                   }}
                 >
                   <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.35rem' }}>

@@ -246,7 +246,7 @@ export const TwoStageReviewDesk: React.FC = () => {
 
       {/* Receipts Awaiting Audit Alert Queue */}
       {completedWithReceiptPending.length > 0 && (
-        <div style={{ marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderLeft: '4px solid var(--color-gold)' }}>
+        <div style={{ marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <Receipt size={18} color="var(--color-gold-text)" />
             <span style={{ fontWeight: 700, color: 'var(--color-navy)', fontSize: '0.95rem' }}>
@@ -333,7 +333,7 @@ export const TwoStageReviewDesk: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {pendingStage2.map((p) => (
-              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--color-oxford)' }}>
+              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
@@ -659,7 +659,7 @@ export const TwoStageReviewDesk: React.FC = () => {
 
             {/* Informative banner for Supervisor on Stage 1 proposal */}
             {isSupervisor && selectedProposal.status === 'pending_leadership' && (
-              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderLeft: '4px solid var(--color-gold)' }}>
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                 <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
                   Stage 1: Awaiting Chapter Leadership Determination
                 </div>
@@ -671,7 +671,7 @@ export const TwoStageReviewDesk: React.FC = () => {
 
             {/* Informative banner for Leadership on Stage 2 proposal */}
             {isLeadership && selectedProposal.status === 'pending_supervisor' && (
-              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderLeft: '4px solid var(--color-oxford)' }}>
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px' }}>
                 <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
                   Stage 2: Awaiting Faculty Supervisor Determination
                 </div>

@@ -24,6 +24,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
   const { rules } = useChapterRules();
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
+
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
     if (el) {
@@ -40,125 +41,79 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
   };
 
   return (
-    <div style={{ backgroundColor: '#F8F9FA', minHeight: '100vh', color: '#0F172A', fontFamily: 'var(--font-sans)' }}>
+    <div className="min-h-screen bg-[#fbfbfa] text-[#0a1e3f] font-sans selection:bg-[#c59b27]/20 selection:text-[#0a1e3f]">
       
       {/* Fixed Public Navigation Bar */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          backgroundColor: 'rgba(255, 255, 255, 0.96)',
-          backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '1280px',
-            margin: '0 auto',
-            padding: '0.85rem 1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1.5rem',
-          }}
-        >
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_rgba(10,30,63,0.03)] transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-3 flex items-center justify-between gap-4">
+          
           {/* Logo & Brand */}
           <div
-            style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }}
+            className="flex items-center gap-3.5 cursor-pointer group"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <img
-              src="/cas-logo.png"
-              alt="Casablanca American School"
-              style={{ width: '44px', height: '44px', objectFit: 'contain' }}
-            />
+            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center p-1 rounded-lg border border-slate-200 bg-white shadow-2xs group-hover:border-[#c59b27] transition-colors">
+              <img
+                src="/cas-logo.png"
+                alt="Casablanca American School"
+                className="w-7 h-7 object-contain"
+                style={{ width: '28px', height: '28px' }}
+              />
+            </div>
             <div>
-              <div
-                style={{
-                  fontSize: '0.68rem',
-                  fontFamily: 'var(--font-mono)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  color: '#64748B',
-                  lineHeight: 1,
-                  marginBottom: '2px',
-                }}
-              >
+              <div className="text-[11px] font-sans font-semibold uppercase tracking-[0.08em] text-slate-500 leading-tight mb-0.5">
                 Casablanca American School
               </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  color: 'var(--color-navy)',
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.01em',
-                }}
-              >
+              <div className="font-serif text-lg sm:text-xl font-bold text-[#0a1e3f] tracking-tight leading-tight group-hover:text-[#16325c] transition-colors">
                 National Honor Society
               </div>
             </div>
           </div>
 
           {/* Center Navigation */}
-          <nav
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1.5rem',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              color: '#475569',
-            }}
-            className="hidden-mobile"
-          >
+          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-slate-600">
             <button
               onClick={() => scrollToSection('about')}
-              style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
             >
               About
             </button>
             <button
               onClick={() => scrollToSection('pillars')}
-              style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
             >
               The 4 Pillars
             </button>
             <button
               onClick={() => scrollToSection('requirements')}
-              style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
             >
               Academic Requirements
             </button>
             <button
               onClick={() => scrollToSection('rules')}
-              style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '0.85rem' }}
+              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
             >
               Rules
             </button>
           </nav>
 
           {/* Header Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              className="btn-secondary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
               onClick={() => onNavigate('screener')}
             >
-              <CheckCircle2 size={14} color="var(--color-oxford)" />
-              <span>Check Academic Eligibility</span>
+              <CheckCircle2 size={14} className="text-[#c59b27]" />
+              <span className="hidden sm:inline">Check Academic Eligibility</span>
+              <span className="sm:hidden">Eligibility</span>
             </button>
 
             {user ? (
               <button
                 type="button"
-                className="btn-primary"
-                style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
                 onClick={() => onNavigate('dashboard')}
               >
                 <LayoutDashboard size={14} />
@@ -167,8 +122,7 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
             ) : (
               <button
                 type="button"
-                className="btn-primary"
-                style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
                 onClick={onOpenAuth}
               >
                 <LogIn size={14} />
@@ -182,365 +136,303 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
       {/* Hero Section */}
       <section
         id="about"
-        style={{
-          padding: '4rem 1.5rem 4.5rem',
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #E2E8F0',
-        }}
+        className="relative pt-14 pb-18 md:pt-22 md:pb-26 bg-gradient-to-b from-white via-[#fcfbf9] to-[#fbfbfa] border-b border-slate-200/80"
       >
-        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-              gap: '3.5rem',
-              alignItems: 'center',
-            }}
-          >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+            
             {/* Left Content */}
-            <div>
-              <h1
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: 'clamp(2.4rem, 5vw, 3.6rem)',
-                  lineHeight: 1.1,
-                  color: 'var(--color-navy)',
-                  margin: '0 0 1.25rem',
-                  letterSpacing: '-0.02em',
-                }}
-              >
+            <div className="lg:col-span-7">
+              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#0a1e3f] leading-[1.08] tracking-tight mb-5">
                 Scholarship. Leadership.<br />
                 Service. Character.
               </h1>
 
-              <p
-                style={{
-                  fontSize: '1.05rem',
-                  lineHeight: 1.6,
-                  color: '#475569',
-                  maxWidth: '560px',
-                  marginBottom: '2rem',
-                }}
-              >
+              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl mb-9">
                 The Casablanca American School chapter of the National Honor Society recognizes students
                 who demonstrate distinction in academic achievement, leadership, community service, and character.
               </p>
 
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
+              {/* Action Buttons with Generous, Balanced Spacing */}
+              <div className="flex flex-wrap items-center gap-3.5">
                 <button
                   type="button"
-                  className="btn-primary"
-                  style={{ padding: '0.8rem 1.6rem', fontSize: '0.95rem' }}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => handleAction('dashboard')}
                 >
-                  {!user && <Lock size={15} />}
+                  {!user && <Lock size={15} className="text-white/80" />}
                   <span>Enter Member Portal</span>
                   <ArrowRight size={16} />
                 </button>
 
                 <button
                   type="button"
-                  className="btn-secondary"
-                  style={{ padding: '0.8rem 1.4rem', fontSize: '0.95rem' }}
+                  className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-sm font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => onNavigate('screener')}
                 >
-                  <CheckCircle2 size={16} color="var(--color-oxford)" />
+                  <CheckCircle2 size={16} className="text-[#c59b27]" />
                   <span>Check Academic Eligibility</span>
                 </button>
 
                 <button
                   type="button"
-                  style={{
-                    padding: '0.8rem 1.2rem',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: 'var(--color-navy)',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontWeight: 600,
-                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold text-slate-700 hover:text-[#0a1e3f] transition-colors cursor-pointer"
                   onClick={() => scrollToSection('rules')}
                 >
                   <span>Rules</span>
-                  <ChevronRight size={14} />
+                  <ChevronRight size={15} />
                 </button>
               </div>
             </div>
 
             {/* Right: NHS Official Keystone Emblem */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <div
-                style={{
-                  maxWidth: '340px',
-                  width: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: '1rem',
-                }}
-              >
+            <div className="lg:col-span-5 flex justify-center lg:justify-end">
+              <div className="relative p-6 sm:p-8 bg-white/80 rounded-2xl border border-slate-200/90 shadow-[0_8px_24px_rgba(10,30,63,0.06)] flex items-center justify-center">
                 <img
                   src="/nhs-logo-bw.png"
-                  alt="National Honor Society"
-                  style={{
-                    maxHeight: '360px',
-                    width: 'auto',
-                    objectFit: 'contain',
-                    filter: 'drop-shadow(0 10px 25px rgba(0, 0, 0, 0.08))',
-                  }}
+                  alt="National Honor Society Keystone Emblem"
+                  className="w-auto max-h-[290px] sm:max-h-[330px] object-contain drop-shadow-sm"
+                  style={{ maxHeight: '310px', width: 'auto', objectFit: 'contain' }}
                 />
               </div>
             </div>
+
           </div>
         </div>
       </section>
 
       {/* The Four Pillars */}
-      <section id="pillars" style={{ padding: '4.5rem 1.5rem', maxWidth: '1280px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '2.5rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-            Core Values
-          </div>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
+      <section id="pillars" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-10 sm:mb-12">
+          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
             The Four Pillars of NHS
           </h2>
-          <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
-            The four criteria required for induction and active membership.
+          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
+            The four foundational standards required for induction and continuous active membership.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
           {/* Pillar 1 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
-            <div style={{ width: '40px', height: '40px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-              <GraduationCap size={22} color="var(--color-oxford)" />
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
+            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
+              <GraduationCap size={22} className="text-[#c59b27]" />
             </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-              Pillar 1
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
               Scholarship
             </h3>
-          </div>
-
-          {/* Pillar 2 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
-            <div style={{ width: '40px', height: '40px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-              <Compass size={22} color="#B45309" />
-            </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-              Pillar 2
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
-              Leadership
-            </h3>
-          </div>
-
-          {/* Pillar 3 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
-            <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--color-sage-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-              <Users size={22} color="var(--color-sage)" />
-            </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-              Pillar 3
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
-              Service
-            </h3>
-          </div>
-
-          {/* Pillar 4 */}
-          <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF' }}>
-            <div style={{ width: '40px', height: '40px', backgroundColor: '#EDE9FE', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem', borderRadius: '2px' }}>
-              <Shield size={22} color="#6D28D9" />
-            </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '0.25rem' }}>
-              Pillar 4
-            </div>
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
-              Character
-            </h3>
-          </div>
-        </div>
-
-      </section>
-
-      {/* Academic Requirements */}
-      <section id="requirements" style={{ padding: '4.5rem 1.5rem', backgroundColor: '#FFFFFF', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '2.5rem' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-              Academic Standing
-            </div>
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
-              Academic Requirements
-            </h2>
-            <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
-              Official grade requirements from the chapter rules.
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Commitment to learning, intellectual curiosity, and maintaining a minimum 5.80 cumulative GPA standard.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '2rem', alignItems: 'stretch' }}>
-            {/* Standards Table */}
-            <div className="sharp-card" style={{ padding: '1.75rem', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', textAlign: 'left' }}>
-                    <th style={{ padding: '0.85rem' }}>Grade Level</th>
-                    <th style={{ padding: '0.85rem' }}>GPA Requirement</th>
-                    <th style={{ padding: '0.85rem' }}>Rules</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                    <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Grade 10</td>
-                    <td style={{ padding: '0.85rem', fontWeight: 700 }}>5.80 / 7.00</td>
-                    <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      Core academic courses only (PE & Design excluded). No AE or BE marks.
-                    </td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
-                    <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Grades 11 & 12 (IB)</td>
-                    <td style={{ padding: '0.85rem', fontWeight: 700 }}>5.80 / 7.00</td>
-                    <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      Calculated across 6 IB courses. Reduced to <strong>5.60</strong> if taking 4 IB Higher Level courses.
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '0.85rem', fontWeight: 600, color: 'var(--color-navy)' }}>Conduct</td>
-                    <td style={{ padding: '0.85rem', fontWeight: 700, color: 'var(--color-sage-text)' }}>Good Standing</td>
-                    <td style={{ padding: '0.85rem', color: '#64748B' }}>
-                      No school disciplinary actions or academic dishonesty.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          {/* Pillar 2 */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
+            <div className="w-11 h-11 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-4 border border-slate-200">
+              <Compass size={22} className="text-[#0a1e3f]" />
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
+              Leadership
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Taking proactive initiative, guiding peers ethically, and spearheading impactful student-led chapter initiatives.
+            </p>
+          </div>
 
-              <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0', fontSize: '0.78rem', color: '#64748B' }}>
+          {/* Pillar 3 */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
+            <div className="w-11 h-11 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-4 border border-[#a7f3d0]">
+              <Users size={22} className="text-[#059669]" />
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
+              Service
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Voluntary contributions to school and community welfare without seeking monetary compensation or recognition.
+            </p>
+          </div>
+
+          {/* Pillar 4 */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
+            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
+              <Shield size={22} className="text-[#c59b27]" />
+            </div>
+            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
+              Character
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Upholding strict academic honesty, demonstrating reliability, integrity, and fostering a culture of mutual respect.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Academic Requirements */}
+      <section id="requirements" className="py-16 md:py-24 bg-white border-y border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 sm:mb-12">
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
+              Academic Requirements
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
+              Official grade requirements from the Casablanca American School chapter bylaws.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* Standards Table */}
+            <div className="lg:col-span-7 bg-[#fbfbfa] p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-card flex flex-col justify-between">
+              <div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-3">Grade Level</th>
+                        <th className="py-3 px-3">GPA Requirement</th>
+                        <th className="py-3 px-3">Rules</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/70 text-slate-700">
+                      <tr>
+                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grade 10</td>
+                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
+                        <td className="py-3.5 px-3 text-xs text-slate-600">
+                          Core academic courses only (PE & Design excluded). No AE or BE marks.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grades 11 & 12 (IB)</td>
+                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
+                        <td className="py-3.5 px-3 text-xs text-slate-600">
+                          Calculated across 6 IB courses. Reduced to <strong className="text-slate-900 font-semibold">5.60</strong> if taking 4 IB Higher Level courses.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Conduct</td>
+                        <td className="py-3.5 px-3 font-bold text-[#059669]">Good Standing</td>
+                        <td className="py-3.5 px-3 text-xs text-slate-600">
+                          No school disciplinary actions or academic dishonesty.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-slate-200 text-xs text-slate-500">
                 Academic standing is verified at each semester report card period.
               </div>
             </div>
 
             {/* Screener Prompt Card */}
-            <div
-              className="sharp-card"
-              style={{
-                backgroundColor: 'var(--color-navy)',
-                color: '#FFFFFF',
-                padding: '2rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
+            <div className="lg:col-span-5 bg-[#0a1e3f] text-white p-6 sm:p-8 rounded-xl shadow-lg border border-[#c59b27]/30 flex flex-col justify-between">
               <div>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.75rem', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '20px', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-gold)', marginBottom: '1.25rem' }}>
-                  <CheckCircle2 size={13} />
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#c59b27] text-xs font-semibold tracking-wide mb-5">
+                  <CheckCircle2 size={14} className="text-[#c59b27]" />
                   <span>Academic Eligibility Screener</span>
                 </div>
-                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: '#FFFFFF', margin: '0 0 0.75rem' }}>
+                
+                <h3 className="font-serif text-2xl font-bold text-white mb-3">
                   Check Your Eligibility
                 </h3>
-                <p style={{ fontSize: '0.9rem', color: '#CBD5E1', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+                
+                <p className="text-sm text-slate-200 leading-relaxed mb-6">
                   Upload your report card PDF or enter your marks into our screener tool to immediately check your GPA against chapter rules.
                 </p>
-                <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0 0 1.5rem' }}>
-                  <li>Calculates Grade 10 vs. IB Grade 11/12 scale</li>
-                  <li>Applies 4 IB Higher Level adjustment (5.60 threshold)</li>
-                  <li>Filters excluded courses (PE and Design)</li>
+                
+                <ul className="space-y-2.5 text-xs text-slate-200 mb-8">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
+                    <span>Calculates Grade 10 vs. IB Grade 11/12 scale</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
+                    <span>Applies 4 IB Higher Level adjustment (5.60 threshold)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
+                    <span>Filters excluded courses (PE and Design)</span>
+                  </li>
                 </ul>
               </div>
+
               <button
                 type="button"
-                className="btn-primary"
-                style={{
-                  backgroundColor: 'var(--color-gold)',
-                  color: 'var(--color-navy)',
-                  fontWeight: 700,
-                  width: '100%',
-                  justifyContent: 'center',
-                  padding: '0.85rem',
-                  fontSize: '0.92rem',
-                }}
+                className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-6 font-bold text-sm bg-[#c59b27] hover:bg-[#b58b1e] text-[#0a1e3f] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
                 onClick={() => onNavigate('screener')}
               >
                 <span>Check Academic Eligibility</span>
                 <ArrowRight size={16} />
               </button>
             </div>
+
           </div>
         </div>
       </section>
 
       {/* Rules Section */}
-      <section id="rules" style={{ padding: '4.5rem 1.5rem', maxWidth: '1280px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '2.5rem' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-            Chapter Rules
-          </div>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '2rem', color: 'var(--color-navy)', margin: 0 }}>
+      <section id="rules" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-10 sm:mb-12">
+          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
             Rules to Maintain Membership
           </h2>
-          <p style={{ fontSize: '0.92rem', color: '#64748B', marginTop: '0.35rem' }}>
+          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
             The official rules required to remain in good standing in the chapter.
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              1. Academic Standing
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Academic Standing
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Maintain a minimum 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Levels).
             </p>
           </div>
 
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              2. Project Leadership
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Project Leadership
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Lead at least 1 approved project per semester, with a maximum cap of 2 projects per semester (4 per year).
             </p>
           </div>
 
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              3. Volunteering
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Volunteering
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Volunteer in at least 2 other members' projects each semester.
             </p>
           </div>
 
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              4. Meeting Attendance
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Meeting Attendance
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Attend all general chapter meetings. Accumulating {rules.absences_for_probation || 2} unexcused absences ({rules.tardies_per_absence || 3} tardies = 1 absence) in a semester results in chapter probation.
             </p>
           </div>
 
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              5. Probation & Dismissal
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Probation & Dismissal
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Failing to meet academic or project requirements results in probation. Incurring 2 probations results in chapter dismissal.
             </p>
           </div>
 
-          <div className="sharp-card" style={{ padding: '1.5rem', backgroundColor: '#FFFFFF' }}>
-            <strong style={{ color: 'var(--color-navy)', display: 'block', marginBottom: '0.5rem', fontSize: '1rem' }}>
-              6. Senior Graduation
+          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
+            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
+              Senior Graduation
             </strong>
-            <p style={{ fontSize: '0.85rem', color: '#64748B', margin: 0, lineHeight: 1.55 }}>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Grade 12 members who meet requirements through Semester 1 graduate in good standing as NHS Graduates.
             </p>
           </div>
@@ -548,29 +440,36 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
       </section>
 
       {/* Institutional Footer */}
-      <footer style={{ backgroundColor: 'var(--color-navy)', color: '#94A3B8', padding: '3rem 1.5rem 2rem' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <img src="/cas-logo.png" alt="CAS" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
+      <footer className="bg-[#0a1e3f] text-slate-300 pt-12 pb-8 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 p-1 bg-white rounded-lg flex items-center justify-center">
+                <img
+                  src="/cas-logo.png"
+                  alt="CAS"
+                  className="w-7 h-7 object-contain"
+                  style={{ width: '28px', height: '28px' }}
+                />
+              </div>
               <div>
-                <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1.05rem', fontFamily: 'var(--font-serif)' }}>
+                <div className="text-white font-serif font-bold text-base">
                   Casablanca American School
                 </div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--color-gold)' }}>
+                <div className="text-xs text-[#c59b27]">
                   National Honor Society Chapter
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+            <div className="flex flex-wrap items-center gap-6 text-xs text-slate-300">
               <button
                 type="button"
                 onClick={() => {
                   setLegalTab('terms');
                   setIsLegalOpen(true);
                 }}
-                style={{ background: 'transparent', border: 'none', color: '#CBD5E1', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}
+                className="hover:text-white underline cursor-pointer"
               >
                 Terms of Use
               </button>
@@ -580,19 +479,19 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   setLegalTab('privacy');
                   setIsLegalOpen(true);
                 }}
-                style={{ background: 'transparent', border: 'none', color: '#CBD5E1', cursor: 'pointer', padding: 0, fontSize: 'inherit', textDecoration: 'underline' }}
+                className="hover:text-white underline cursor-pointer"
               >
                 Privacy Policy
               </button>
-              <span>Casablanca, Morocco</span>
+              <span className="text-slate-400">Casablanca, Morocco</span>
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.25rem', marginBottom: '1.25rem', fontSize: '0.74rem', color: '#64748B', lineHeight: 1.55 }}>
-            <strong>Institutional Usage Notice:</strong> By using this portal, you automatically accept our Terms of Use and Privacy Policy. Whichever account performs actions on the platform, the account holder or representative is held strictly accountable. Passcodes must remain secure and any compromise must be reported immediately to Chapter Leadership.
+          <div className="py-4 text-[11px] text-slate-400 leading-relaxed border-b border-white/5">
+            <strong className="text-slate-300">Institutional Usage Notice:</strong> By using this portal, you automatically accept our Terms of Use and Privacy Policy. Whichever account performs actions on the platform, the account holder or representative is held strictly accountable. Passcodes must remain secure and any compromise must be reported immediately to Chapter Leadership.
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', fontSize: '0.78rem' }}>
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
             <span>© Casablanca American School National Honor Society</span>
             <span>Academic Year 2026–2027</span>
           </div>

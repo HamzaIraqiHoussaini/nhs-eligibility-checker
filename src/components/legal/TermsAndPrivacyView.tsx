@@ -41,7 +41,7 @@ export const TermsAndPrivacyView: React.FC<TermsAndPrivacyViewProps> = ({
           backgroundColor: 'var(--color-navy)',
           color: '#FFFFFF',
           marginBottom: '2rem',
-          borderLeft: '4px solid var(--color-gold)',
+          borderRadius: '12px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
@@ -96,9 +96,9 @@ export const TermsAndPrivacyView: React.FC<TermsAndPrivacyViewProps> = ({
         style={{
           backgroundColor: '#EFF6FF',
           border: '1px solid #BFDBFE',
+          borderRadius: '10px',
           padding: '1.25rem 1.5rem',
           marginBottom: '2rem',
-          borderLeft: '4px solid var(--color-oxford)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
@@ -162,9 +162,9 @@ export const TermsAndPrivacyView: React.FC<TermsAndPrivacyViewProps> = ({
                 style={{
                   backgroundColor: '#FEF2F2',
                   border: '1px solid #FECACA',
+                  borderRadius: '8px',
                   padding: '1.15rem 1.35rem',
                   marginBottom: '1rem',
-                  borderLeft: '4px solid var(--color-terracotta)',
                 }}
               >
                 <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.35rem', fontSize: '0.92rem' }}>

@@ -211,13 +211,15 @@ function PortalContent() {
               style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }}
               onClick={() => navigateTo('home')}
             >
-              <img
-                src="/cas-logo.png"
-                alt="Casablanca American School"
-                style={{ width: '40px', height: '40px', objectFit: 'contain' }}
-              />
+              <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
+                <img
+                  src="/cas-logo.png"
+                  alt="Casablanca American School"
+                  style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+                />
+              </div>
               <div>
-                <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#64748B', lineHeight: 1, marginBottom: '2px' }}>
+                <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', lineHeight: 1, marginBottom: '3px' }}>
                   Casablanca American School
                 </div>
                 <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
@@ -364,16 +366,18 @@ function PortalContent() {
           onClick={() => navigateTo('dashboard')}
           title="Return to Dashboard"
         >
-          <img
-            src="/cas-logo.png"
-            alt="CAS NHS Crest"
-            style={{ width: '38px', height: '38px', objectFit: 'contain' }}
-          />
+          <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
+            <img
+              src="/cas-logo.png"
+              alt="CAS NHS Crest"
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+            />
+          </div>
           <div>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
               CAS NHS Portal
             </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginTop: '3px' }}>
               Casablanca American School
             </div>
           </div>

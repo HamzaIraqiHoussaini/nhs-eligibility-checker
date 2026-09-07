@@ -152,7 +152,6 @@ const ConfirmDialogModal: React.FC<{
           iconBg: 'var(--color-terracotta-bg)',
           confirmBtnBg: 'var(--color-terracotta)',
           confirmBtnColor: '#FFFFFF',
-          borderLeft: '4px solid var(--color-terracotta)',
         };
       case 'warning':
         return {
@@ -160,7 +159,6 @@ const ConfirmDialogModal: React.FC<{
           iconBg: 'var(--color-gold-bg)',
           confirmBtnBg: 'var(--color-gold)',
           confirmBtnColor: '#1E293B',
-          borderLeft: '4px solid var(--color-gold)',
         };
       case 'success':
         return {
@@ -168,7 +166,6 @@ const ConfirmDialogModal: React.FC<{
           iconBg: 'var(--color-sage-bg)',
           confirmBtnBg: 'var(--color-oxford)',
           confirmBtnColor: '#FFFFFF',
-          borderLeft: '4px solid var(--color-sage)',
         };
       case 'info':
       default:
@@ -177,7 +174,6 @@ const ConfirmDialogModal: React.FC<{
           iconBg: '#F1F5F9',
           confirmBtnBg: 'var(--color-navy)',
           confirmBtnColor: '#FFFFFF',
-          borderLeft: '4px solid var(--color-oxford)',
         };
     }
   };
@@ -208,7 +204,8 @@ const ConfirmDialogModal: React.FC<{
           width: '100%',
           maxWidth: '460px',
           backgroundColor: '#FFFFFF',
-          borderLeft: vStyles.borderLeft,
+          border: '1px solid var(--color-border)',
+          borderRadius: '12px',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08)',
           padding: '1.5rem',
         }}

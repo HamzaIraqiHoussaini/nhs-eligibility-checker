@@ -60,6 +60,12 @@ export const IndividualScreener: React.FC<IndividualScreenerProps> = ({
   // ===================== UPLOAD LOGIC =====================
 
   const handleFileSelect = async (file: File) => {
+    // Defensive check: limit file size to 25MB to prevent client memory exhaustion
+    if (file.size > 25 * 1024 * 1024) {
+      setError('File is too large (maximum allowed size is 25MB). Please upload a standard report card PDF or image.');
+      return;
+    }
+
     setIsParsing(true);
     setError(null);
     setResult(null);

@@ -13,6 +13,11 @@ dist-ssr
 *.local
 test*.js
 stitch_screens/
+stitch_designs/
+.agent/
+.agents/
+.claude/
+.impeccable/
 .env
 .env*.local
 

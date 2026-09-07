@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
             padding: '2.5rem 2rem',
             backgroundColor: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderLeft: '4px solid var(--color-terracotta)',
+            borderRadius: '12px',
             textAlign: 'center',
           }}
         >
