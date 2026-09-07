@@ -37,6 +37,14 @@ interface RevealCodeData {
   isReset?: boolean;
 }
 
+function getEntryDisplayName(item: { first_name?: string | null; last_name?: string | null; full_name?: string | null; email?: string }): string {
+  if (item.first_name && item.last_name) return `${item.first_name} ${item.last_name}`;
+  if (item.first_name) return item.first_name;
+  if (item.full_name) return item.full_name;
+  if (item.email) return item.email.split('@')[0];
+  return '—';
+}
+
 function getMailtoLink(data: RevealCodeData): string {
   const roleDisplay = data.role === 'supervisor' ? 'Chapter Advisor / Supervisor' : data.role === 'leadership' ? 'Leadership' : 'Member';
   const subject = encodeURIComponent(`Your CAS National Honor Society Portal Access Code`);
@@ -75,7 +83,8 @@ export const AllowlistManager: React.FC = () => {
 
   // Single Add Form
   const [email, setEmail] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<UserRole>('member');
   const [studentGrade, setStudentGrade] = useState<number>(11);
   const [provisioning, setProvisioning] = useState(false);
@@ -123,7 +132,11 @@ export const AllowlistManager: React.FC = () => {
     setErrorMsg(null);
 
     const generatedCode = generateAccessCode();
-    const memberName = fullName.trim() || cleanEmail.split('@')[0];
+    const cleanFirst = firstName.trim();
+    const cleanLast = lastName.trim();
+    const memberName = cleanFirst && cleanLast
+      ? `${cleanFirst} ${cleanLast}`
+      : (cleanFirst || cleanLast || cleanEmail.split('@')[0]);
 
     try {
       const { data, error } = await supabase.rpc('provision_member', {
@@ -131,6 +144,8 @@ export const AllowlistManager: React.FC = () => {
         p_full_name: memberName,
         p_role: role,
         p_password: generatedCode,
+        p_first_name: cleanFirst || null,
+        p_last_name: cleanLast || null,
       });
 
       if (error) throw error;
@@ -157,7 +172,8 @@ export const AllowlistManager: React.FC = () => {
       });
 
       setEmail('');
-      setFullName('');
+      setFirstName('');
+      setLastName('');
       setRole('member');
       setStudentGrade(11);
       await loadAllowlist();
@@ -187,15 +203,18 @@ export const AllowlistManager: React.FC = () => {
     });
     if (!confirmed) return;
 
+    const displayName = getEntryDisplayName(entry);
     const newCode = generateAccessCode();
     setProvisioning(true);
 
     try {
       const { data, error } = await supabase.rpc('provision_member', {
         p_email: entry.email,
-        p_full_name: entry.full_name || entry.email.split('@')[0],
+        p_full_name: displayName,
         p_role: entry.role,
         p_password: newCode,
+        p_first_name: entry.first_name || null,
+        p_last_name: entry.last_name || null,
       });
 
       if (error) throw error;
@@ -203,7 +222,7 @@ export const AllowlistManager: React.FC = () => {
 
       setRevealData({
         email: entry.email,
-        fullName: entry.full_name || entry.email.split('@')[0],
+        fullName: displayName,
         role: entry.role,
         code: newCode,
         isReset: true,
@@ -221,9 +240,10 @@ export const AllowlistManager: React.FC = () => {
 
   // Promote Member to Leadership
   const handlePromoteToLeadership = async (entry: AllowlistEntry) => {
+    const displayName = getEntryDisplayName(entry);
     const confirmed = await confirm({
       title: 'Promote to Chapter Leadership',
-      message: `Are you sure you want to promote ${entry.full_name || entry.email} to Chapter Leadership?`,
+      message: `Are you sure you want to promote ${displayName} to Chapter Leadership?`,
       details: 'This grants leadership privileges, project review abilities, and treasury access.',
       confirmText: 'Promote Member',
       variant: 'info',
@@ -240,7 +260,7 @@ export const AllowlistManager: React.FC = () => {
       await loadAllowlist();
       await alert({
         title: 'Promotion Successful',
-        message: `${entry.full_name || entry.email} has been promoted to Leadership.`,
+        message: `${displayName} has been promoted to Leadership.`,
         variant: 'success',
       });
     } catch (err: any) {
@@ -500,7 +520,7 @@ export const AllowlistManager: React.FC = () => {
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
           Onboard New Student or Chapter Advisor
         </h3>
-        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: role === 'supervisor' ? '2fr 1.5fr 1.2fr auto' : '2fr 1.5fr 1.2fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: role === 'supervisor' ? '1.8fr 1.2fr 1.2fr 1.1fr auto' : '1.8fr 1.1fr 1.1fr 1.1fr 0.9fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
               CAS Email *
@@ -517,14 +537,28 @@ export const AllowlistManager: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-              Full Name *
+              First Name *
             </label>
             <input
               type="text"
               required
-              placeholder="First & Last Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              placeholder="First Name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+              Last Name *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Last Name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             />
           </div>
@@ -602,7 +636,7 @@ export const AllowlistManager: React.FC = () => {
           <thead>
             <tr>
               <th>Account</th>
-              <th>Full Name</th>
+              <th>Name</th>
               <th>Chapter Role</th>
               <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
@@ -631,7 +665,7 @@ export const AllowlistManager: React.FC = () => {
                       <td>
                         <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{item.email}</div>
                       </td>
-                      <td>{item.full_name || '—'}</td>
+                      <td>{getEntryDisplayName(item)}</td>
                       <td>
                         <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
                           {item.role}
@@ -709,7 +743,7 @@ export const AllowlistManager: React.FC = () => {
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{item.email}</div>
                     </td>
-                    <td>{item.full_name || '—'}</td>
+                    <td>{getEntryDisplayName(item)}</td>
                     <td>
                       <span className="status-pill ineligible" style={{ textTransform: 'capitalize', fontSize: '0.72rem' }}>
                         {item.role.replace('_', ' ')}

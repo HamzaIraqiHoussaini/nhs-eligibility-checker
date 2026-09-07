@@ -18,6 +18,8 @@ end $$;
 create table if not exists public.allowlist (
   email text primary key,
   role user_role default 'member'::user_role not null,
+  first_name text,
+  last_name text,
   full_name text,
   added_by text default 'system',
   created_at timestamp with time zone default now()
@@ -365,7 +367,14 @@ create policy "Attendance manage" on public.meeting_attendance for all using (
 -- ==============================================================================
 -- 10. Provision Member Function (Used by AllowlistManager)
 -- ==============================================================================
-CREATE OR REPLACE FUNCTION public.provision_member(p_email text, p_full_name text, p_role text, p_password text)
+CREATE OR REPLACE FUNCTION public.provision_member(
+  p_email text,
+  p_full_name text,
+  p_role text,
+  p_password text,
+  p_first_name text default null,
+  p_last_name text default null
+)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -379,6 +388,9 @@ DECLARE
   v_clean_role public.user_role;
   v_existing_role text;
   v_encrypted_pw text;
+  v_first_name text;
+  v_last_name text;
+  v_full_name text;
 BEGIN
   v_caller_email := lower(auth.jwt() ->> 'email');
 
@@ -400,11 +412,27 @@ BEGIN
     END IF;
   END IF;
 
+  -- Determine names
+  v_first_name := nullif(trim(p_first_name), '');
+  v_last_name := nullif(trim(p_last_name), '');
+
+  IF v_first_name IS NULL AND p_full_name IS NOT NULL THEN
+    v_first_name := split_part(trim(p_full_name), ' ', 1);
+    v_last_name := nullif(substr(trim(p_full_name), length(split_part(trim(p_full_name), ' ', 1)) + 2), '');
+  END IF;
+
+  v_full_name := trim(coalesce(v_first_name, '') || ' ' || coalesce(v_last_name, ''));
+  IF v_full_name = '' THEN
+    v_full_name := trim(coalesce(p_full_name, ''));
+  END IF;
+
   -- 1. Insert/update allowlist
-  INSERT INTO public.allowlist (email, full_name, role, added_by)
-  VALUES (v_clean_email, p_full_name, v_clean_role, v_caller_email)
+  INSERT INTO public.allowlist (email, first_name, last_name, full_name, role, added_by)
+  VALUES (v_clean_email, v_first_name, v_last_name, v_full_name, v_clean_role, v_caller_email)
   ON CONFLICT (email) DO UPDATE
-  SET full_name = EXCLUDED.full_name,
+  SET first_name = EXCLUDED.first_name,
+      last_name = EXCLUDED.last_name,
+      full_name = EXCLUDED.full_name,
       role = EXCLUDED.role;
 
   -- Hash password using extensions.crypt and extensions.gen_salt
@@ -416,7 +444,7 @@ BEGIN
   IF v_user_id IS NOT NULL THEN
     UPDATE auth.users
     SET encrypted_password = v_encrypted_pw,
-        raw_user_meta_data = jsonb_build_object('full_name', p_full_name, 'role', p_role, 'email_verified', true),
+        raw_user_meta_data = jsonb_build_object('first_name', v_first_name, 'last_name', v_last_name, 'full_name', v_full_name, 'role', p_role, 'email_verified', true),
         confirmation_token = COALESCE(confirmation_token, ''),
         recovery_token = COALESCE(recovery_token, ''),
         email_change_token_new = COALESCE(email_change_token_new, ''),
@@ -430,7 +458,7 @@ BEGIN
     WHERE id = v_user_id;
 
     UPDATE public.profiles
-    SET full_name = p_full_name,
+    SET full_name = v_full_name,
         role = v_clean_role,
         grade_level = CASE WHEN v_clean_role IN ('supervisor', 'past_supervisor') THEN NULL ELSE COALESCE(public.profiles.grade_level, 11) END
     WHERE id = v_user_id;
@@ -473,7 +501,7 @@ BEGIN
       '',
       '',
       '{"provider":"email","providers":["email"]}'::jsonb,
-      jsonb_build_object('full_name', p_full_name, 'role', p_role, 'email_verified', true),
+      jsonb_build_object('first_name', v_first_name, 'last_name', v_last_name, 'full_name', v_full_name, 'role', p_role, 'email_verified', true),
       'authenticated',
       'authenticated',
       false,
@@ -483,7 +511,7 @@ BEGIN
     );
 
     INSERT INTO public.profiles (id, email, full_name, role, grade_level)
-    VALUES (v_user_id, v_clean_email, p_full_name, v_clean_role, CASE WHEN v_clean_role IN ('supervisor', 'past_supervisor') THEN NULL ELSE 11 END)
+    VALUES (v_user_id, v_clean_email, v_full_name, v_clean_role, CASE WHEN v_clean_role IN ('supervisor', 'past_supervisor') THEN NULL ELSE 11 END)
     ON CONFLICT (id) DO UPDATE
     SET full_name = EXCLUDED.full_name,
         role = EXCLUDED.role,

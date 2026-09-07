@@ -29,6 +29,8 @@ export interface Profile {
 export interface AllowlistEntry {
   email: string;
   role: UserRole;
+  first_name?: string | null;
+  last_name?: string | null;
   full_name: string | null;
   added_by: string;
   created_at: string;
