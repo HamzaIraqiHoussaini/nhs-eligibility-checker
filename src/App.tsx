@@ -119,6 +119,16 @@ function PortalContent() {
   const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
 
   const navigateTo = (tab: ActiveTab) => {
+    // If account is restricted, lock down navigation to dashboard only (and legal terms if clicked)
+    if (isRestricted && tab !== 'dashboard' && tab !== 'legal') {
+      setActiveTab('dashboard');
+      const path = TAB_ROUTES['dashboard'] || '/dashboard';
+      if (window.location.pathname !== path) {
+        window.history.pushState({ tab: 'dashboard' }, '', path);
+      }
+      return;
+    }
+
     setActiveTab(tab);
     const path = TAB_ROUTES[tab] || `/${tab}`;
     if (window.location.pathname !== path) {
@@ -148,6 +158,15 @@ function PortalContent() {
       }
     }
   }, [user, isSupervisor, activeTab]);
+
+  // Strict route containment for Restricted accounts: Dashboard only
+  useEffect(() => {
+    if (user && isRestricted) {
+      if (activeTab !== 'dashboard' && activeTab !== 'legal') {
+        navigateTo('dashboard');
+      }
+    }
+  }, [user, isRestricted, activeTab]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -417,6 +436,19 @@ function PortalContent() {
                 <span>Chapter Members</span>
               </button>
             </>
+          ) : isRestricted ? (
+            <>
+              <div className="stitch-nav-section-label">Account Restricted</div>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => navigateTo('dashboard')}
+              >
+                <LayoutDashboard size={16} />
+                <span>Dashboard</span>
+              </button>
+            </>
           ) : (
             <>
               <div className="stitch-nav-section-label">General Workspace</div>
@@ -655,6 +687,17 @@ function PortalContent() {
                   initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
                   onBack={() => navigateTo('review')}
                 />
+              )}
+            </>
+          ) : isRestricted ? (
+            <>
+              {activeTab === 'legal' ? (
+                <TermsAndPrivacyView
+                  initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+                  onBack={() => navigateTo('dashboard')}
+                />
+              ) : (
+                <MemberDashboard onNavigate={(t) => navigateTo(t as ActiveTab)} />
               )}
             </>
           ) : (

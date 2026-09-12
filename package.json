@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node test_screener_feature.js && node test_pentest_and_stress.js && node test_probation_restriction.js && node test_universal.js && node test_full.js",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -284,7 +284,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
             )}
           </div>
         );
-      })() : (
+      })() : (isLeadership || isSupervisor) ? (
         <div className="p-6 mb-8 rounded-xl bg-white border border-slate-200/90 shadow-card">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -303,7 +303,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Statistics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -313,7 +313,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
             {semesterProjectsLed} <span className="text-xs text-slate-500 font-normal">({projectCount} proposed)</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}
+            {isRestricted ? 'Account restricted' : isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Led or mentored • Quota exempt' : 'Approved & led this sem • Max 2 / sem'}
           </div>
         </div>
 
@@ -323,7 +323,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
             {semesterVolunteered} <span className="text-xs text-slate-500 font-normal">({volunteerCount} total)</span>
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}
+            {isRestricted ? 'Account restricted' : isGraduated ? 'Archived • Workload exempt' : isLeadership || isSupervisor ? 'Voluntary participation • Quota exempt' : 'Min 2 / sem (excluding own)'}
           </div>
         </div>
 
@@ -335,82 +335,88 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               : '100%'}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            {isGraduated
+            {isRestricted
+              ? 'Membership dismissed'
+              : isGraduated
               ? 'Archived • Attendance exempt'
               : `${attendanceStats.absences} absent, ${attendanceStats.tardies} tardy (${effectiveAbsences >= absencesForProbation ? 'Probation Triggered' : `${remainingBeforeProbation} left before probation`})`}
           </div>
         </div>
 
         <div className="p-5 bg-white border border-slate-200/90 rounded-xl shadow-card">
-          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">Chapter Project Cap</div>
-          <div className="font-serif text-2xl sm:text-3xl font-bold text-[#0a1e3f]">
-            Max 2 / Sem
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-1">
+            {isRestricted ? 'Account Standing' : 'Chapter Project Cap'}
+          </div>
+          <div className={`font-serif text-2xl sm:text-3xl font-bold ${isRestricted ? 'text-[#93000a]' : 'text-[#0a1e3f]'}`}>
+            {isRestricted ? 'Restricted' : 'Max 2 / Sem'}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            Yearly projects exempt from cap
+            {isRestricted ? 'Accumulated 2 probations' : 'Yearly projects exempt from cap'}
           </div>
         </div>
       </div>
 
-      {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <div
-          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
-          onClick={() => onNavigate('projects')}
-        >
-          <div className="w-10 h-10 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-3 border border-slate-200">
-            <FileText size={20} className="text-[#0a1e3f]" />
+      {/* Quick Navigation Cards - Only for active, non-restricted members */}
+      {!isRestricted && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div
+            className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
+            onClick={() => onNavigate('projects')}
+          >
+            <div className="w-10 h-10 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-3 border border-slate-200">
+              <FileText size={20} className="text-[#0a1e3f]" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
+              Submit Project Proposal
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Propose a student-led competition, workshop, or community service initiative using the official CAS template.
+            </p>
+            <div className="text-xs text-[#0a1e3f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>Open Project Hub</span>
+              <ArrowRight size={14} />
+            </div>
           </div>
-          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
-            Submit Project Proposal
-          </h3>
-          <p className="text-xs text-slate-600 leading-relaxed mb-4">
-            Propose a student-led competition, workshop, or community service initiative using the official CAS template.
-          </p>
-          <div className="text-xs text-[#0a1e3f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-            <span>Open Project Hub</span>
-            <ArrowRight size={14} />
-          </div>
-        </div>
 
-        <div
-          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
-          onClick={() => onNavigate('screener')}
-        >
-          <div className="w-10 h-10 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-3 border border-[#a7f3d0]">
-            <CheckCircle2 size={20} className="text-[#059669]" />
+          <div
+            className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
+            onClick={() => onNavigate('screener')}
+          >
+            <div className="w-10 h-10 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-3 border border-[#a7f3d0]">
+              <CheckCircle2 size={20} className="text-[#059669]" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
+              Verify My Report Card
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Upload your individual CAS report card (PDF/image) to audit your GPA, check for AE/BE flags, and verify good standing.
+            </p>
+            <div className="text-xs text-[#059669] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>Run Individual Audit</span>
+              <ArrowRight size={14} />
+            </div>
           </div>
-          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
-            Verify My Report Card
-          </h3>
-          <p className="text-xs text-slate-600 leading-relaxed mb-4">
-            Upload your individual CAS report card (PDF/image) to audit your GPA, check for AE/BE flags, and verify good standing.
-          </p>
-          <div className="text-xs text-[#059669] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-            <span>Run Individual Audit</span>
-            <ArrowRight size={14} />
-          </div>
-        </div>
 
-        <div
-          className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
-          onClick={() => onNavigate('rules')}
-        >
-          <div className="w-10 h-10 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-3 border border-[#ead59b]">
-            <Award size={20} className="text-[#c59b27]" />
-          </div>
-          <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
-            Chapter Rules
-          </h3>
-          <p className="text-xs text-slate-600 leading-relaxed mb-4">
-            Review Grade 10 vs 11/12 criteria, 4 IB HL exemptions, Senior rules, probation triggers, and dismissal guidelines.
-          </p>
-          <div className="text-xs text-[#8c6d1f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-            <span>View Rules</span>
-            <ArrowRight size={14} />
+          <div
+            className="p-6 bg-white border border-slate-200/90 rounded-xl shadow-card hover:border-[#c59b27]/40 hover:shadow-card-hover transition-all cursor-pointer group"
+            onClick={() => onNavigate('rules')}
+          >
+            <div className="w-10 h-10 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-3 border border-[#ead59b]">
+              <Award size={20} className="text-[#c59b27]" />
+            </div>
+            <h3 className="font-serif text-lg font-bold text-[#0a1e3f] group-hover:text-[#16325c] mb-1.5 transition-colors">
+              Chapter Rules
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Review Grade 10 vs 11/12 criteria, 4 IB HL exemptions, Senior rules, probation triggers, and dismissal guidelines.
+            </p>
+            <div className="text-xs text-[#8c6d1f] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+              <span>View Rules</span>
+              <ArrowRight size={14} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
     </div>
   );

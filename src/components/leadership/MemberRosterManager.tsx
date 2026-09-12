@@ -121,9 +121,13 @@ export const MemberRosterManager: React.FC = () => {
   const handleIssueProbation = async () => {
     if (!probationTarget || !isLeadership) return;
 
-    const isAlreadyOnProbation = Boolean(probationTarget.is_on_probation);
-    const willBeRestricted = isAlreadyOnProbation;
-    const newCount = isAlreadyOnProbation ? 2 : 1;
+    // Check if member already has 1 or more probations, or is currently on probation
+    const currentCount = Math.max(
+      Number(probationTarget.probation_count) || 0,
+      probationTarget.is_on_probation ? 1 : 0
+    );
+    const newCount = currentCount + 1;
+    const willBeRestricted = newCount >= 2;
 
     const confirmed = await confirm({
       title: willBeRestricted ? 'Chapter Dismissal Confirmation' : 'Issue Chapter Probation',
@@ -143,7 +147,7 @@ export const MemberRosterManager: React.FC = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          is_on_probation: !willBeRestricted,
+          is_on_probation: willBeRestricted ? false : true,
           probation_count: newCount,
           probation_reason: probationReason,
           probation_notes: probationNotes.trim() || undefined,
@@ -162,7 +166,7 @@ export const MemberRosterManager: React.FC = () => {
         await supabase
           .from('allowlist')
           .update({ role: 'kicked_out' })
-          .eq('email', probationTarget.email);
+          .ilike('email', probationTarget.email.trim());
       }
 
       setProbationTarget(null);
@@ -611,45 +615,51 @@ export const MemberRosterManager: React.FC = () => {
                       </button>
 
                       {isLeadership && !isRestrictedMember(member) && !isGraduatedMember(member) && (
-                        member.is_on_probation ? (
+                        (member.is_on_probation || (Number(member.probation_count) || 0) >= 1) ? (
                           <>
-                            <button
-                              className="btn-inspect"
-                              style={{ color: 'var(--color-sage-text)' }}
-                              onClick={() => handleClearProbation(member)}
-                              title="Cancel probation and return member to Good Standing"
-                            >
-                              <UserCheck size={12} /> Cancel Probation
-                            </button>
+                            {member.is_on_probation && (
+                              <button
+                                className="btn-inspect"
+                                style={{ color: 'var(--color-sage-text)' }}
+                                onClick={() => handleClearProbation(member)}
+                                title="Cancel probation and return member to Good Standing"
+                              >
+                                <UserCheck size={12} /> Cancel Probation
+                              </button>
+                            )}
 
                             <button
                               className="btn-inspect"
                               style={{ color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)' }}
-                              onClick={() => { setProbationTarget(member); setProbationNotes(''); }}
+                              onClick={() => {
+                                setProbationTarget(member);
+                                setProbationReason(part.meetsQuota ? 'behavior' : 'inactivity');
+                                setProbationNotes('');
+                              }}
                               title="Issue 2nd probation and dismiss member from chapter"
                             >
                               <UserX size={12} /> 2nd Probation (Kick Out)
                             </button>
                           </>
                         ) : (
-                            <button
-                              className="btn-inspect"
-                              style={{ color: 'var(--color-gold-text)' }}
-                              onClick={() => {
-                                setProbationTarget(member);
-                                setProbationReason(part.meetsQuota ? 'grades' : 'inactivity');
-                                setProbationNotes(
-                                  part.meetsQuota
-                                    ? ''
-                                    : `Semester participation deficit in ${activeSemester?.name || 'current semester'}: Member has ${rules.no_projects_led_required ? '' : `led ${part.ledCount}/${rules.required_projects_led} project(s)`}${!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}${rules.no_volunteering_required ? '' : `volunteered in ${part.volCount}/${rules.required_volunteering} initiative(s)`}.`
-                                );
-                              }}
-                              title="Place member on Chapter Probation #1"
-                            >
-                              <UserX size={12} /> Place on Probation
-                            </button>
-                          )
-                        )}
+                          <button
+                            className="btn-inspect"
+                            style={{ color: 'var(--color-gold-text)' }}
+                            onClick={() => {
+                              setProbationTarget(member);
+                              setProbationReason(part.meetsQuota ? 'grades' : 'inactivity');
+                              setProbationNotes(
+                                part.meetsQuota
+                                  ? ''
+                                  : `Semester participation deficit in ${activeSemester?.name || 'current semester'}: Member has ${rules.no_projects_led_required ? '' : `led ${part.ledCount}/${rules.required_projects_led} project(s)`}${!rules.no_projects_led_required && !rules.no_volunteering_required ? ' and ' : ''}${rules.no_volunteering_required ? '' : `volunteered in ${part.volCount}/${rules.required_volunteering} initiative(s)`}.`
+                              );
+                            }}
+                            title="Place member on Chapter Probation #1"
+                          >
+                            <UserX size={12} /> Place on Probation
+                          </button>
+                        )
+                      )}
 
                       {isSuperadmin && member.email.toLowerCase() !== SUPERADMIN_EMAIL && (
                         <button
@@ -680,78 +690,87 @@ export const MemberRosterManager: React.FC = () => {
       />
 
       {/* Issue Probation Modal (Leadership Only) */}
-      {probationTarget && (
-        <div className="drawer-backdrop" onClick={() => setProbationTarget(null)}>
-          <div
-            className="sharp-card"
-            style={{ width: '100%', maxWidth: '480px', margin: 'auto', backgroundColor: 'var(--color-surface)', padding: '2rem' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-              Issue Official Probation
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1.25rem' }}>
-              Placing <strong>{probationTarget.full_name}</strong> on Chapter Probation #{probationTarget.is_on_probation ? 2 : 1}.
-              {probationTarget.is_on_probation && (
-                <span style={{ display: 'block', color: 'var(--color-terracotta)', fontWeight: 700, marginTop: '4px' }}>
-                  Notice: This is the student's 2nd probation. Accumulating 2 probations results in immediate Dismissal and Account Restriction.
-                </span>
-              )}
-            </p>
+      {probationTarget && (() => {
+        const currentCount = Math.max(
+          Number(probationTarget.probation_count) || 0,
+          probationTarget.is_on_probation ? 1 : 0
+        );
+        const nextProbationNumber = currentCount + 1;
+        const isSecondOrMore = nextProbationNumber >= 2;
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                  Violation Category *
-                </label>
-                <select
-                  value={probationReason || 'grades'}
-                  onChange={e => setProbationReason(e.target.value as ProbationReason)}
-                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+        return (
+          <div className="drawer-backdrop" onClick={() => setProbationTarget(null)}>
+            <div
+              className="sharp-card"
+              style={{ width: '100%', maxWidth: '480px', margin: 'auto', backgroundColor: 'var(--color-surface)', padding: '2rem' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.5rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                {isSecondOrMore ? 'Issue 2nd Probation (Dismissal)' : 'Issue Official Probation'}
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', marginBottom: '1.25rem' }}>
+                Placing <strong>{probationTarget.full_name}</strong> on Chapter Probation #{nextProbationNumber}.
+                {isSecondOrMore && (
+                  <span style={{ display: 'block', color: 'var(--color-terracotta)', fontWeight: 700, marginTop: '4px' }}>
+                    Notice: This is the student's 2nd probation. Accumulating 2 probations results in immediate Dismissal and Account Restriction.
+                  </span>
+                )}
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                    Violation Category *
+                  </label>
+                  <select
+                    value={probationReason || 'grades'}
+                    onChange={e => setProbationReason(e.target.value as ProbationReason)}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+                  >
+                    <option value="grades">Grades (Fell below required 5.8 / 5.6 average)</option>
+                    <option value="behavior">Behavior / Conduct (AEs or BEs in more than one class)</option>
+                    <option value="attendance">Attendance ({rules.absences_for_probation || 2} unexcused meeting absences — {rules.tardies_per_absence || 3} tardies = 1 absence)</option>
+                    <option value="inactivity">Participation Deficit (Failed to lead 1 project & volunteer twice in semester)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                    Official Leadership Notes *
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="Specific details regarding the deficiency or violation..."
+                    value={probationNotes}
+                    onChange={e => setProbationNotes(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button className="btn-secondary" onClick={() => setProbationTarget(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  style={{
+                    backgroundColor: isSecondOrMore ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                    borderColor: isSecondOrMore ? 'var(--color-terracotta)' : 'var(--color-gold)',
+                    color: '#FFFFFF',
+                  }}
+                  onClick={handleIssueProbation}
                 >
-                  <option value="grades">Grades (Fell below required 5.8 / 5.6 average)</option>
-                  <option value="behavior">Behavior / Conduct (AEs or BEs in more than one class)</option>
-                  <option value="attendance">Attendance ({rules.absences_for_probation || 2} unexcused meeting absences — {rules.tardies_per_absence || 3} tardies = 1 absence)</option>
-                  <option value="inactivity">Participation Deficit (Failed to lead 1 project & volunteer twice in semester)</option>
-                </select>
+                  {isSecondOrMore
+                    ? 'Confirm 2nd Probation (Kick Out & Dismiss)'
+                    : 'Confirm Probation #1'}
+                </button>
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                  Official Leadership Notes *
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="Specific details regarding the deficiency or violation..."
-                  value={probationNotes}
-                  onChange={e => setProbationNotes(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button className="btn-secondary" onClick={() => setProbationTarget(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                style={{
-                  backgroundColor: probationTarget.is_on_probation ? 'var(--color-terracotta)' : 'var(--color-gold)',
-                  borderColor: probationTarget.is_on_probation ? 'var(--color-terracotta)' : 'var(--color-gold)',
-                  color: '#FFFFFF',
-                }}
-                onClick={handleIssueProbation}
-              >
-                {probationTarget.is_on_probation
-                  ? 'Confirm 2nd Probation (Kick Out & Dismiss)'
-                  : 'Confirm Probation #1'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
