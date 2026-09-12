@@ -4,9 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck, RotateCcw } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useChapterRules } from '../../hooks/useChapterRules';
+import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
@@ -157,6 +158,7 @@ export const MemberRosterManager: React.FC = () => {
           restricted_reason: willBeRestricted
             ? 'Dismissed from CAS NHS: Accumulated 2 probations. Account restricted.'
             : undefined,
+          restricted_at: willBeRestricted ? new Date().toISOString() : null,
         })
         .eq('id', probationTarget.id);
 
@@ -213,6 +215,54 @@ export const MemberRosterManager: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to clear probation:', err);
       await alert(`Failed to cancel probation: ${err.message}`);
+    }
+  };
+
+  const handleRestoreRestrictedMember = async (member: Profile) => {
+    if (!isLeadership) return;
+    const eligibility = getRestorationEligibility(member);
+    if (!eligibility.canRestore) {
+      await alert({
+        title: 'Cannot Restore Account',
+        message: eligibility.reason,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Restore Restricted Account',
+      message: `Are you sure you want to restore ${member.full_name} (${member.email}) to Chapter Probation #1?`,
+      details: `Chapter bylaws permit lifting account restrictions within 7 days of dismissal (${eligibility.timeRemainingText}). This will reset their account to active status, set their probation count to 1, and lift all navigation locks.`,
+      confirmText: 'Restore to Probation #1',
+      variant: 'warning',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const updatePayload = getRestoredProfilePayload(member.probation_notes);
+      const { error } = await supabase
+        .from('profiles')
+        .update(updatePayload)
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      await supabase
+        .from('allowlist')
+        .update({ role: 'member' })
+        .ilike('email', member.email.trim());
+
+      await loadMembers();
+      await alert({
+        title: 'Account Restored',
+        message: `${member.full_name} has been restored to active membership with 1 probation (Probation #1). Account restriction has been lifted.`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      console.error('Failed to restore restricted member:', err);
+      await alert(`Failed to restore account: ${err.message}`);
     }
   };
 
@@ -569,9 +619,23 @@ export const MemberRosterManager: React.FC = () => {
                         <Award size={12} /> NHS Graduate
                       </span>
                     ) : member.is_restricted || member.role === 'kicked_out' ? (
-                      <span className="status-pill ineligible">
-                        <ShieldAlert size={12} /> Dismissed / Restricted
-                      </span>
+                      <div>
+                        <span className="status-pill ineligible">
+                          <ShieldAlert size={12} /> Dismissed / Restricted
+                        </span>
+                        {(() => {
+                          const eligibility = getRestorationEligibility(member);
+                          return eligibility.canRestore ? (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--color-oxford)', marginTop: '3px', fontWeight: 600 }}>
+                              Appeal: {eligibility.timeRemainingText}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', marginTop: '3px' }}>
+                              Appeal Window Expired (&gt;7d)
+                            </div>
+                          );
+                        })()}
+                      </div>
                     ) : member.is_on_probation ? (
                       <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
                         <AlertTriangle size={12} /> Probation #{member.probation_count} ({member.probation_reason || 'quota'})
@@ -659,6 +723,29 @@ export const MemberRosterManager: React.FC = () => {
                             <UserX size={12} /> Place on Probation
                           </button>
                         )
+                      )}
+
+                      {isLeadership && isRestrictedMember(member) && (
+                        (() => {
+                          const eligibility = getRestorationEligibility(member);
+                          return eligibility.canRestore ? (
+                            <button
+                              className="btn-inspect"
+                              style={{ color: 'var(--color-oxford)', borderColor: 'var(--color-oxford)', fontWeight: 600 }}
+                              onClick={() => handleRestoreRestrictedMember(member)}
+                              title={`Restore account to Probation #1 (${eligibility.timeRemainingText})`}
+                            >
+                              <RotateCcw size={12} /> Restore ({eligibility.daysRemaining > 0 ? `${eligibility.daysRemaining}d left` : `${eligibility.hoursRemaining}h left`})
+                            </button>
+                          ) : (
+                            <span
+                              style={{ fontSize: '0.70rem', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '0.2rem 0.4rem' }}
+                              title={eligibility.reason}
+                            >
+                              Appeal Expired (&gt;7d)
+                            </span>
+                          );
+                        })()
                       )}
 
                       {isSuperadmin && member.email.toLowerCase() !== SUPERADMIN_EMAIL && (

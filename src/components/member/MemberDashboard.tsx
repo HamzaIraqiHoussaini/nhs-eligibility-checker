@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { Award, AlertTriangle, ShieldAlert, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
+import { getRestorationEligibility } from '../../lib/probation';
 
 interface MemberDashboardProps {
   onNavigate: (tab: string) => void;
@@ -159,13 +160,33 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       ) : isRestricted ? (
         <div className="p-6 bg-[#ffdad6]/40 border border-[#ba1a1a] rounded-xl mb-8 flex flex-col sm:flex-row gap-4 items-start shadow-card">
           <ShieldAlert size={36} className="text-[#ba1a1a] flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="flex-1">
             <div className="font-serif text-xl font-bold text-[#93000a]">
               Membership Dismissed • Account Restricted
             </div>
             <p className="text-sm text-[#93000a] my-2">
               {profile?.restricted_reason || 'You have accumulated two probations, which violates official CAS NHS Chapter rules. Membership privileges and project proposal submissions are now locked.'}
             </p>
+            {(() => {
+              const eligibility = getRestorationEligibility(profile);
+              if (eligibility.canRestore) {
+                return (
+                  <div className="my-2.5 p-3 rounded-lg bg-red-100/80 border border-red-200 text-xs text-[#7f1d1d] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <strong>7-Day Appeal Window Active:</strong> You have <strong>{eligibility.timeRemainingText}</strong> to appeal to Chapter Leadership and request account restoration to Probation #1.
+                    </div>
+                    <div className="text-[0.7rem] uppercase tracking-wider font-bold text-[#991b1b]">
+                      Restorable
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="my-2.5 p-3 rounded-lg bg-red-100/40 border border-red-200/60 text-xs text-red-900">
+                  <strong>Appeal Window Expired:</strong> The 7-day post-dismissal restoration window has concluded. Chapter dismissal is finalized.
+                </div>
+              );
+            })()}
             <div className="text-xs text-red-900 font-medium">
               Please schedule a meeting with the Chapter Faculty Advisor or Chapter Leadership regarding your status.
             </div>

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProjectProposal, ProjectVolunteer, MeetingAttendance, Semester } from '../../types/nhs';
-import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award, ShieldCheck } from 'lucide-react';
+import { X, AlertTriangle, ShieldAlert, CheckCircle2, Award, ShieldCheck, RotateCcw } from 'lucide-react';
 import { useChapterRules } from '../../hooks/useChapterRules';
+import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
 
 interface MemberProfileDrawerProps {
   member: Profile | null;
@@ -49,6 +51,62 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
       if (onUpdated) onUpdated();
     } catch (err) {
       console.error('Failed to update grade:', err);
+    }
+  };
+
+  const { confirm, alert } = useConfirm();
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestoreMember = async () => {
+    if (!member || !isLeadership) return;
+    const eligibility = getRestorationEligibility(member);
+    if (!eligibility.canRestore) {
+      await alert({
+        title: 'Cannot Restore Account',
+        message: eligibility.reason,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Restore Chapter Member',
+      message: `Are you sure you want to restore ${member.full_name} (${member.email}) to Chapter Probation #1?`,
+      details: `This member was restricted on ${eligibility.restrictedDate ? eligibility.restrictedDate.toLocaleDateString() : 'prior date'}. Restoring will lift the account restriction, return their role to 'member', and place them on Chapter Probation #1 with ${eligibility.timeRemainingText} left in the 7-day appeal window.`,
+      confirmText: 'Restore to Probation #1',
+      variant: 'warning',
+    });
+
+    if (!confirmed) return;
+
+    setRestoring(true);
+    try {
+      const updatePayload = getRestoredProfilePayload(member.probation_notes);
+      const { error } = await supabase
+        .from('profiles')
+        .update(updatePayload)
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      await supabase
+        .from('allowlist')
+        .update({ role: 'member' })
+        .ilike('email', member.email.trim());
+
+      await alert({
+        title: 'Account Restored',
+        message: `${member.full_name} has been restored to active chapter membership on Chapter Probation #1.`,
+        variant: 'success',
+      });
+
+      if (onUpdated) onUpdated();
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to restore member:', err);
+      await alert(`Failed to restore member: ${err.message}`);
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -239,16 +297,67 @@ export const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ member
               </div>
             </div>
           ) : member.is_restricted || member.role === 'kicked_out' ? (
-            <div style={{ padding: '1rem 1.25rem', backgroundColor: 'var(--color-terracotta-bg)', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <ShieldAlert size={24} color="var(--color-terracotta)" />
-              <div>
-                <div style={{ fontWeight: 700, color: 'var(--color-terracotta-text)', fontSize: '0.92rem' }}>
-                  Chapter Dismissed • Account Restricted
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#991B1B' }}>
-                  {member.restricted_reason || 'Accumulated 2 probations. Account restricted.'}
+            <div style={{ padding: '1.25rem', backgroundColor: 'var(--color-terracotta-bg)', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <ShieldAlert size={24} color="var(--color-terracotta)" />
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--color-terracotta-text)', fontSize: '0.92rem' }}>
+                    Chapter Dismissed • Account Restricted
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#991B1B' }}>
+                    {member.restricted_reason || 'Accumulated 2 probations. Account restricted.'}
+                  </div>
                 </div>
               </div>
+
+              {(() => {
+                const eligibility = getRestorationEligibility(member);
+                return (
+                  <div style={{ borderTop: '1px solid rgba(186, 26, 26, 0.15)', paddingTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#7f1d1d', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span>
+                        <strong>7-Day Appeal Window:</strong> {eligibility.canRestore ? (
+                          <span style={{ color: '#065f46', fontWeight: 600, backgroundColor: '#ecfdf5', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                            Active • {eligibility.timeRemainingText}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#991b1b', fontStyle: 'italic' }}>
+                            Expired (&gt;7 days) • Permanent Dismissal
+                          </span>
+                        )}
+                      </span>
+                      {eligibility.restrictedDate && (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '0.70rem' }}>
+                          Dismissed: {eligibility.restrictedDate.toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+
+                    {isLeadership && eligibility.canRestore && (
+                      <div style={{ marginTop: '0.25rem' }}>
+                        <button
+                          className="btn-primary"
+                          style={{
+                            fontSize: '0.78rem',
+                            padding: '0.4rem 0.85rem',
+                            backgroundColor: 'var(--color-oxford)',
+                            borderColor: 'var(--color-oxford)',
+                            color: '#FFFFFF',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                          }}
+                          disabled={restoring}
+                          onClick={handleRestoreMember}
+                        >
+                          <RotateCcw size={13} />
+                          <span>{restoring ? 'Restoring...' : 'Restore to Probation #1 (7-Day Appeal)'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : member.is_on_probation ? (
             <div style={{ padding: '1rem 1.25rem', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

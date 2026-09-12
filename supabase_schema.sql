@@ -44,6 +44,7 @@ create table if not exists public.profiles (
   probation_updated_at timestamp with time zone,
   is_restricted boolean default false,
   restricted_reason text,
+  restricted_at timestamp with time zone,
   created_at timestamp with time zone default now()
 );
 

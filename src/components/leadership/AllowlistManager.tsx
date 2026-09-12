@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { AllowlistEntry, UserRole } from '../../types/nhs';
+import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
 import {
   UserPlus,
   Trash2,
@@ -337,6 +338,7 @@ export const AllowlistManager: React.FC = () => {
         role: archiveRole,
         is_restricted: archiveRole === 'kicked_out',
         restricted_reason: archiveRole === 'kicked_out' ? 'Dismissed from CAS NHS.' : null,
+        restricted_at: archiveRole === 'kicked_out' ? new Date().toISOString() : null,
       }).eq('email', targetEmail);
       await loadAllowlist();
     } catch (err: any) {
@@ -350,6 +352,55 @@ export const AllowlistManager: React.FC = () => {
 
   // Restore Account from Archive to Active Member
   const handleRestoreAccount = async (targetEmail: string) => {
+    // Fetch profile to see if currently kicked_out / restricted
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('is_restricted, role, restricted_at, probation_updated_at, probation_notes, full_name')
+      .eq('email', targetEmail)
+      .maybeSingle();
+
+    const isRestrictedTarget = Boolean(profileData?.is_restricted || profileData?.role === 'kicked_out');
+
+    if (isRestrictedTarget) {
+      const eligibility = getRestorationEligibility(profileData);
+      if (!eligibility.canRestore) {
+        await alert({
+          title: 'Cannot Restore Dismissed Account',
+          message: eligibility.reason,
+          variant: 'danger',
+        });
+        return;
+      }
+
+      const confirmed = await confirm({
+        title: 'Restore Chapter Member',
+        message: `Restore dismissed member ${profileData?.full_name || targetEmail} (${targetEmail})?`,
+        details: `This account was dismissed on ${eligibility.restrictedDate ? eligibility.restrictedDate.toLocaleDateString() : 'prior date'}. Restoring within the 7-day appeal window (${eligibility.timeRemainingText}) will lift the account restriction, return role to 'member', and place them on Chapter Probation #1.`,
+        confirmText: 'Restore to Probation #1',
+        variant: 'warning',
+      });
+      if (!confirmed) return;
+
+      try {
+        const updatePayload = getRestoredProfilePayload(profileData?.probation_notes);
+        await supabase.from('profiles').update(updatePayload).eq('email', targetEmail);
+        await supabase.from('allowlist').update({ role: 'member' }).eq('email', targetEmail);
+        await loadAllowlist();
+        await alert({
+          title: 'Account Restored',
+          message: `${targetEmail} has been restored to active Member status on Chapter Probation #1.`,
+          variant: 'success',
+        });
+      } catch (err: any) {
+        await alert({
+          title: 'Restore Failed',
+          message: `Failed to restore account: ${err.message}`,
+          variant: 'danger',
+        });
+      }
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Restore Chapter Member',
       message: `Restore ${targetEmail} back to active Member standing?`,
@@ -364,6 +415,7 @@ export const AllowlistManager: React.FC = () => {
         role: 'member',
         is_restricted: false,
         restricted_reason: null,
+        restricted_at: null,
       }).eq('email', targetEmail);
       await loadAllowlist();
       await alert({

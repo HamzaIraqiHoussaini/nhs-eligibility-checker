@@ -306,8 +306,16 @@ export const AttendanceSheet: React.FC = () => {
               restricted_reason: willBeRestricted
                 ? 'Dismissed from CAS NHS: Accumulated 2 probations. Account restricted.'
                 : member.restricted_reason,
+              restricted_at: willBeRestricted ? new Date().toISOString() : null,
             })
             .eq('id', member.id);
+
+          if (willBeRestricted) {
+            await supabase
+              .from('allowlist')
+              .update({ role: 'kicked_out' })
+              .ilike('email', member.email.trim());
+          }
         } else if (effectiveAbsences < absencesForProbation && member.is_on_probation && member.probation_reason === 'attendance') {
           // If effective absences dropped below threshold and member was on probation due to attendance, restore to Good Standing!
           await supabase

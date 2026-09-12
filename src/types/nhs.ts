@@ -23,6 +23,7 @@ export interface Profile {
   probation_updated_at: string | null;
   is_restricted: boolean;
   restricted_reason: string | null;
+  restricted_at?: string | null;
   created_at: string;
 }
 
