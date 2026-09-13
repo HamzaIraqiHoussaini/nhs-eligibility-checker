@@ -1261,8 +1261,110 @@ insert into public.chapter_rules (
   1,
   false,
   2
-) on conflict (id) do nothing;
+) on conflict (id) do nothing;-- -----------------------------------------------------------------------------
+-- Member Login Telemetry & Account Analytics Tracking
+-- -----------------------------------------------------------------------------
 
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS last_login_at timestamp with time zone,
+ADD COLUMN IF NOT EXISTS login_count integer DEFAULT 0,
+ADD COLUMN IF NOT EXISTS restricted_at timestamp with time zone;
 
+CREATE TABLE IF NOT EXISTS public.member_login_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  logged_in_at timestamp with time zone DEFAULT now() NOT NULL,
+  user_agent text,
+  device_type text,
+  browser text
+);
 
+CREATE INDEX IF NOT EXISTS idx_member_login_logs_user_id ON public.member_login_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_member_login_logs_logged_in_at ON public.member_login_logs(logged_in_at DESC);
 
+ALTER TABLE public.member_login_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert their own login logs"
+  ON public.member_login_logs
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Members can view their own login logs"
+  ON public.member_login_logs
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Leadership and supervisors can view all login logs"
+  ON public.member_login_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.role IN ('leadership', 'supervisor')
+    )
+  );
+
+CREATE OR REPLACE FUNCTION public.record_member_login(
+  p_user_agent text DEFAULT NULL,
+  p_device_type text DEFAULT NULL,
+  p_browser text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_email text;
+  v_new_count integer;
+  v_now timestamp with time zone := now();
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Unauthenticated');
+  END IF;
+
+  SELECT email, COALESCE(login_count, 0) + 1 INTO v_email, v_new_count
+  FROM public.profiles
+  WHERE id = v_user_id;
+
+  IF v_email IS NULL THEN
+    v_email := lower(auth.jwt() ->> 'email');
+    v_new_count := 1;
+  END IF;
+
+  UPDATE public.profiles
+  SET last_login_at = v_now,
+      login_count = v_new_count
+  WHERE id = v_user_id;
+
+  INSERT INTO public.member_login_logs (
+    user_id,
+    email,
+    logged_in_at,
+    user_agent,
+    device_type,
+    browser
+  ) VALUES (
+    v_user_id,
+    v_email,
+    v_now,
+    p_user_agent,
+    p_device_type,
+    p_browser
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'last_login_at', v_now,
+    'login_count', v_new_count
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.record_member_login(text, text, text) TO authenticated;

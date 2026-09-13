@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { X, Lock, Mail, AlertCircle } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 
+import { recordLoginEvent } from '../../lib/authTracking';
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -57,6 +59,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       }
 
       if (data?.user) {
+        await recordLoginEvent(data.user.id, cleanEmail);
         await refreshProfile();
       }
       setEmail('');

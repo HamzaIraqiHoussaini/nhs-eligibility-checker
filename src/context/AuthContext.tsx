@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase, fetchUserProfile } from '../lib/supabase';
 import type { Profile, UserRole } from '../types/nhs';
+import { recordLoginEvent } from '../lib/authTracking';
 
 interface AuthContextType {
   user: User | null;
@@ -63,6 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        if (_event === 'SIGNED_IN') {
+          recordLoginEvent(session.user.id, session.user.email || '');
+        }
         await loadProfile(session.user);
       } else {
         setProfile(null);

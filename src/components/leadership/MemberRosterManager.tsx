@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck, RotateCcw } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck, RotateCcw, Users } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
+import { formatRelativeTime, getLoginRecency } from '../../lib/authTracking';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
@@ -29,7 +30,7 @@ export const MemberRosterManager: React.FC = () => {
     setAppliedQuery(searchQuery);
   };
 
-  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'graduates' | 'restricted'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'good' | 'probation' | 'quota_deficit' | 'active_week' | 'inactive_telemetry' | 'never_logged_in' | 'graduates' | 'restricted'>('all');
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [probationTarget, setProbationTarget] = useState<Profile | null>(null);
   const [probationReason, setProbationReason] = useState<ProbationReason>('grades');
@@ -348,6 +349,19 @@ export const MemberRosterManager: React.FC = () => {
     if (statusFilter === 'good') return !m.is_on_probation;
     if (statusFilter === 'probation') return m.is_on_probation;
     if (statusFilter === 'quota_deficit') return m.role !== 'leadership' && m.role !== 'supervisor' && !participationMap[m.id]?.meetsQuota;
+    if (statusFilter === 'active_week') {
+      if (!m.last_login_at) return false;
+      const diffDays = (Date.now() - new Date(m.last_login_at).getTime()) / (24 * 60 * 60 * 1000);
+      return diffDays <= 7;
+    }
+    if (statusFilter === 'inactive_telemetry') {
+      if (!m.last_login_at) return false;
+      const diffDays = (Date.now() - new Date(m.last_login_at).getTime()) / (24 * 60 * 60 * 1000);
+      return diffDays > 14;
+    }
+    if (statusFilter === 'never_logged_in') {
+      return !m.last_login_at;
+    }
     return true;
   }), [members, appliedQuery, statusFilter, participationMap]);
 
@@ -355,11 +369,37 @@ export const MemberRosterManager: React.FC = () => {
   const graduatesCount = useMemo(() => members.filter((m) => isGraduatedMember(m)).length, [members]);
   const deficitCount = useMemo(() => members.filter((m) => !isRestrictedMember(m) && !isGraduatedMember(m) && m.role !== 'leadership' && m.role !== 'supervisor' && !(participationMap[m.id]?.meetsQuota)).length, [members, participationMap]);
 
+  const activeWeekCount = useMemo(
+    () =>
+      members.filter((m) => {
+        if (isRestrictedMember(m) || isGraduatedMember(m) || !m.last_login_at) return false;
+        const diffDays = (Date.now() - new Date(m.last_login_at).getTime()) / (24 * 60 * 60 * 1000);
+        return diffDays <= 7;
+      }).length,
+    [members]
+  );
+
+  const inactiveTelemetryCount = useMemo(
+    () =>
+      members.filter((m) => {
+        if (isRestrictedMember(m) || isGraduatedMember(m) || !m.last_login_at) return false;
+        const diffDays = (Date.now() - new Date(m.last_login_at).getTime()) / (24 * 60 * 60 * 1000);
+        return diffDays > 14;
+      }).length,
+    [members]
+  );
+
+  const neverLoggedInCount = useMemo(
+    () =>
+      members.filter((m) => !isRestrictedMember(m) && !isGraduatedMember(m) && !m.last_login_at).length,
+    [members]
+  );
+
   return (
     <div style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '1.5rem 0 3rem' }}>
       
       {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ fontSize: '0.78rem', color: 'var(--color-gold-text)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
           CAS NHS Chapter
         </div>
@@ -372,6 +412,113 @@ export const MemberRosterManager: React.FC = () => {
         </p>
       </div>
 
+      {/* Chapter Telemetry Snapshot Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', marginBottom: '1.75rem' }}>
+        <div
+          onClick={() => setStatusFilter('all')}
+          style={{
+            padding: '1rem 1.15rem',
+            backgroundColor: statusFilter === 'all' ? '#EFF6FF' : '#FFFFFF',
+            border: `1px solid ${statusFilter === 'all' ? '#BFDBFE' : 'var(--color-border)'}`,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Filter all active inducted members"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
+              Active Roster
+            </span>
+            <Users size={16} color="var(--color-oxford)" />
+          </div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.25rem' }}>
+            {activeMembersCount}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+            Inducted chapter members
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('active_week')}
+          style={{
+            padding: '1rem 1.15rem',
+            backgroundColor: statusFilter === 'active_week' ? '#ECFDF5' : '#FFFFFF',
+            border: `1px solid ${statusFilter === 'active_week' ? '#A7F3D0' : 'var(--color-border)'}`,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Filter members who signed in over the past 7 days"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#065F46' }}>
+              Active This Week
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
+          </div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#065F46', marginTop: '0.25rem' }}>
+            {activeWeekCount}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#047857', marginTop: '0.15rem' }}>
+            Logged in &le; 7 days ago
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('inactive_telemetry')}
+          style={{
+            padding: '1rem 1.15rem',
+            backgroundColor: statusFilter === 'inactive_telemetry' ? '#FFFBEB' : '#FFFFFF',
+            border: `1px solid ${statusFilter === 'inactive_telemetry' ? '#FDE68A' : 'var(--color-border)'}`,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Filter members with no logins in the past 14 days"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#92400E' }}>
+              Dormant / Inactive
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
+          </div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#92400E', marginTop: '0.25rem' }}>
+            {inactiveTelemetryCount}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '0.15rem' }}>
+            No login &gt; 14 days
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('never_logged_in')}
+          style={{
+            padding: '1rem 1.15rem',
+            backgroundColor: statusFilter === 'never_logged_in' ? '#FEF2F2' : '#FFFFFF',
+            border: `1px solid ${statusFilter === 'never_logged_in' ? '#FECACA' : 'var(--color-border)'}`,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Filter members who have never signed in"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#991B1B' }}>
+              Never Logged In
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#EF4444' }} />
+          </div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#991B1B', marginTop: '0.25rem' }}>
+            {neverLoggedInCount}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#B91C1C', marginTop: '0.15rem' }}>
+            Awaiting portal onboarding
+          </div>
+        </div>
+      </div>
+
       {/* Toolbar */}
       <div className="table-toolbar">
         <div className="filter-group">
@@ -379,7 +526,7 @@ export const MemberRosterManager: React.FC = () => {
             className={`filter-chip ${statusFilter === 'all' ? 'active' : ''}`}
             onClick={() => setStatusFilter('all')}
           >
-            All Active Members ({activeMembersCount})
+            All Active ({activeMembersCount})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'good' ? 'active' : ''}`}
@@ -399,6 +546,24 @@ export const MemberRosterManager: React.FC = () => {
             title="Members who have not led 1 project and volunteered twice this semester"
           >
             Needs Activity ({deficitCount})
+          </button>
+          <button
+            className={`filter-chip ${statusFilter === 'active_week' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('active_week')}
+          >
+            Active This Week ({activeWeekCount})
+          </button>
+          <button
+            className={`filter-chip ${statusFilter === 'inactive_telemetry' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('inactive_telemetry')}
+          >
+            Inactive &gt;14d ({inactiveTelemetryCount})
+          </button>
+          <button
+            className={`filter-chip ${statusFilter === 'never_logged_in' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('never_logged_in')}
+          >
+            Never Logged In ({neverLoggedInCount})
           </button>
           <button
             className={`filter-chip ${statusFilter === 'graduates' ? 'active' : ''}`}
@@ -515,13 +680,14 @@ export const MemberRosterManager: React.FC = () => {
       {/* Roster Table */}
       <div className="sharp-card" style={{ overflow: 'hidden' }}>
         <div className="table-responsive" style={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="roster-table" style={{ width: '100%', minWidth: '960px' }}>
+          <table className="roster-table" style={{ width: '100%', minWidth: '1060px' }}>
             <thead>
               <tr>
                 <th style={{ minWidth: '180px' }}>Member</th>
                 <th style={{ minWidth: '110px' }}>Grade Level</th>
                 <th style={{ minWidth: '110px' }}>Role</th>
                 <th style={{ minWidth: '140px' }}>Chapter Standing</th>
+                <th style={{ minWidth: '160px' }}>Login Activity</th>
                 <th style={{ minWidth: '170px' }}>Semester Participation</th>
                 <th style={{ textAlign: 'right', minWidth: '240px', paddingRight: '1.25rem', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
@@ -529,13 +695,13 @@ export const MemberRosterManager: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                     Loading member roster...
                   </td>
                 </tr>
               ) : filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                     No members matched the filter.
                   </td>
                 </tr>
@@ -645,6 +811,38 @@ export const MemberRosterManager: React.FC = () => {
                         <CheckCircle2 size={12} /> Good Standing
                       </span>
                     )}
+                  </td>
+                  <td>
+                    {(() => {
+                      const recency = getLoginRecency(member.last_login_at);
+                      const relTime = formatRelativeTime(member.last_login_at);
+                      const sessionCount = Number(member.login_count) || 0;
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span
+                              style={{
+                                width: '7px',
+                                height: '7px',
+                                borderRadius: '50%',
+                                backgroundColor: recency.color,
+                                display: 'inline-block',
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-navy)' }}>
+                              {relTime}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.70rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span>{sessionCount} session{sessionCount === 1 ? '' : 's'}</span>
+                            <span>•</span>
+                            <span style={{ color: recency.color, fontWeight: 500 }}>{recency.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>
                     {member.role === 'supervisor' || member.role === 'past_supervisor' ? (

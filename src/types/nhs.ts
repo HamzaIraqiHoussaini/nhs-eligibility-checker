@@ -24,7 +24,19 @@ export interface Profile {
   is_restricted: boolean;
   restricted_reason: string | null;
   restricted_at?: string | null;
+  last_login_at?: string | null;
+  login_count?: number | null;
   created_at: string;
+}
+
+export interface MemberLoginLog {
+  id: string;
+  user_id: string;
+  email: string;
+  logged_in_at: string;
+  user_agent?: string | null;
+  device_type?: string | null;
+  browser?: string | null;
 }
 
 export interface AllowlistEntry {
@@ -242,6 +254,4 @@ export interface ChapterRulesConfig {
   updated_at?: string | null;
 }
 
-
-
-
+export type ChapterRules = ChapterRulesConfig;
