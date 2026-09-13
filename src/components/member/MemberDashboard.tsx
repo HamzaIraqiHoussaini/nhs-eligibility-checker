@@ -216,7 +216,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
               </div>
             )}
             <div className="text-xs text-[#8c6d1f] font-medium">
-              <strong>Warning:</strong> Accumulating a 2nd probation will result in immediate chapter dismissal. Work with leadership to return to good standing.
+              <strong>Warning:</strong> Accumulating a 2nd probation will result in immediate chapter dismissal.
             </div>
           </div>
         </div>
