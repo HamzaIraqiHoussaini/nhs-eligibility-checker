@@ -19,6 +19,7 @@ import { RulesManagementDesk } from './components/leadership/RulesManagementDesk
 import { PublicHomepage } from './components/public/PublicHomepage';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { TermsAndPrivacyView } from './components/legal/TermsAndPrivacyView';
+import { NotificationBell } from './components/common/NotificationBell';
 import {
   LayoutDashboard,
   FileText,
@@ -638,6 +639,9 @@ function PortalContent() {
                   <AlertTriangle size={12} /> Probation
                 </span>
               ) : null}
+
+              {/* In-App Notification Bell */}
+              <NotificationBell onNavigate={(tab) => navigateTo(tab as ActiveTab)} />
 
               <button
                 type="button"

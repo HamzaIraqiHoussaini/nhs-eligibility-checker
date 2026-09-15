@@ -39,6 +39,43 @@ export interface MemberLoginLog {
   browser?: string | null;
 }
 
+export type NotificationType =
+  | 'project_submitted'
+  | 'stage1_approved'
+  | 'stage2_approved'
+  | 'project_rejected'
+  | 'project_comment'
+  | 'general';
+
+export interface InAppNotification {
+  id: string;
+  user_id: string;
+  project_id?: string | null;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link_tab?: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export type EmailStatus = 'queued' | 'sent' | 'failed' | 'simulated';
+
+export interface EmailLog {
+  id: string;
+  recipient_email: string;
+  recipient_name?: string | null;
+  event_type: NotificationType;
+  project_id?: string | null;
+  project_title: string;
+  subject: string;
+  html_body: string;
+  status: EmailStatus;
+  error_message?: string | null;
+  sent_at?: string | null;
+  created_at: string;
+}
+
 export interface AllowlistEntry {
   email: string;
   role: UserRole;

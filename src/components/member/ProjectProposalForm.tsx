@@ -6,6 +6,7 @@ import type { Semester, ProjectProposal, ProposalStatus } from '../../types/nhs'
 import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save, Clock } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useChapterRules } from '../../hooks/useChapterRules';
+import { notifyProjectSubmitted } from '../../lib/projectNotificationOrchestrator';
 
 interface CoLeaderMember {
   id: string;
@@ -400,9 +401,22 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         }
 
         if (isSubmitting) {
+          notifyProjectSubmitted({
+            id: initialData.id,
+            project_title: projectTitle.trim(),
+            creator_id: initialData.creator_id || user.id,
+            creator_name: primaryName,
+            creator_email: initialData.creator_email || user.email || '',
+            co_leader_emails: cleanCoLeaders,
+            advisor_name: advisorName.trim() || undefined,
+            event_date: eventDate || undefined,
+            location: location.trim() || undefined,
+            volunteers_needed: Number(volunteersNeeded) || 0,
+          }).catch(err => console.error('[NotificationOrchestrator] Error notifying project submission:', err));
+
           await alert({
             title: 'Proposal Submitted',
-            message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.`,
+            message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review. Automated notifications and emails dispatched.`,
             variant: 'success',
           });
         } else {
@@ -450,9 +464,24 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         }
 
         if (isSubmitting) {
+          if (newProject?.id) {
+            notifyProjectSubmitted({
+              id: newProject.id,
+              project_title: projectTitle.trim(),
+              creator_id: user.id,
+              creator_name: profile.full_name || 'Member',
+              creator_email: user.email || '',
+              co_leader_emails: cleanCoLeaders,
+              advisor_name: advisorName.trim() || undefined,
+              event_date: eventDate || undefined,
+              location: location.trim() || undefined,
+              volunteers_needed: Number(volunteersNeeded) || 0,
+            }).catch(err => console.error('[NotificationOrchestrator] Error notifying project submission:', err));
+          }
+
           await alert({
             title: 'Proposal Submitted',
-            message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
+            message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations and automated notifications dispatched.' : ' Automated notifications dispatched.'}`,
             variant: 'success',
           });
         } else {

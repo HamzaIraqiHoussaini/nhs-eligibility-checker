@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
+import { notifyStage1Decision, notifyStage2Decision } from '../../lib/projectNotificationOrchestrator';
 import {
   CheckCircle2,
   XCircle,
@@ -61,13 +62,16 @@ export const TwoStageReviewDesk: React.FC = () => {
     try {
       const updates: Partial<ProjectProposal> = {};
 
-      if (isLeadership && selectedProposal.status === 'pending_leadership') {
+      const wasStage1 = isLeadership && selectedProposal.status === 'pending_leadership';
+      const wasStage2 = isSupervisor && selectedProposal.status === 'pending_supervisor';
+
+      if (wasStage1) {
         updates.leadership_decision = decision;
         updates.leadership_notes = decisionNotes.trim() || undefined;
         updates.leadership_reviewer_id = user.id;
         updates.leadership_reviewed_at = new Date().toISOString();
         updates.status = decision === 'approved' ? 'pending_supervisor' : 'rejected_leadership';
-      } else if (isSupervisor && selectedProposal.status === 'pending_supervisor') {
+      } else if (wasStage2) {
         updates.supervisor_decision = decision;
         updates.supervisor_notes = decisionNotes.trim() || undefined;
         updates.supervisor_reviewer_id = user.id;
@@ -81,6 +85,25 @@ export const TwoStageReviewDesk: React.FC = () => {
         .eq('id', selectedProposal.id);
 
       if (error) throw error;
+
+      // Trigger asynchronous notifications and emails
+      if (wasStage1) {
+        notifyStage1Decision(selectedProposal, decision, profile, decisionNotes.trim())
+          .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 1 decision:', err));
+      } else if (wasStage2) {
+        notifyStage2Decision(selectedProposal, decision, profile, decisionNotes.trim())
+          .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 2 decision:', err));
+      }
+
+      await alert({
+        title: decision === 'approved' ? 'Proposal Approved' : 'Proposal Revision Requested',
+        message: decision === 'approved'
+          ? (wasStage1
+              ? `Stage 1 approval recorded for "${selectedProposal.project_title}". The faculty supervisor and project leadership have been automatically notified.`
+              : `Stage 2 final approval granted for "${selectedProposal.project_title}"! Official approval confirmation emails and notifications have been dispatched to project leaders.`)
+          : `Decision recorded. Feedback notes and notifications have been dispatched to the project leadership team.`,
+        variant: decision === 'approved' ? 'success' : 'warning',
+      });
 
       setSelectedProposal(null);
       setDecisionNotes('');

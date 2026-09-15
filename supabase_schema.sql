@@ -1368,3 +1368,94 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.record_member_login(text, text, text) TO authenticated;
+
+-- -----------------------------------------------------------------------------
+-- Project In-App Notifications & Outbound Email Logs
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  project_id uuid REFERENCES public.project_proposals(id) ON DELETE CASCADE,
+  type text NOT NULL,
+  title text NOT NULL,
+  message text NOT NULL,
+  link_tab text DEFAULT 'projects',
+  read boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own notifications"
+  ON public.notifications
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own notifications"
+  ON public.notifications
+  FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can insert notifications"
+  ON public.notifications
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS public.email_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_email text NOT NULL,
+  recipient_name text,
+  event_type text NOT NULL,
+  project_id uuid REFERENCES public.project_proposals(id) ON DELETE CASCADE,
+  project_title text NOT NULL,
+  subject text NOT NULL,
+  html_body text NOT NULL,
+  status text DEFAULT 'queued' NOT NULL,
+  error_message text,
+  sent_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON public.email_logs(recipient_email);
+CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON public.email_logs(created_at DESC);
+
+ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Leadership and supervisors can view all email logs"
+  ON public.email_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.role IN ('leadership', 'supervisor')
+    )
+  );
+
+CREATE POLICY "Recipients can view their own email logs"
+  ON public.email_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND lower(profiles.email) = lower(recipient_email)
+    )
+  );
+
+CREATE POLICY "Authenticated users can insert email logs"
+  ON public.email_logs
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
