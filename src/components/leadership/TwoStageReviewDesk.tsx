@@ -88,22 +88,42 @@ export const TwoStageReviewDesk: React.FC = () => {
 
       // Trigger asynchronous notifications and emails
       if (wasStage1) {
-        notifyStage1Decision(selectedProposal, decision, profile, decisionNotes.trim())
-          .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 1 decision:', err));
+        const notifRes = await notifyStage1Decision(selectedProposal, decision, profile, decisionNotes.trim())
+          .catch(err => {
+            console.error('[NotificationOrchestrator] Error notifying Stage 1 decision:', err);
+            return null;
+          });
+
+        if (decision === 'approved') {
+          const openGmail = await confirm({
+            title: 'Stage 1 Approved • Routed to Supervisor',
+            message: `Stage 1 approval recorded for "${selectedProposal.project_title}". The review request has been routed to Faculty Supervisor Laura Hayes (lhayes@cas.ac.ma).\n\nWould you like to open the supervisor notification in CAS Gmail?`,
+            confirmText: 'Open in CAS Gmail',
+            cancelText: 'Done',
+            variant: 'success',
+          });
+          if (openGmail && notifRes?.gmailUrl) {
+            window.open(notifRes.gmailUrl, '_blank');
+          }
+        } else {
+          await alert({
+            title: 'Proposal Revision Requested',
+            message: `Revision request recorded. Feedback notes have been dispatched to the project leadership team.`,
+            variant: 'warning',
+          });
+        }
       } else if (wasStage2) {
         notifyStage2Decision(selectedProposal, decision, profile, decisionNotes.trim())
           .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 2 decision:', err));
-      }
 
-      await alert({
-        title: decision === 'approved' ? 'Proposal Approved' : 'Proposal Revision Requested',
-        message: decision === 'approved'
-          ? (wasStage1
-              ? `Stage 1 approval recorded for "${selectedProposal.project_title}". The faculty supervisor and project leadership have been automatically notified.`
-              : `Stage 2 final approval granted for "${selectedProposal.project_title}"! Official approval confirmation emails and notifications have been dispatched to project leaders.`)
-          : `Decision recorded. Feedback notes and notifications have been dispatched to the project leadership team.`,
-        variant: decision === 'approved' ? 'success' : 'warning',
-      });
+        await alert({
+          title: decision === 'approved' ? 'Project Officially Approved!' : 'Proposal Revision Requested',
+          message: decision === 'approved'
+            ? `Stage 2 final approval granted for "${selectedProposal.project_title}"! Official approval emails and notifications have been dispatched to project leaders.`
+            : `Decision recorded. Feedback notes and notifications have been dispatched to the project leadership team.`,
+          variant: decision === 'approved' ? 'success' : 'warning',
+        });
+      }
 
       setSelectedProposal(null);
       setDecisionNotes('');

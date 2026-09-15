@@ -19,19 +19,19 @@ export async function notifyProjectSubmitted(
     location?: string | null;
     volunteers_needed?: number;
   }
-): Promise<{ success: boolean; reviewersNotified: number }> {
+): Promise<{ success: boolean; reviewersNotified: number; gmailComposeUrl?: string }> {
   try {
-    // 1. Fetch all active Leadership and Supervisor profiles
-    const { data: reviewers } = await supabase
+    // 1. Fetch active Leadership profiles for in-app bell notifications
+    const { data: leadershipMembers } = await supabase
       .from('profiles')
       .select('id, email, full_name, role')
-      .in('role', ['leadership', 'supervisor'])
+      .eq('role', 'leadership')
       .eq('is_restricted', false);
 
-    const reviewerList = (reviewers as Array<{ id: string; email: string; full_name: string; role: string }>) || [];
+    const leaderList = leadershipMembers || [];
 
-    // 2. In-App Notifications for Reviewers (Leadership & Supervisor)
-    const reviewerNotifications = reviewerList.map(r => ({
+    // 2. In-App Notifications for Chapter Leadership officers
+    const reviewerNotifications = leaderList.map(r => ({
       userId: r.id,
       projectId: project.id,
       type: 'project_submitted' as const,
@@ -72,31 +72,29 @@ export async function notifyProjectSubmitted(
       }
     }
 
-    // 4. Automated Emails to Reviewers
-    for (const reviewer of reviewerList) {
-      const emailContent = generateProjectEmailTemplate({
-        type: 'project_submitted',
-        projectTitle: project.project_title,
-        creatorName: project.creator_name,
-        creatorEmail: project.creator_email,
-        coLeaderEmails: project.co_leader_emails,
-        eventDate: project.event_date,
-        location: project.location,
-        volunteersNeeded: project.volunteers_needed,
-        recipientName: reviewer.full_name || 'Reviewer',
-        isReviewerNotification: true,
-      });
+    // 4. Automated Email EXCLUSIVELY to nhs@cas.ac.ma
+    const leadershipEmailContent = generateProjectEmailTemplate({
+      type: 'project_submitted',
+      projectTitle: project.project_title,
+      creatorName: project.creator_name,
+      creatorEmail: project.creator_email,
+      coLeaderEmails: project.co_leader_emails,
+      eventDate: project.event_date,
+      location: project.location,
+      volunteersNeeded: project.volunteers_needed,
+      recipientName: 'CAS NHS Chapter Leadership',
+      isReviewerNotification: true,
+    });
 
-      await sendProjectEmail({
-        recipient: { email: reviewer.email, name: reviewer.full_name },
-        type: 'project_submitted',
-        projectId: project.id,
-        projectTitle: project.project_title,
-        subject: emailContent.subject,
-        htmlBody: emailContent.htmlBody,
-        plainTextBody: emailContent.plainText,
-      });
-    }
+    const sendRes = await sendProjectEmail({
+      recipient: { email: 'nhs@cas.ac.ma', name: 'CAS NHS Chapter Leadership' },
+      type: 'project_submitted',
+      projectId: project.id,
+      projectTitle: project.project_title,
+      subject: leadershipEmailContent.subject,
+      htmlBody: leadershipEmailContent.htmlBody,
+      plainTextBody: leadershipEmailContent.plainText,
+    });
 
     // 5. Automated Confirmation Email to Creator
     const creatorEmailContent = generateProjectEmailTemplate({
@@ -122,7 +120,11 @@ export async function notifyProjectSubmitted(
       plainTextBody: creatorEmailContent.plainText,
     });
 
-    return { success: true, reviewersNotified: reviewerList.length };
+    return {
+      success: true,
+      reviewersNotified: 1,
+      gmailComposeUrl: sendRes.gmailComposeUrl,
+    };
   } catch (err) {
     console.error('Error in notifyProjectSubmitted:', err);
     return { success: false, reviewersNotified: 0 };
@@ -176,6 +178,8 @@ export async function notifyStage1Decision(
       }
     }
 
+    let supervisorGmailUrl: string | undefined;
+
     // 3. If Approved, notify Faculty Supervisor for Stage 2
     if (isApproved) {
       const { data: supervisors } = await supabase
@@ -184,45 +188,50 @@ export async function notifyStage1Decision(
         .eq('role', 'supervisor')
         .eq('is_restricted', false);
 
-      const supervisorList = supervisors || [];
-      if (supervisorList.length > 0) {
-        const supervisorNotifications = supervisorList.map(s => ({
-          userId: s.id,
+      const supervisorList = (supervisors && supervisors.length > 0)
+        ? supervisors
+        : [{ id: 'supervisor-fallback', email: 'lhayes@cas.ac.ma', full_name: 'Laura Hayes' }];
+
+      const supervisorNotifications = supervisorList.map(s => ({
+        userId: s.id,
+        projectId: project.id,
+        type: 'stage1_approved' as const,
+        title: 'Stage 2 Authorization Required',
+        message: `"${project.project_title}" was approved by Leadership and awaits your Stage 2 final authorization.`,
+        linkTab: 'review',
+      }));
+      await createBulkInAppNotifications(supervisorNotifications);
+
+      // Send email to supervisor
+      for (const sup of supervisorList) {
+        const supEmail = generateProjectEmailTemplate({
+          type: 'stage1_approved',
+          projectTitle: project.project_title,
+          creatorName: project.creator_name,
+          creatorEmail: project.creator_email,
+          coLeaderEmails: project.co_leader_emails,
+          eventDate: project.event_date,
+          location: project.location,
+          volunteersNeeded: project.volunteers_needed,
+          reviewerName: reviewer.full_name,
+          reviewerRole: 'Chapter Leadership',
+          reviewerNotes: notes,
+          recipientName: sup.full_name || 'Faculty Advisor',
+          isReviewerNotification: true,
+        });
+
+        const supSendRes = await sendProjectEmail({
+          recipient: { email: sup.email, name: sup.full_name },
+          type: 'stage1_approved',
           projectId: project.id,
-          type: 'stage1_approved' as const,
-          title: 'Stage 2 Authorization Required',
-          message: `"${project.project_title}" was approved by Leadership and awaits your Stage 2 final authorization.`,
-          linkTab: 'review',
-        }));
-        await createBulkInAppNotifications(supervisorNotifications);
+          projectTitle: project.project_title,
+          subject: supEmail.subject,
+          htmlBody: supEmail.htmlBody,
+          plainTextBody: supEmail.plainText,
+        });
 
-        // Send email to supervisor
-        for (const sup of supervisorList) {
-          const supEmail = generateProjectEmailTemplate({
-            type: 'stage1_approved',
-            projectTitle: project.project_title,
-            creatorName: project.creator_name,
-            creatorEmail: project.creator_email,
-            coLeaderEmails: project.co_leader_emails,
-            eventDate: project.event_date,
-            location: project.location,
-            volunteersNeeded: project.volunteers_needed,
-            reviewerName: reviewer.full_name,
-            reviewerRole: 'Chapter Leadership',
-            reviewerNotes: notes,
-            recipientName: sup.full_name || 'Faculty Advisor',
-            isReviewerNotification: true,
-          });
-
-          await sendProjectEmail({
-            recipient: { email: sup.email, name: sup.full_name },
-            type: 'stage1_approved',
-            projectId: project.id,
-            projectTitle: project.project_title,
-            subject: supEmail.subject,
-            htmlBody: supEmail.htmlBody,
-            plainTextBody: supEmail.plainText,
-          });
+        if (supSendRes.gmailComposeUrl) {
+          supervisorGmailUrl = supSendRes.gmailComposeUrl;
         }
       }
     }
@@ -269,7 +278,7 @@ export async function notifyStage1Decision(
       }
     }
 
-    return { success: true, gmailUrl: sendRes.gmailComposeUrl };
+    return { success: true, gmailUrl: supervisorGmailUrl || sendRes.gmailComposeUrl };
   } catch (err) {
     console.error('Error in notifyStage1Decision:', err);
     return { success: false };

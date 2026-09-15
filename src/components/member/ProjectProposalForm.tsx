@@ -35,7 +35,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   onSubmitted,
 }) => {
   const { user, profile } = useAuth();
-  const { alert } = useConfirm();
+  const { alert, confirm } = useConfirm();
   const { rules } = useChapterRules();
   const isEditing = Boolean(initialData);
 
@@ -401,7 +401,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         }
 
         if (isSubmitting) {
-          notifyProjectSubmitted({
+          const notifRes = await notifyProjectSubmitted({
             id: initialData.id,
             project_title: projectTitle.trim(),
             creator_id: initialData.creator_id || user.id,
@@ -412,13 +412,29 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             event_date: eventDate || undefined,
             location: location.trim() || undefined,
             volunteers_needed: Number(volunteersNeeded) || 0,
-          }).catch(err => console.error('[NotificationOrchestrator] Error notifying project submission:', err));
-
-          await alert({
-            title: 'Proposal Submitted',
-            message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review. Automated notifications and emails dispatched.`,
-            variant: 'success',
+          }).catch(err => {
+            console.error('[NotificationOrchestrator] Error notifying project submission:', err);
+            return null;
           });
+
+          if (notifRes?.gmailComposeUrl) {
+            const openGmail = await confirm({
+              title: 'Proposal Submitted for Review',
+              message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.\n\nWould you like to open a copy in CAS Gmail to send directly to nhs@cas.ac.ma?`,
+              confirmText: 'Open in CAS Gmail',
+              cancelText: 'Close',
+              variant: 'success',
+            });
+            if (openGmail) {
+              window.open(notifRes.gmailComposeUrl, '_blank');
+            }
+          } else {
+            await alert({
+              title: 'Proposal Submitted',
+              message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.`,
+              variant: 'success',
+            });
+          }
         } else {
           await alert({
             title: 'Progress Saved',
@@ -464,8 +480,9 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
         }
 
         if (isSubmitting) {
+          let notifRes = null;
           if (newProject?.id) {
-            notifyProjectSubmitted({
+            notifRes = await notifyProjectSubmitted({
               id: newProject.id,
               project_title: projectTitle.trim(),
               creator_id: user.id,
@@ -476,14 +493,30 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
               event_date: eventDate || undefined,
               location: location.trim() || undefined,
               volunteers_needed: Number(volunteersNeeded) || 0,
-            }).catch(err => console.error('[NotificationOrchestrator] Error notifying project submission:', err));
+            }).catch(err => {
+              console.error('[NotificationOrchestrator] Error notifying project submission:', err);
+              return null;
+            });
           }
 
-          await alert({
-            title: 'Proposal Submitted',
-            message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations and automated notifications dispatched.' : ' Automated notifications dispatched.'}`,
-            variant: 'success',
-          });
+          if (notifRes?.gmailComposeUrl) {
+            const openGmail = await confirm({
+              title: 'Proposal Submitted for Review',
+              message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}\n\nWould you like to open a copy in CAS Gmail to send directly to nhs@cas.ac.ma?`,
+              confirmText: 'Open in CAS Gmail',
+              cancelText: 'Close',
+              variant: 'success',
+            });
+            if (openGmail) {
+              window.open(notifRes.gmailComposeUrl, '_blank');
+            }
+          } else {
+            await alert({
+              title: 'Proposal Submitted',
+              message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}`,
+              variant: 'success',
+            });
+          }
         } else {
           await alert({
             title: 'Project Created',

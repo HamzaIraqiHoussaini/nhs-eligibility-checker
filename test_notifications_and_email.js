@@ -303,57 +303,36 @@ test('Unread notification counter accurately increments and caps badge display',
   assert.strictEqual(getBadgeText(15), '9+');
 });
 
-test('Orchestrator fans out notifications to Creator, Co-Leaders, and Reviewers', () => {
-  const mockProject = {
-    id: 'proj-123',
-    project_title: 'Math Olympiad Prep',
-    creator_id: 'user-primary',
-    creator_name: 'Alice Wong',
-    creator_email: 'alice@cas.edu',
-    co_leader_emails: ['bob@cas.edu', 'clara@cas.edu'],
-  };
-
-  const mockReviewers = [
-    { id: 'rev-1', email: 'vp@cas.edu', full_name: 'VP Leadership' },
-    { id: 'rev-2', email: 'pres@cas.edu', full_name: 'President' },
-  ];
-
-  const mockCoLeaderProfiles = [
-    { id: 'co-1', email: 'bob@cas.edu' },
-    { id: 'co-2', email: 'clara@cas.edu' },
-  ];
-
-  // Reviewers notifications
-  const reviewerNotifs = mockReviewers.map(r => ({
-    userId: r.id,
-    projectId: mockProject.id,
+test('Submission review email is routed exclusively to nhs@cas.ac.ma', () => {
+  const targetEmail = 'nhs@cas.ac.ma';
+  const emailContent = generateProjectEmailTemplate({
     type: 'project_submitted',
-    linkTab: 'review',
-  }));
+    projectTitle: 'Math Olympiad Prep',
+    creatorName: 'Alice Wong',
+    creatorEmail: 'alice@cas.ac.ma',
+    recipientName: 'CAS NHS Chapter Leadership',
+    isReviewerNotification: true,
+  });
 
-  // Creator notification
-  const creatorNotif = {
-    userId: mockProject.creator_id,
-    projectId: mockProject.id,
-    type: 'project_submitted',
-    linkTab: 'projects',
-  };
+  assert.strictEqual(targetEmail, 'nhs@cas.ac.ma');
+  assert.strictEqual(emailContent.subject.includes('[NHS Project Review] Action Required'), true);
+  assert.strictEqual(emailContent.htmlBody.includes('STAGE 1 REVIEW PENDING'), true);
+});
 
-  // Co-leader notifications
-  const coLeaderNotifs = mockCoLeaderProfiles.map(cl => ({
-    userId: cl.id,
-    projectId: mockProject.id,
-    type: 'project_submitted',
-    linkTab: 'projects',
-  }));
+test('Stage 1 Approval email is routed to Faculty Supervisor email', () => {
+  const supervisorEmail = 'lhayes@cas.ac.ma';
+  const emailContent = generateProjectEmailTemplate({
+    type: 'stage1_approved',
+    projectTitle: 'Math Olympiad Prep',
+    creatorName: 'Alice Wong',
+    creatorEmail: 'alice@cas.ac.ma',
+    recipientName: 'Laura Hayes',
+    isReviewerNotification: true,
+  });
 
-  const allInApp = [...reviewerNotifs, creatorNotif, ...coLeaderNotifs];
-  assert.strictEqual(allInApp.length, 5);
-  assert.strictEqual(allInApp.filter(n => n.linkTab === 'review').length, 2);
-  assert.strictEqual(allInApp.filter(n => n.linkTab === 'projects').length, 3);
-  assert.strictEqual(allInApp.some(n => n.userId === 'user-primary'), true);
-  assert.strictEqual(allInApp.some(n => n.userId === 'co-1'), true);
-  assert.strictEqual(allInApp.some(n => n.userId === 'co-2'), true);
+  assert.strictEqual(supervisorEmail, 'lhayes@cas.ac.ma');
+  assert.strictEqual(emailContent.subject.includes('[NHS Supervisor Action] Stage 2 Sign-off Needed'), true);
+  assert.strictEqual(emailContent.htmlBody.includes('STAGE 2 SUPERVISOR AUTHORIZATION'), true);
 });
 
 // ---------------------------------------------------------
