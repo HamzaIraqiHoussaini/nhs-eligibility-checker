@@ -331,43 +331,36 @@ export async function sendProjectEmail(params: SendProjectEmailParams): Promise<
     params.plainTextBody
   );
 
-  const resendApiKey = typeof import.meta !== 'undefined' ? import.meta.env.VITE_RESEND_API_KEY : '';
   let status: EmailStatus = 'queued';
   let errorMessage: string | null = null;
 
-  // 1. If Resend API Key is available, dispatch directly via Resend API
-  if (resendApiKey) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'CAS NHS Chapter <onboarding@resend.dev>', // or custom verified domain
-          to: [params.recipient.email],
-          subject: params.subject,
-          html: params.htmlBody,
-          text: params.plainTextBody,
-        }),
-      });
+  // 1. Secure dispatch: Call serverless endpoint /api/send-email so RESEND_API_KEY remains strictly server-side
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: params.recipient.email,
+        fromName: 'CAS NHS Chapter',
+        subject: params.subject,
+        html: params.htmlBody,
+        text: params.plainTextBody,
+      }),
+    });
 
-      if (res.ok) {
-        status = 'sent';
-      } else {
-        const data = await res.json();
-        errorMessage = data.message || `Resend HTTP error ${res.status}`;
-        status = 'failed';
-        console.warn('Resend email dispatch error:', errorMessage);
-      }
-    } catch (apiErr: any) {
-      errorMessage = apiErr?.message || 'Network error calling Resend API';
-      status = 'failed';
-      console.warn('Resend network error:', errorMessage);
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      status = 'sent';
+    } else {
+      errorMessage = data.error || `Email dispatch notice (status ${res.status})`;
+      status = (res.status === 404 || res.status === 500) ? 'simulated' : 'failed';
+      console.warn('Email dispatch warning:', errorMessage);
     }
-  } else {
-    // Simulated / queued for audit in Supabase
+  } catch (apiErr: any) {
+    errorMessage = apiErr?.message || 'Network error calling /api/send-email';
     status = 'simulated';
   }
 
