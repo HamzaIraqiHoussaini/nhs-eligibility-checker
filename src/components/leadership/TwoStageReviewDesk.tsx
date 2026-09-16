@@ -95,15 +95,23 @@ export const TwoStageReviewDesk: React.FC = () => {
           });
 
         if (decision === 'approved') {
-          const openGmail = await confirm({
-            title: 'Stage 1 Approved • Routed to Supervisor',
-            message: `Stage 1 approval recorded for "${selectedProposal.project_title}". The review request has been routed to Faculty Supervisor Laura Hayes (lhayes@cas.ac.ma).\n\nWould you like to open the supervisor notification in CAS Gmail?`,
-            confirmText: 'Open in CAS Gmail',
-            cancelText: 'Done',
-            variant: 'success',
-          });
-          if (openGmail && notifRes?.gmailUrl) {
-            window.open(notifRes.gmailUrl, '_blank');
+          if (notifRes?.supervisorEmailSent) {
+            await alert({
+              title: 'Stage 1 Approved • Supervisor Notified',
+              message: `Stage 1 approval recorded for "${selectedProposal.project_title}". An automated email notification has been dispatched to Faculty Supervisor Laura Hayes (lhayes@cas.ac.ma).`,
+              variant: 'success',
+            });
+          } else {
+            const openGmail = await confirm({
+              title: 'Stage 1 Approved • Routed to Supervisor',
+              message: `Stage 1 approval recorded for "${selectedProposal.project_title}". The review request has been routed to Faculty Supervisor Laura Hayes (lhayes@cas.ac.ma).\n\nWould you like to open the supervisor notification in CAS Gmail?`,
+              confirmText: 'Open in CAS Gmail',
+              cancelText: 'Done',
+              variant: 'success',
+            });
+            if (openGmail && notifRes?.gmailUrl) {
+              window.open(notifRes.gmailUrl, '_blank');
+            }
           }
         } else {
           await alert({

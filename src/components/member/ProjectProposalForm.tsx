@@ -417,7 +417,13 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             return null;
           });
 
-          if (notifRes?.gmailComposeUrl) {
+          if (notifRes?.emailSent) {
+            await alert({
+              title: 'Proposal Submitted & Email Delivered!',
+              message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.`,
+              variant: 'success',
+            });
+          } else if (notifRes?.gmailComposeUrl) {
             const openGmail = await confirm({
               title: 'Proposal Submitted for Review',
               message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.\n\nWould you like to open a copy in CAS Gmail to send directly to nhs@cas.ac.ma?`,
@@ -499,7 +505,13 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             });
           }
 
-          if (notifRes?.gmailComposeUrl) {
+          if (notifRes?.emailSent) {
+            await alert({
+              title: 'Proposal Submitted & Email Delivered!',
+              message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.`,
+              variant: 'success',
+            });
+          } else if (notifRes?.gmailComposeUrl) {
             const openGmail = await confirm({
               title: 'Proposal Submitted for Review',
               message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review and routed to nhs@cas.ac.ma.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}\n\nWould you like to open a copy in CAS Gmail to send directly to nhs@cas.ac.ma?`,

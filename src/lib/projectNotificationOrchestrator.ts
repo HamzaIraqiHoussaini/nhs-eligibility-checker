@@ -19,7 +19,7 @@ export async function notifyProjectSubmitted(
     location?: string | null;
     volunteers_needed?: number;
   }
-): Promise<{ success: boolean; reviewersNotified: number; gmailComposeUrl?: string }> {
+): Promise<{ success: boolean; emailSent: boolean; reviewersNotified: number; gmailComposeUrl?: string }> {
   try {
     // 1. Fetch active Leadership profiles for in-app bell notifications
     const { data: leadershipMembers } = await supabase
@@ -122,12 +122,13 @@ export async function notifyProjectSubmitted(
 
     return {
       success: true,
+      emailSent: sendRes.success,
       reviewersNotified: 1,
       gmailComposeUrl: sendRes.gmailComposeUrl,
     };
   } catch (err) {
     console.error('Error in notifyProjectSubmitted:', err);
-    return { success: false, reviewersNotified: 0 };
+    return { success: false, emailSent: false, reviewersNotified: 0 };
   }
 }
 
@@ -139,7 +140,7 @@ export async function notifyStage1Decision(
   decision: 'approved' | 'rejected',
   reviewer: Profile,
   notes?: string
-): Promise<{ success: boolean; gmailUrl?: string }> {
+): Promise<{ success: boolean; supervisorEmailSent: boolean; gmailUrl?: string }> {
   try {
     const isApproved = decision === 'approved';
     const type: 'stage1_approved' | 'project_rejected' = isApproved ? 'stage1_approved' : 'project_rejected';
@@ -179,6 +180,7 @@ export async function notifyStage1Decision(
     }
 
     let supervisorGmailUrl: string | undefined;
+    let supervisorEmailSent = false;
 
     // 3. If Approved, notify Faculty Supervisor for Stage 2
     if (isApproved) {
@@ -230,6 +232,10 @@ export async function notifyStage1Decision(
           plainTextBody: supEmail.plainText,
         });
 
+        if (supSendRes.success) {
+          supervisorEmailSent = true;
+        }
+
         if (supSendRes.gmailComposeUrl) {
           supervisorGmailUrl = supSendRes.gmailComposeUrl;
         }
@@ -278,10 +284,14 @@ export async function notifyStage1Decision(
       }
     }
 
-    return { success: true, gmailUrl: supervisorGmailUrl || sendRes.gmailComposeUrl };
+    return {
+      success: true,
+      supervisorEmailSent,
+      gmailUrl: supervisorGmailUrl || sendRes.gmailComposeUrl,
+    };
   } catch (err) {
     console.error('Error in notifyStage1Decision:', err);
-    return { success: false };
+    return { success: false, supervisorEmailSent: false };
   }
 }
 
