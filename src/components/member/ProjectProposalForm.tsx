@@ -420,7 +420,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           if (notifRes?.emailSent) {
             await alert({
               title: 'Proposal Submitted & Email Delivered!',
-              message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.`,
+              message: `Proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.\n\n(Note: If checking nhs@cas.ac.ma, please check the Spam or Junk folder if this is the first email from the notification system).`,
               variant: 'success',
             });
           } else if (notifRes?.gmailComposeUrl) {
@@ -508,7 +508,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           if (notifRes?.emailSent) {
             await alert({
               title: 'Proposal Submitted & Email Delivered!',
-              message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.`,
+              message: `Your proposal "${projectTitle}" has been submitted for Stage 1 Leadership Review.${cleanCoLeaders.length > 0 ? ' Invitations were sent to co-leaders.' : ''}\n\nAn automated email notification has been dispatched directly to nhs@cas.ac.ma.\n\n(Note: If checking nhs@cas.ac.ma, please check the Spam or Junk folder if this is the first email from the notification system).`,
               variant: 'success',
             });
           } else if (notifRes?.gmailComposeUrl) {

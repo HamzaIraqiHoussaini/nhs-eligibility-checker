@@ -96,30 +96,6 @@ export async function notifyProjectSubmitted(
       plainTextBody: leadershipEmailContent.plainText,
     });
 
-    // 5. Automated Confirmation Email to Creator
-    const creatorEmailContent = generateProjectEmailTemplate({
-      type: 'project_submitted',
-      projectTitle: project.project_title,
-      creatorName: project.creator_name,
-      creatorEmail: project.creator_email,
-      coLeaderEmails: project.co_leader_emails,
-      eventDate: project.event_date,
-      location: project.location,
-      volunteersNeeded: project.volunteers_needed,
-      recipientName: project.creator_name,
-      isReviewerNotification: false,
-    });
-
-    await sendProjectEmail({
-      recipient: { email: project.creator_email, name: project.creator_name },
-      type: 'project_submitted',
-      projectId: project.id,
-      projectTitle: project.project_title,
-      subject: creatorEmailContent.subject,
-      htmlBody: creatorEmailContent.htmlBody,
-      plainTextBody: creatorEmailContent.plainText,
-    });
-
     return {
       success: true,
       emailSent: sendRes.success,
