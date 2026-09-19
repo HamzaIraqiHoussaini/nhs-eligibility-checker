@@ -102,10 +102,10 @@ export const AllowlistManager: React.FC = () => {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) return;
 
-    if (role === 'leadership' && !isSuperadmin) {
+    if (role === 'leadership') {
       await alert({
-        title: 'Action Restricted',
-        message: 'Only the Superadmin can authorize new Leadership accounts directly. You can promote existing members to leadership.',
+        title: 'Promotion Required',
+        message: 'Accounts cannot be provisioned directly as Chapter Leadership. Please onboard the student as a Member first, then promote them to Leadership using the "Promote to Leader" button in the active accounts table.',
         variant: 'warning',
       });
       return;
@@ -653,9 +653,14 @@ export const AllowlistManager: React.FC = () => {
 
       {/* Provision Form */}
       <div className="sharp-card" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
-        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
-          Onboard New Student, Chapter Advisor or Administrator
-        </h3>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.35rem' }}>
+            Onboard New Student, Chapter Advisor or Administrator
+          </h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0, lineHeight: '1.4' }}>
+            To designate Chapter Leadership officers, onboard them as a <strong>Member (Student)</strong> first, then click <strong>"Promote to Leader"</strong> in the active accounts table below.
+          </p>
+        </div>
         <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: (role === 'supervisor' || role === 'administrator') ? '1.8fr 1.2fr 1.2fr 1.1fr auto' : '1.8fr 1.1fr 1.1fr 1.1fr 0.9fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
@@ -709,7 +714,6 @@ export const AllowlistManager: React.FC = () => {
               style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem' }}
             >
               <option value="member">Member (Student)</option>
-              {isSuperadmin && <option value="leadership">Leadership (Student)</option>}
               <option value="supervisor">Supervisor (Faculty Advisor)</option>
               <option value="administrator">Administrator (Executive Reviewer)</option>
             </select>

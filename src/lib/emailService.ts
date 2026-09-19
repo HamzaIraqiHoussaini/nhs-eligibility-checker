@@ -439,47 +439,136 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
   plainText: string;
 } {
   const portalUrl = params.portalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://casnhs.vercel.app');
-
-  const roleLabel =
-    params.role === 'administrator'
-      ? 'Chapter Administrator'
-      : params.role === 'supervisor'
-      ? 'Chapter Advisor & Faculty Supervisor'
-      : params.role === 'leadership'
-      ? 'Chapter Officer (Student Leadership)'
-      : 'Active Chapter Member';
-
-  const roleBadgeBg =
-    params.role === 'administrator'
-      ? '#EEF2FF'
-      : params.role === 'supervisor'
-      ? '#E0F2FE'
-      : params.role === 'leadership'
-      ? '#FEF3C7'
-      : '#ECFDF5';
-
-  const roleBadgeColor =
-    params.role === 'administrator'
-      ? '#4338CA'
-      : params.role === 'supervisor'
-      ? '#0369A1'
-      : params.role === 'leadership'
-      ? '#92400E'
-      : '#065F46';
-
   const isReset = Boolean(params.isReset);
 
-  const subject = isReset
-    ? `[CAS NHS Security] Your Chapter Portal Access Code Has Been Reset`
-    : `Welcome to Casablanca American School NHS Chapter • Your Access Credentials`;
+  // Role-specific configuration matrix
+  let roleLabel: string;
+  let badgeText: string;
+  let roleBadgeBg: string;
+  let roleBadgeColor: string;
+  let roleBadgeBorder: string;
+  let subject: string;
+  let headline: string;
+  let leadText: string;
+  let scopeCardTitle: string;
+  let scopeCardBg: string;
+  let scopeCardBorder: string;
+  let scopeCardTitleColor: string;
+  let scopeCardItems: string[];
+  let signInDestination: string;
+  let ctaButtonText: string;
+  let ctaButtonBg: string;
 
-  const headline = isReset
-    ? `Your Access Code Has Been Reset`
-    : `Welcome to the CAS National Honor Society`;
-
-  const leadText = isReset
-    ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society account.`
-    : `You have been officially granted access to the Casablanca American School National Honor Society Portal as a <strong>${roleLabel}</strong>.`;
+  if (params.role === 'administrator') {
+    roleLabel = 'Executive Chapter Administrator';
+    badgeText = 'EXECUTIVE CHAPTER ADMINISTRATOR';
+    roleBadgeBg = '#EEF2FF';
+    roleBadgeColor = '#4338CA';
+    roleBadgeBorder = '#C7D2FE';
+    subject = isReset
+      ? `[CAS NHS Security] Your Executive Administrator Access Code Has Been Reset`
+      : `CAS NHS Chapter • Executive Administrator Access Credentials`;
+    headline = isReset
+      ? `Your Administrator Access Code Has Been Reset`
+      : `Executive Chapter Administration Access`;
+    leadText = isReset
+      ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society Administrator account.`
+      : `You have been officially appointed as a <strong>Chapter Administrator</strong> for the Casablanca American School National Honor Society, granting you Level 3 Executive Project Authorization authority.`;
+    scopeCardTitle = 'Executive Administration & Authorization Scope';
+    scopeCardBg = '#EEF2FF';
+    scopeCardBorder = '#C7D2FE';
+    scopeCardTitleColor = '#4338CA';
+    scopeCardItems = [
+      '<strong>Level 3 Final Project Authorization:</strong> Review student service initiatives that have passed Stage 1 Leadership vetting and Stage 2 Faculty Advisor sign-off before school-wide execution.',
+      '<strong>Executive Review Desk:</strong> Grant final authorization, request administrative revisions, or provide executive counsel directly from the portal.',
+      '<strong>School Policy & Safety Alignment:</strong> Ensure chapter initiatives comply with Casablanca American School administration standards and community safety guidelines.',
+    ];
+    signInDestination = 'You will be routed directly to the <strong>Final Project Reviews</strong> queue.';
+    ctaButtonText = 'Access Chapter Administration Desk →';
+    ctaButtonBg = '#4338CA';
+  } else if (params.role === 'supervisor') {
+    roleLabel = 'Faculty Advisor & Chapter Supervisor';
+    badgeText = 'CHAPTER ADVISOR & FACULTY SUPERVISOR';
+    roleBadgeBg = '#F0F9FF';
+    roleBadgeColor = '#0369A1';
+    roleBadgeBorder = '#BAE6FD';
+    subject = isReset
+      ? `[CAS NHS Security] Your Faculty Supervisor Access Code Has Been Reset`
+      : `CAS NHS Chapter • Faculty Sponsor & Supervisor Credentials`;
+    headline = isReset
+      ? `Your Faculty Supervisor Access Code Has Been Reset`
+      : `Faculty Sponsor & Chapter Supervisor Onboarding`;
+    leadText = isReset
+      ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society Faculty Supervisor account.`
+      : `You have been registered as the official <strong>Faculty Advisor & Chapter Supervisor</strong> for the Casablanca American School National Honor Society chapter.`;
+    scopeCardTitle = 'Faculty Advisory & Oversight Scope';
+    scopeCardBg = '#F0F9FF';
+    scopeCardBorder = '#BAE6FD';
+    scopeCardTitleColor = '#0369A1';
+    scopeCardItems = [
+      '<strong>Stage 2 Faculty Sign-Off:</strong> Review proposals pre-vetted by student leadership to confirm faculty sponsorship, safety, and campus logistics.',
+      '<strong>Proposal Review Desk:</strong> Advance authorized initiatives to Level 3 Chapter Administration for final school sign-off.',
+      '<strong>Constitutional Governance:</strong> Supervise student chapter officers and ensure all activities align with NHS national standards.',
+    ];
+    signInDestination = 'You will be routed directly to the <strong>Proposal Review Desk</strong>.';
+    ctaButtonText = 'Access Faculty Review Desk →';
+    ctaButtonBg = '#0284C7';
+  } else if (params.role === 'leadership') {
+    roleLabel = 'Chapter Officer (Student Leadership)';
+    badgeText = 'CHAPTER OFFICER (STUDENT LEADERSHIP)';
+    roleBadgeBg = '#FEF3C7';
+    roleBadgeColor = '#92400E';
+    roleBadgeBorder = '#FDE68A';
+    subject = isReset
+      ? `[CAS NHS Security] Your Chapter Leadership Access Code Has Been Reset`
+      : `CAS NHS Chapter • Leadership Core Appointment & Credentials`;
+    headline = isReset
+      ? `Your Leadership Access Code Has Been Reset`
+      : `Chapter Leadership Core Appointment`;
+    leadText = isReset
+      ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society Leadership account.`
+      : `Congratulations on your appointment to the <strong>Executive Leadership Core</strong> of the Casablanca American School National Honor Society.`;
+    scopeCardTitle = 'Leadership Responsibilities & Governance';
+    scopeCardBg = '#FEF3C7';
+    scopeCardBorder = '#FDE68A';
+    scopeCardTitleColor = '#92400E';
+    scopeCardItems = [
+      '<strong>Stage 1 Proposal Vetting:</strong> Review member community service proposals for feasibility and merit before escalating to Faculty Advisors.',
+      '<strong>Governance Desk Access:</strong> Oversee chapter attendance, member roster, treasury ledger, and access codes.',
+      '<strong>Core Leadership Standing:</strong> Executive officers are granted chapter leadership standing and manage chapter initiatives.',
+    ];
+    signInDestination = 'You will have full access to the <strong>Governance Desk</strong> and Chapter Management tools.';
+    ctaButtonText = 'Open Leadership Governance Desk →';
+    ctaButtonBg = '#0A1E3F';
+  } else {
+    // Default: Member (Student)
+    roleLabel = 'Active Chapter Member';
+    badgeText = 'ACTIVE CHAPTER MEMBER';
+    roleBadgeBg = '#ECFDF5';
+    roleBadgeColor = '#065F46';
+    roleBadgeBorder = '#A7F3D0';
+    subject = isReset
+      ? `[CAS NHS Security] Your Chapter Portal Access Code Has Been Reset`
+      : `Welcome to Casablanca American School NHS Chapter • Your Access Credentials`;
+    headline = isReset
+      ? `Your Access Code Has Been Reset`
+      : `Welcome to the CAS National Honor Society`;
+    leadText = isReset
+      ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society account.`
+      : `You have been officially granted access to the Casablanca American School National Honor Society Portal as an <strong>Active Chapter Member</strong>.`;
+    scopeCardTitle = 'Chapter Member Portal Features';
+    scopeCardBg = '#ECFDF5';
+    scopeCardBorder = '#A7F3D0';
+    scopeCardTitleColor = '#065F46';
+    scopeCardItems = [
+      '<strong>Service Initiatives:</strong> Submit community service proposals and participate as student volunteers in approved initiatives.',
+      '<strong>Attendance & Standing:</strong> Track your semester meeting attendance, service hours, and chapter good standing.',
+      '<strong>Constitution & Policies:</strong> Review CAS NHS bylaws, induction requirements, and chapter rules.',
+    ];
+    signInDestination = 'Navigate to your Member Dashboard to view upcoming meetings and active service projects.';
+    ctaButtonText = 'Sign In to Member Portal →';
+    ctaButtonBg = '#0A1E3F';
+  }
 
   const customNotesHtml = params.customNotes?.trim()
     ? `
@@ -493,6 +582,10 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
     </div>
     `
     : '';
+
+  const scopeItemsHtml = scopeCardItems
+    .map((item) => `<li style="margin-bottom: 6px;">${item}</li>`)
+    .join('');
 
   const htmlBody = `
 <!DOCTYPE html>
@@ -526,8 +619,8 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
             <td style="padding: 30px;">
               
               <!-- Role Badge -->
-              <div style="display: inline-block; padding: 4px 10px; background-color: ${roleBadgeBg}; color: ${roleBadgeColor}; border: 1px solid ${roleBadgeColor}33; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px; margin-bottom: 14px;">
-                ${roleLabel.toUpperCase()}
+              <div style="display: inline-block; padding: 4px 10px; background-color: ${roleBadgeBg}; color: ${roleBadgeColor}; border: 1px solid ${roleBadgeBorder}; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px; margin-bottom: 14px;">
+                ${badgeText}
               </div>
 
               <!-- Title -->
@@ -544,6 +637,16 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
               </p>
 
               ${customNotesHtml}
+
+              <!-- Role Scope & Responsibilities Box -->
+              <div style="margin: 20px 0; padding: 16px 18px; background-color: ${scopeCardBg}; border: 1px solid ${scopeCardBorder}; border-left: 4px solid ${roleBadgeColor}; border-radius: 6px;">
+                <div style="color: ${scopeCardTitleColor}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">
+                  ${scopeCardTitle}
+                </div>
+                <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: #334155;">
+                  ${scopeItemsHtml}
+                </ul>
+              </div>
 
               <!-- Credentials Box -->
               <div style="margin: 24px 0; padding: 20px; background-color: #0F172A; border: 2px solid #C59B27; border-radius: 6px; text-align: center;">
@@ -567,14 +670,15 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
                   <li>Open the chapter portal: <a href="${portalUrl}" target="_blank" style="color: #0A1E3F; font-weight: 600;">${portalUrl}</a></li>
                   <li>Click <strong>"Member Portal"</strong> and enter your CAS email: <strong>${params.email}</strong></li>
                   <li>Paste your one-time passcode into the password field.</li>
+                  <li>${signInDestination}</li>
                   <li>Once logged in, you can personalize your passcode at any time via <strong>"Change Code"</strong> in the top header.</li>
                 </ol>
               </div>
 
               <!-- Primary CTA Button -->
               <div style="margin: 28px 0 20px 0; text-align: center;">
-                <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #0A1E3F; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 4px; box-shadow: 0 2px 4px rgba(10,30,63,0.2);">
-                  Sign In to CAS NHS Portal &rarr;
+                <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: ${ctaButtonBg}; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 4px; box-shadow: 0 2px 4px rgba(10,30,63,0.2);">
+                  ${ctaButtonText}
                 </a>
               </div>
 
@@ -620,11 +724,15 @@ YOUR ACCESS CREDENTIALS:
 - Email: ${params.email}
 - One-Time Passcode: ${params.code}
 
+ROLE SCOPE & RESPONSIBILITIES:
+${scopeCardItems.map((item) => `* ${item.replace(/<[^>]+>/g, '')}`).join('\n')}
+
 SIGN IN STEPS:
 1. Open the portal: ${portalUrl}
 2. Click "Member Portal" and enter your CAS email: ${params.email}
 3. Enter your one-time passcode above as your password.
-4. Once signed in, you can update your passcode at any time via "Change Code" in the top header.
+4. ${signInDestination.replace(/<[^>]+>/g, '')}
+5. Once signed in, you can update your passcode at any time via "Change Code" in the top header.
 
 Direct Portal Link: ${portalUrl}
 
