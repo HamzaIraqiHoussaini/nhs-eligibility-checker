@@ -109,7 +109,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   );
   const isProjectLeader = isOwner || isCoLeader || isLeadership || isSupervisor;
 
-  // Rule: Proposals can only be modified until approved by supervisor
+  // Rule: Proposals can only be modified until approved by administrator
   const isApprovedOrCompleted = project.status === 'approved' || project.status === 'completed';
   const canModify = !isApprovedOrCompleted && (isOwner || isCoLeader || isLeadership || isSupervisor);
 
@@ -473,7 +473,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       case 'approved':
         return (
           <span className="status-pill eligible" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <CheckCircle2 size={13} /> Approved by Faculty
+            <CheckCircle2 size={13} /> Approved by Administrator
           </span>
         );
       case 'completed':
@@ -490,9 +490,16 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
         );
       case 'rejected_leadership':
       case 'rejected_supervisor':
+      case 'rejected_administrator':
         return (
           <span className="status-pill ineligible" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <XCircle size={13} /> Rejected ({project.status === 'rejected_leadership' ? 'Leadership' : 'Supervisor'})
+            <XCircle size={13} /> Rejected ({project.status === 'rejected_leadership' ? 'Leadership' : project.status === 'rejected_supervisor' ? 'Supervisor' : 'Administrator'})
+          </span>
+        );
+      case 'pending_administrator':
+        return (
+          <span className="status-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}>
+            <Clock size={13} /> Stage 3: Pending Administrator Review
           </span>
         );
       case 'pending_supervisor':
@@ -613,6 +620,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               {project.supervisor_notes && (
                 <div style={{ fontSize: '0.82rem', color: '#991B1B', marginTop: '0.35rem' }}>
                   <strong>Supervisor Feedback:</strong> {project.supervisor_notes}
+                </div>
+              )}
+              {project.administrator_notes && (
+                <div style={{ fontSize: '0.82rem', color: '#991B1B', marginTop: '0.35rem' }}>
+                  <strong>Administrator Feedback:</strong> {project.administrator_notes}
                 </div>
               )}
             </div>
@@ -1270,12 +1282,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           <div>
             {isApprovedOrCompleted && (
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                Approved by Supervisor: Proposal is finalized and locked.
+                Approved by Administrator: Proposal is finalized and locked.
               </span>
             )}
             {!isApprovedOrCompleted && (
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                Modifiable until approved by faculty supervisor.
+                Modifiable until approved by chapter administrator.
               </span>
             )}
           </div>

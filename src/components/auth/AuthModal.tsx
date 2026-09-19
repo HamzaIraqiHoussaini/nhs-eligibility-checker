@@ -3,13 +3,13 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { X, Lock, Mail, AlertCircle } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
-
+import type { UserRole } from '../../types/nhs';
 import { recordLoginEvent } from '../../lib/authTracking';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (role?: UserRole) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -59,14 +59,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       }
 
       if (data?.user) {
-        await recordLoginEvent(data.user.id, cleanEmail);
-        await refreshProfile();
-      }
-      setEmail('');
-      setPassword('');
-      onClose();
-      if (onSuccess) {
-        onSuccess();
+        // Fire telemetry in background so it never blocks or delays login completion
+        recordLoginEvent(data.user.id, cleanEmail).catch((telemetryErr) => {
+          console.warn('[CAS NHS] Non-blocking login event logging notice:', telemetryErr);
+        });
+
+        // Fast synchronous-ready profile refresh using the live user from sign in
+        const loadedProfile = await refreshProfile(data.user);
+
+        const resolvedRole: UserRole =
+          loadedProfile?.role ||
+          (data.user.user_metadata?.role as UserRole) ||
+          (cleanEmail === 'hiraqihoussaini@cas.ac.ma' ? 'leadership' : 'member');
+
+        setEmail('');
+        setPassword('');
+        onClose();
+
+        if (onSuccess) {
+          onSuccess(resolvedRole);
+        }
       }
     } catch (err: unknown) {
       let message = 'An unexpected error occurred. Please try again.';

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { AuthModal } from './components/auth/AuthModal';
 import { ChangePasswordModal } from './components/auth/ChangePasswordModal';
+import type { UserRole } from './types/nhs';
 import { MemberDashboard } from './components/member/MemberDashboard';
 import { MyProjectsView } from './components/member/MyProjectsView';
 import { ChapterRules } from './components/member/ChapterRules';
@@ -113,13 +114,23 @@ function getTabFromPath(path: string): ActiveTab {
 }
 
 function PortalContent() {
-  const { user, profile, role, isLeadership, isSupervisor, isRestricted, isGraduated, signOut } = useAuth();
+  const { user, profile, role, isLeadership, isSupervisor, isAdministrator, isRestricted, isGraduated, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => getTabFromPath(window.location.pathname));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
 
   const navigateTo = (tab: ActiveTab) => {
+    // If account is administrator, strictly lock down to review only (and legal terms if clicked)
+    if (isAdministrator && tab !== 'review' && tab !== 'legal') {
+      setActiveTab('review');
+      const path = TAB_ROUTES['review'] || '/review_desk';
+      if (window.location.pathname !== path) {
+        window.history.pushState({ tab: 'review' }, '', path);
+      }
+      return;
+    }
+
     // If account is restricted, lock down navigation to dashboard only (and legal terms if clicked)
     if (isRestricted && tab !== 'dashboard' && tab !== 'legal') {
       setActiveTab('dashboard');
@@ -137,18 +148,39 @@ function PortalContent() {
     }
   };
 
-  // Automatically direct newly authenticated users to the member dashboard (or review desk for supervisor)
+  const handleAuthSuccess = (resolvedRole?: UserRole) => {
+    setIsAuthModalOpen(false);
+    const targetRole = resolvedRole || role || (user?.user_metadata?.role as UserRole);
+    if (targetRole === 'administrator' || targetRole === 'supervisor') {
+      navigateTo('review');
+    } else {
+      navigateTo('dashboard');
+    }
+  };
+
+  // Automatically direct newly authenticated users to the member dashboard (or review desk for supervisor / administrator)
   const prevUserRef = useRef(user);
   useEffect(() => {
     if (!prevUserRef.current && user) {
-      if (isSupervisor) {
+      const targetRole = role || (user?.user_metadata?.role as UserRole);
+      if (targetRole === 'administrator' || targetRole === 'supervisor') {
         navigateTo('review');
       } else {
         navigateTo('dashboard');
       }
     }
     prevUserRef.current = user;
-  }, [user, isSupervisor]);
+  }, [user, role, isAdministrator, isSupervisor]);
+
+  // Strict route containment for Administrator role (Final Reviews & Legal only)
+  useEffect(() => {
+    if (user && isAdministrator) {
+      const allowedAdminTabs: ActiveTab[] = ['review', 'legal'];
+      if (!allowedAdminTabs.includes(activeTab)) {
+        navigateTo('review');
+      }
+    }
+  }, [user, isAdministrator, activeTab]);
 
   // Strict route containment for Supervisor role
   useEffect(() => {
@@ -254,10 +286,10 @@ function PortalContent() {
                   type="button"
                   className="btn-primary"
                   style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
-                  onClick={() => navigateTo(isSupervisor ? 'review' : 'dashboard')}
+                  onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
                 >
                   <LayoutDashboard size={14} />
-                  <span>{isSupervisor ? 'Review Desk' : 'Member Portal'}</span>
+                  <span>{(isAdministrator || isSupervisor) ? 'Review Desk' : 'Member Portal'}</span>
                 </button>
               ) : (
                 <button
@@ -275,9 +307,9 @@ function PortalContent() {
                 type="button"
                 className="btn-secondary"
                 style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
-                onClick={() => navigateTo(isSupervisor ? 'review' : 'home')}
+                onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'home')}
               >
-                {isSupervisor ? 'Back to Portal' : 'Back to Homepage'}
+                {(isAdministrator || isSupervisor) ? 'Back to Portal' : 'Back to Homepage'}
               </button>
             </div>
           </div>
@@ -291,7 +323,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={() => navigateTo('dashboard')}
+          onSuccess={handleAuthSuccess}
         />
       </div>
     );
@@ -349,7 +381,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={() => navigateTo('dashboard')}
+          onSuccess={handleAuthSuccess}
         />
       </div>
     );
@@ -367,7 +399,7 @@ function PortalContent() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={() => navigateTo('dashboard')}
+          onSuccess={handleAuthSuccess}
         />
       </div>
     );
@@ -383,8 +415,8 @@ function PortalContent() {
         <div
           className="stitch-sidebar-header"
           style={{ cursor: 'pointer' }}
-          onClick={() => navigateTo('dashboard')}
-          title="Return to Dashboard"
+          onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
+          title="Return to Portal"
         >
           <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
             <img
@@ -406,7 +438,20 @@ function PortalContent() {
         {/* Navigation Items */}
         <nav className="stitch-sidebar-nav">
           
-          {isSupervisor ? (
+          {isAdministrator ? (
+            <>
+              <div className="stitch-nav-section-label">Administration Desk</div>
+
+              <button
+                type="button"
+                className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
+                onClick={() => navigateTo('review')}
+              >
+                <ClipboardCheck size={16} />
+                <span>Final Project Reviews</span>
+              </button>
+            </>
+          ) : isSupervisor ? (
             <>
               <div className="stitch-nav-section-label">Faculty Desk</div>
 
@@ -580,10 +625,10 @@ function PortalContent() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
-                  {profile?.full_name || 'Member'}
+                  {profile?.full_name || (user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'Hamza Iraqi Houssaini' : user?.email?.split('@')[0] || 'Member')}
                 </span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
-                  {role || 'Member'}
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: isAdministrator ? '#4338CA' : isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
+                  {role || (user?.user_metadata?.role as string) || 'Member'}
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -680,9 +725,19 @@ function PortalContent() {
         <ErrorBoundary
           fallbackTitle="Unable to Display Portal View"
           fallbackMessage="An unexpected error occurred while loading this section. Please try again or return to the dashboard."
-          onReset={() => navigateTo(isSupervisor ? 'review' : 'dashboard')}
+          onReset={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
         >
-          {isSupervisor ? (
+          {isAdministrator ? (
+            <>
+              {activeTab === 'review' && <TwoStageReviewDesk />}
+              {activeTab === 'legal' && (
+                <TermsAndPrivacyView
+                  initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
+                  onBack={() => navigateTo('review')}
+                />
+              )}
+            </>
+          ) : isSupervisor ? (
             <>
               {activeTab === 'review' && <TwoStageReviewDesk />}
               {activeTab === 'roster' && <MemberRosterManager />}
@@ -738,7 +793,7 @@ function PortalContent() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={() => navigateTo('dashboard')}
+        onSuccess={handleAuthSuccess}
       />
 
       {/* Change Password / Access Code Modal */}

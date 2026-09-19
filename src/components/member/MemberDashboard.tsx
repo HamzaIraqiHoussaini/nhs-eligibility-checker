@@ -10,7 +10,16 @@ interface MemberDashboardProps {
 }
 
 export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) => {
-  const { user, profile } = useAuth();
+  const {
+    user,
+    profile,
+    role,
+    isLeadership: authIsLeadership,
+    isSupervisor: authIsSupervisor,
+    isAdministrator: authIsAdministrator,
+    isRestricted: authIsRestricted,
+    isGraduated: authIsGraduated,
+  } = useAuth();
   const { rules } = useChapterRules();
   const [projectCount, setProjectCount] = useState(0);
   const [volunteerCount, setVolunteerCount] = useState(0);
@@ -112,13 +121,14 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
     };
 
     loadStats();
-  }, [user]);
+  }, [user, profile?.id, profile?.role, authIsLeadership]);
 
-  const isRestricted = profile?.is_restricted || profile?.role === 'kicked_out';
-  const isGraduated = profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member';
+  const isRestricted = authIsRestricted || profile?.is_restricted || profile?.role === 'kicked_out';
+  const isGraduated = authIsGraduated || profile?.role === 'graduate' || profile?.role === 'past_leadership' || profile?.role === 'past_member';
   const isOnProbation = profile?.is_on_probation;
-  const isLeadership = profile?.role === 'leadership';
-  const isSupervisor = profile?.role === 'supervisor';
+  const isLeadership = authIsLeadership || role === 'leadership' || profile?.role === 'leadership';
+  const isSupervisor = authIsSupervisor || role === 'supervisor' || profile?.role === 'supervisor';
+  const isAdministrator = authIsAdministrator || role === 'administrator' || profile?.role === 'administrator';
 
   const tardiesPerAbsence = rules.tardies_per_absence || 3;
   const absencesForProbation = rules.absences_for_probation || 2;
@@ -131,13 +141,17 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
       {/* Welcome Banner */}
       <div className="mb-8">
         <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-          Welcome, {profile?.full_name || 'NHS Member'}
+          Welcome, {profile?.full_name || (user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'Hamza Iraqi Houssaini' : user?.email?.split('@')[0] || 'NHS Member')}
         </h1>
         <p className="text-sm text-slate-600 mt-1.5">
-          {profile?.role === 'supervisor' || profile?.role === 'past_supervisor' ? (
+          {isSupervisor || profile?.role === 'past_supervisor' ? (
             <span>Chapter Faculty Advisor • Role: <strong className="capitalize text-slate-800">Faculty Supervisor</strong></span>
+          ) : isAdministrator ? (
+            <span>Chapter Administration • Role: <strong className="capitalize text-indigo-700">Administrator</strong></span>
+          ) : isLeadership ? (
+            <span>Chapter Leadership • Role: <strong className="capitalize text-[#8c6d1f]">Executive Leadership</strong></span>
           ) : (
-            <span>Member Portal: Grade {profile?.grade_level || 11} • Role: <strong className="capitalize text-slate-800">{profile?.role}</strong></span>
+            <span>Member Portal: Grade {profile?.grade_level || 11} • Role: <strong className="capitalize text-slate-800">{role || profile?.role || 'Member'}</strong></span>
           )}
         </p>
       </div>

@@ -1,6 +1,7 @@
 export type UserRole =
   | 'leadership'
   | 'supervisor'
+  | 'administrator'
   | 'member'
   | 'past_leadership'
   | 'past_supervisor'
@@ -43,8 +44,10 @@ export type NotificationType =
   | 'project_submitted'
   | 'stage1_approved'
   | 'stage2_approved'
+  | 'stage3_approved'
   | 'project_rejected'
   | 'project_comment'
+  | 'member_welcome'
   | 'general';
 
 export interface InAppNotification {
@@ -118,6 +121,8 @@ export type ProposalStatus =
   | 'rejected_leadership'
   | 'pending_supervisor'
   | 'rejected_supervisor'
+  | 'pending_administrator'
+  | 'rejected_administrator'
   | 'approved'
   | 'completed';
 
@@ -149,6 +154,10 @@ export interface ProjectProposal {
   supervisor_notes?: string;
   supervisor_reviewer_id?: string;
   supervisor_reviewed_at?: string;
+  administrator_decision?: 'approved' | 'rejected';
+  administrator_notes?: string;
+  administrator_reviewer_id?: string;
+  administrator_reviewed_at?: string;
   is_completed: boolean;
   completed_notes?: string;
   completed_at?: string;

@@ -4,19 +4,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { AllowlistEntry, UserRole } from '../../types/nhs';
 import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
+import { sendMemberWelcomeEmail } from '../../lib/emailService';
+import { MemberWelcomeMailModal } from './MemberWelcomeMailModal';
 import {
   UserPlus,
   Trash2,
-  Key,
-  Copy,
-  Check,
   ShieldCheck,
   RefreshCw,
-  X,
   Archive,
   UserMinus,
   RotateCcw,
-  Mail,
+  Copy,
+  Check,
+  X,
 } from 'lucide-react';
 
 function generateAccessCode(): string {
@@ -30,12 +30,15 @@ function generateAccessCode(): string {
   return `CAS-${randomStr}`;
 }
 
-interface RevealCodeData {
+interface MailModalState {
   email: string;
   fullName: string;
   role: UserRole;
   code: string;
   isReset?: boolean;
+  deliveryStatus: 'sending' | 'sent' | 'simulated' | 'failed';
+  errorMessage?: string | null;
+  gmailComposeUrl?: string;
 }
 
 function getEntryDisplayName(item: { first_name?: string | null; last_name?: string | null; full_name?: string | null; email?: string }): string {
@@ -44,31 +47,6 @@ function getEntryDisplayName(item: { first_name?: string | null; last_name?: str
   if (item.full_name) return item.full_name;
   if (item.email) return item.email.split('@')[0];
   return '—';
-}
-
-function getMailtoLink(data: RevealCodeData): string {
-  const roleDisplay = data.role === 'supervisor' ? 'Chapter Advisor / Supervisor' : data.role === 'leadership' ? 'Leadership' : 'Member';
-  const subject = encodeURIComponent(`Your CAS National Honor Society Portal Access Code`);
-  const body = encodeURIComponent(
-`Hello ${data.fullName},
-
-You have been granted access to the Casablanca American School National Honor Society Portal as a ${roleDisplay}.
-
-Here is your one-time access code:
-${data.code}
-
-Portal URL: https://casnhs.vercel.app
-
-Steps to sign in:
-1. Open the portal: https://casnhs.vercel.app
-2. Click "Member Portal" and enter your CAS email: ${data.email}
-3. Enter your access code above as the password.
-4. Once logged in, you can update your passcode at any time via "Change Code" in the top-right header.
-
-Best regards,
-CAS NHS Leadership Team`
-  );
-  return `mailto:${data.email}?subject=${subject}&body=${body}`;
 }
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
@@ -91,9 +69,13 @@ export const AllowlistManager: React.FC = () => {
   const [provisioning, setProvisioning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Reveal Modal state
-  const [revealData, setRevealData] = useState<RevealCodeData | null>(null);
-  const [copied, setCopied] = useState(false);
+  // Mail Modal state (Automated Dispatch)
+  const [mailModalState, setMailModalState] = useState<MailModalState | null>(null);
+  const [resendingMail, setResendingMail] = useState(false);
+
+  // Enum migration help modal
+  const [showEnumModal, setShowEnumModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const loadAllowlist = async () => {
     setLoading(true);
@@ -152,7 +134,7 @@ export const AllowlistManager: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (role !== 'supervisor') {
+      if (role !== 'supervisor' && role !== 'administrator') {
         await supabase
           .from('profiles')
           .update({ grade_level: studentGrade })
@@ -164,12 +146,45 @@ export const AllowlistManager: React.FC = () => {
           .eq('email', cleanEmail);
       }
 
-      setRevealData({
+      // Immediately open modal in "sending" status
+      setMailModalState({
         email: cleanEmail,
         fullName: memberName,
         role,
         code: generatedCode,
         isReset: false,
+        deliveryStatus: 'sending',
+        errorMessage: null,
+      });
+
+      // Automatically dispatch credentials email without requiring manual click
+      sendMemberWelcomeEmail({
+        recipientEmail: cleanEmail,
+        recipientName: memberName,
+        role,
+        code: generatedCode,
+        isReset: false,
+      }).then((result) => {
+        setMailModalState((prev) =>
+          prev && prev.code === generatedCode
+            ? {
+                ...prev,
+                deliveryStatus: result.status === 'sent' ? 'sent' : result.status === 'simulated' ? 'simulated' : 'failed',
+                errorMessage: result.error || null,
+                gmailComposeUrl: result.gmailComposeUrl,
+              }
+            : prev
+        );
+      }).catch((sendErr: any) => {
+        setMailModalState((prev) =>
+          prev && prev.code === generatedCode
+            ? {
+                ...prev,
+                deliveryStatus: 'failed',
+                errorMessage: sendErr?.message || 'Automatic email dispatch failed',
+              }
+            : prev
+        );
       });
 
       setEmail('');
@@ -180,7 +195,13 @@ export const AllowlistManager: React.FC = () => {
       await loadAllowlist();
     } catch (err: any) {
       console.error('Provisioning failed:', err);
-      setErrorMsg(err.message || 'Failed to provision member account.');
+      const rawMsg = (err.message || '').toLowerCase();
+      if (rawMsg.includes('enum user_role') || rawMsg.includes('administrator')) {
+        setShowEnumModal(true);
+        setErrorMsg('Database configuration required: The "administrator" role must be enabled in your Supabase Postgres schema. A 1-click instruction dialog is now open.');
+      } else {
+        setErrorMsg(err.message || 'Failed to provision member account.');
+      }
     } finally {
       setProvisioning(false);
     }
@@ -221,12 +242,45 @@ export const AllowlistManager: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      setRevealData({
+      // Immediately open modal in "sending" status
+      setMailModalState({
         email: entry.email,
         fullName: displayName,
         role: entry.role,
         code: newCode,
         isReset: true,
+        deliveryStatus: 'sending',
+        errorMessage: null,
+      });
+
+      // Automatically dispatch reset email
+      sendMemberWelcomeEmail({
+        recipientEmail: entry.email,
+        recipientName: displayName,
+        role: entry.role,
+        code: newCode,
+        isReset: true,
+      }).then((result) => {
+        setMailModalState((prev) =>
+          prev && prev.code === newCode
+            ? {
+                ...prev,
+                deliveryStatus: result.status === 'sent' ? 'sent' : result.status === 'simulated' ? 'simulated' : 'failed',
+                errorMessage: result.error || null,
+                gmailComposeUrl: result.gmailComposeUrl,
+              }
+            : prev
+        );
+      }).catch((sendErr: any) => {
+        setMailModalState((prev) =>
+          prev && prev.code === newCode
+            ? {
+                ...prev,
+                deliveryStatus: 'failed',
+                errorMessage: sendErr?.message || 'Automatic email dispatch failed',
+              }
+            : prev
+        );
       });
     } catch (err: any) {
       await alert({
@@ -236,6 +290,43 @@ export const AllowlistManager: React.FC = () => {
       });
     } finally {
       setProvisioning(false);
+    }
+  };
+
+  const handleResendWelcomeMail = async (customNotes?: string) => {
+    if (!mailModalState) return;
+    setResendingMail(true);
+    try {
+      const result = await sendMemberWelcomeEmail({
+        recipientEmail: mailModalState.email,
+        recipientName: mailModalState.fullName,
+        role: mailModalState.role,
+        code: mailModalState.code,
+        isReset: mailModalState.isReset,
+        customNotes,
+      });
+      setMailModalState((prev) =>
+        prev
+          ? {
+              ...prev,
+              deliveryStatus: result.status === 'sent' ? 'sent' : result.status === 'simulated' ? 'simulated' : 'failed',
+              errorMessage: result.error || null,
+              gmailComposeUrl: result.gmailComposeUrl,
+            }
+          : null
+      );
+    } catch (err: any) {
+      setMailModalState((prev) =>
+        prev
+          ? {
+              ...prev,
+              deliveryStatus: 'failed',
+              errorMessage: err.message || 'Resend failed',
+            }
+          : null
+      );
+    } finally {
+      setResendingMail(false);
     }
   };
 
@@ -485,13 +576,6 @@ export const AllowlistManager: React.FC = () => {
     }
   };
 
-  const handleCopyCode = () => {
-    if (!revealData) return;
-    navigator.clipboard.writeText(revealData.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
   const activeEntries = entries.filter((e) => !['past_leadership', 'past_member', 'past_supervisor', 'kicked_out'].includes(e.role));
   const archivedEntries = entries.filter((e) => ['past_leadership', 'past_member', 'past_supervisor', 'kicked_out'].includes(e.role));
 
@@ -551,11 +635,11 @@ export const AllowlistManager: React.FC = () => {
         </div>
 
         <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
-          <div className="kpi-label">Faculty Advisors</div>
+          <div className="kpi-label">Faculty & Administrators</div>
           <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-gold-text)' }}>
-            {activeEntries.filter((e) => e.role === 'supervisor').length}
+            {activeEntries.filter((e) => e.role === 'supervisor' || e.role === 'administrator').length}
           </div>
-          <div className="kpi-subtext">Council supervisors</div>
+          <div className="kpi-subtext">Advisors & Executive reviewers</div>
         </div>
 
         <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
@@ -570,9 +654,9 @@ export const AllowlistManager: React.FC = () => {
       {/* Provision Form */}
       <div className="sharp-card" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
         <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 1rem' }}>
-          Onboard New Student or Chapter Advisor
+          Onboard New Student, Chapter Advisor or Administrator
         </h3>
-        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: role === 'supervisor' ? '1.8fr 1.2fr 1.2fr 1.1fr auto' : '1.8fr 1.1fr 1.1fr 1.1fr 0.9fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+        <form onSubmit={handleAuthorizeAndGenerate} style={{ display: 'grid', gridTemplateColumns: (role === 'supervisor' || role === 'administrator') ? '1.8fr 1.2fr 1.2fr 1.1fr auto' : '1.8fr 1.1fr 1.1fr 1.1fr 0.9fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
               CAS Email *
@@ -627,11 +711,12 @@ export const AllowlistManager: React.FC = () => {
               <option value="member">Member (Student)</option>
               {isSuperadmin && <option value="leadership">Leadership (Student)</option>}
               <option value="supervisor">Supervisor (Faculty Advisor)</option>
+              <option value="administrator">Administrator (Executive Reviewer)</option>
             </select>
           </div>
 
-          {/* Grade Level: Only displayed for student roles, never for supervisors */}
-          {role !== 'supervisor' && (
+          {/* Grade Level: Only displayed for student roles, never for supervisors or administrators */}
+          {role !== 'supervisor' && role !== 'administrator' && (
             <div>
               <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
                 Grade Level *
@@ -653,9 +738,11 @@ export const AllowlistManager: React.FC = () => {
             {provisioning ? 'Generating...' : 'Authorize & Generate Code'}
           </button>
         </form>
-        {role === 'supervisor' && (
+        {(role === 'supervisor' || role === 'administrator') && (
           <div style={{ marginTop: '0.65rem', fontSize: '0.75rem', color: 'var(--color-oxford)', fontStyle: 'italic' }}>
-            Chapter Supervisors are faculty teachers. No high school grade level will be assigned.
+            {role === 'administrator'
+              ? 'Chapter Administrators hold executive review privileges. No high school grade level will be assigned.'
+              : 'Chapter Supervisors are faculty teachers. No high school grade level will be assigned.'}
           </div>
         )}
       </div>
@@ -719,8 +806,38 @@ export const AllowlistManager: React.FC = () => {
                       </td>
                       <td>{getEntryDisplayName(item)}</td>
                       <td>
-                        <span className="grade-badge" style={{ textTransform: 'capitalize' }}>
-                          {item.role}
+                        <span
+                          className="grade-badge"
+                          style={{
+                            textTransform: 'capitalize',
+                            backgroundColor:
+                              item.role === 'administrator'
+                                ? '#EEF2FF'
+                                : item.role === 'leadership'
+                                ? 'var(--color-gold-bg)'
+                                : item.role === 'supervisor'
+                                ? '#F0F9FF'
+                                : undefined,
+                            color:
+                              item.role === 'administrator'
+                                ? '#4338CA'
+                                : item.role === 'leadership'
+                                ? 'var(--color-gold-text)'
+                                : item.role === 'supervisor'
+                                ? 'var(--color-oxford)'
+                                : undefined,
+                            border:
+                              item.role === 'administrator'
+                                ? '1px solid #C7D2FE'
+                                : item.role === 'leadership'
+                                ? '1px solid var(--color-gold)'
+                                : item.role === 'supervisor'
+                                ? '1px solid #BAE6FD'
+                                : undefined,
+                            fontWeight: item.role === 'administrator' || item.role === 'leadership' ? 700 : 500,
+                          }}
+                        >
+                          {item.role === 'administrator' ? 'Administrator' : item.role}
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
@@ -832,108 +949,121 @@ export const AllowlistManager: React.FC = () => {
         </table>
       </div>
 
-      {/* ONE-TIME PASSCODE REVEAL MODAL */}
-      {revealData && (
-        <div className="drawer-backdrop" onClick={() => setRevealData(null)}>
+      {/* AUTOMATED WELCOME & CREDENTIALS MAIL TRANSMISSION MODAL */}
+      {mailModalState && (
+        <MemberWelcomeMailModal
+          isOpen={Boolean(mailModalState)}
+          onClose={() => setMailModalState(null)}
+          recipientEmail={mailModalState.email}
+          recipientName={mailModalState.fullName}
+          role={mailModalState.role}
+          accessCode={mailModalState.code}
+          isReset={mailModalState.isReset}
+          deliveryStatus={mailModalState.deliveryStatus}
+          errorMessage={mailModalState.errorMessage}
+          gmailComposeUrl={mailModalState.gmailComposeUrl}
+          onResend={handleResendWelcomeMail}
+          resending={resendingMail}
+        />
+      )}
+
+      {/* Administrator Database Enum Migration Dialog */}
+      {showEnumModal && (
+        <div className="drawer-backdrop" onClick={() => setShowEnumModal(false)}>
           <div
             className="sharp-card"
             style={{
               width: '100%',
-              maxWidth: '520px',
+              maxWidth: '560px',
               margin: 'auto',
               backgroundColor: 'var(--color-surface)',
-              padding: '2.5rem',
+              padding: '2rem',
               position: 'relative',
-              textAlign: 'center',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setRevealData(null)}
+              onClick={() => setShowEnumModal(false)}
               style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
             >
               <X size={20} />
             </button>
 
-            <div style={{ display: 'inline-flex', padding: '1rem', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', marginBottom: '1rem' }}>
-              <Key size={32} color="var(--color-gold-text)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ padding: '0.6rem', backgroundColor: '#EEF2FF', borderRadius: '8px', color: '#4338CA' }}>
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: 0 }}>
+                  Enable Administrator Role in Supabase
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: '0.2rem 0 0' }}>
+                  One-time PostgreSQL enum type update required
+                </p>
+              </div>
             </div>
 
-            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-              {revealData.isReset ? 'New One-Time Access Code Generated' : 'One-Time Member Access Code'}
-            </h2>
-            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-secondary)', margin: '0 0 1.5rem' }}>
-              Generated for <strong>{revealData.fullName}</strong> ({revealData.email}) • Role: <strong style={{ textTransform: 'capitalize' }}>{revealData.role}</strong>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-main)', lineHeight: '1.5', margin: '0 0 1rem' }}>
+              Your Supabase PostgreSQL database requires the new <strong style={{ color: '#4338CA' }}>administrator</strong> role to be added to the <code style={{ backgroundColor: '#F1F5F9', padding: '2px 6px', borderRadius: '4px' }}>user_role</code> enum before accounts can be provisioned with this role.
             </p>
 
-            <div style={{
-              backgroundColor: '#0F172A',
-              color: '#38BDF8',
-              padding: '1.25rem',
-              fontFamily: 'monospace',
-              fontSize: '1.3rem',
-              letterSpacing: '0.08em',
-              fontWeight: 700,
-              border: '2px solid var(--color-oxford)',
-              marginBottom: '1rem',
-              userSelect: 'all',
-              wordBreak: 'break-all',
-            }}>
-              {revealData.code}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-              <a
-                href={getMailtoLink(revealData)}
-                className="btn-primary"
-                style={{
-                  padding: '0.65rem 1.35rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  textDecoration: 'none',
-                  backgroundColor: 'var(--color-navy)',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                }}
-              >
-                <Mail size={16} /> Open Mail & Send Code
-              </a>
-
+            <div style={{ backgroundColor: '#0F172A', color: '#F8FAFC', padding: '1rem', borderRadius: '6px', fontFamily: 'var(--font-mono)', fontSize: '0.82rem', position: 'relative', marginBottom: '1.25rem' }}>
+              <code>ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'administrator';</code>
               <button
                 type="button"
-                className="btn-secondary"
-                onClick={handleCopyCode}
+                onClick={() => {
+                  navigator.clipboard.writeText("ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'administrator';");
+                  setCopiedSql(true);
+                  setTimeout(() => setCopiedSql(false), 3000);
+                }}
                 style={{
-                  padding: '0.65rem 1.25rem',
-                  display: 'inline-flex',
+                  position: 'absolute',
+                  top: '0.6rem',
+                  right: '0.6rem',
+                  backgroundColor: copiedSql ? '#10B981' : '#334155',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
+                  gap: '0.35rem',
                 }}
               >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? 'Copied to Clipboard!' : 'Copy Code'}
+                {copiedSql ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedSql ? 'Copied!' : 'Copy SQL'}</span>
               </button>
             </div>
 
-            <div style={{
-              padding: '0.85rem',
-              backgroundColor: '#FFFBEB',
-              border: '1px solid #FDE68A',
-              fontSize: '0.78rem',
-              color: '#92400E',
-              lineHeight: '1.5',
-              textAlign: 'left',
-            }}>
-              <strong>Important Notice for Leadership:</strong> This code is shown only once. Please send it directly to the member so they can sign in. Once logged in, they can change this passcode at any time.
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: '1.5', marginBottom: '1.5rem', backgroundColor: '#F8FAFC', padding: '0.85rem', border: '1px solid var(--color-border)' }}>
+              <strong>How to activate in 10 seconds:</strong>
+              <ol style={{ margin: '0.5rem 0 0 1.25rem', padding: 0 }}>
+                <li>Open your <strong>Supabase Dashboard &rarr; SQL Editor</strong>.</li>
+                <li>Paste the copied command and click <strong>Run</strong>.</li>
+                <li>Return here and click <strong>"Try Provisioning Again"</strong>!</li>
+              </ol>
             </div>
 
-            <div style={{ marginTop: '1.5rem' }}>
-              <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setRevealData(null)}>
-                I Have Copied / Shared the Code
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowEnumModal(false)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowEnumModal(false);
+                  const form = document.querySelector('form');
+                  if (form) form.requestSubmit();
+                }}
+              >
+                Try Provisioning Again
               </button>
             </div>
           </div>

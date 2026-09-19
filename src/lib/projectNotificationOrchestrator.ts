@@ -272,14 +272,15 @@ export async function notifyStage1Decision(
 }
 
 /**
- * Dispatches notifications and emails when Stage 2 Faculty Supervisor decision is recorded
+ * Dispatches notifications and emails when Stage 2 Faculty Supervisor decision is recorded.
+ * Upon approval, advances the proposal to Stage 3 for Administrator final review.
  */
 export async function notifyStage2Decision(
   project: ProjectProposal,
   decision: 'approved' | 'rejected',
   supervisor: Profile,
   notes?: string
-): Promise<{ success: boolean; gmailUrl?: string }> {
+): Promise<{ success: boolean; adminEmailSent?: boolean; gmailUrl?: string }> {
   try {
     const isApproved = decision === 'approved';
     const type: 'stage2_approved' | 'project_rejected' = isApproved ? 'stage2_approved' : 'project_rejected';
@@ -289,9 +290,9 @@ export async function notifyStage2Decision(
       userId: project.creator_id,
       projectId: project.id,
       type,
-      title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Proposal Not Approved',
+      title: isApproved ? 'Stage 2 Approved • Awaiting Administrator' : 'Notice: Revision Requested by Supervisor',
       message: isApproved
-        ? `"${project.project_title}" has received final authorization from Faculty Supervisor ${supervisor.full_name}. You may now recruit volunteers!`
+        ? `"${project.project_title}" has passed Faculty Supervisor review and is now awaiting final Level 3 review by Chapter Administrator.`
         : `Faculty Supervisor review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,
       linkTab: 'projects',
     });
@@ -308,9 +309,9 @@ export async function notifyStage2Decision(
           userId: cl.id,
           projectId: project.id,
           type,
-          title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Proposal Not Approved',
+          title: isApproved ? 'Stage 2 Approved • Awaiting Administrator' : 'Notice: Revision Requested by Supervisor',
           message: isApproved
-            ? `"${project.project_title}" has received final authorization from Faculty Supervisor ${supervisor.full_name}. You may now recruit volunteers!`
+            ? `"${project.project_title}" has passed Faculty Supervisor review and is now awaiting final Level 3 review by Chapter Administrator.`
             : `Faculty Supervisor review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,
           linkTab: 'projects',
         }));
@@ -318,7 +319,69 @@ export async function notifyStage2Decision(
       }
     }
 
-    // 3. Send Email to Creator
+    let adminEmailSent = false;
+    let adminGmailUrl: string | undefined;
+
+    // 3. If Approved, notify Administrator for Stage 3 Final Sign-off
+    if (isApproved) {
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('role', 'administrator')
+        .eq('is_restricted', false);
+
+      const adminList = (admins && admins.length > 0)
+        ? admins
+        : [{ id: 'admin-fallback', email: 'nhs@cas.ac.ma', full_name: 'Chapter Administrator' }];
+
+      const adminNotifications = adminList.map(a => ({
+        userId: a.id,
+        projectId: project.id,
+        type: 'stage2_approved' as const,
+        title: 'Stage 3 Final Review Required',
+        message: `"${project.project_title}" has passed Supervisor review and awaits your final Level 3 authorization.`,
+        linkTab: 'review',
+      }));
+      await createBulkInAppNotifications(adminNotifications);
+
+      // Send email to Administrator
+      for (const adm of adminList) {
+        const admEmail = generateProjectEmailTemplate({
+          type: 'stage2_approved',
+          projectTitle: project.project_title,
+          creatorName: project.creator_name,
+          creatorEmail: project.creator_email,
+          coLeaderEmails: project.co_leader_emails,
+          eventDate: project.event_date,
+          location: project.location,
+          volunteersNeeded: project.volunteers_needed,
+          reviewerName: supervisor.full_name,
+          reviewerRole: 'Faculty Advisor',
+          reviewerNotes: notes,
+          recipientName: adm.full_name || 'Chapter Administrator',
+          isReviewerNotification: true,
+        });
+
+        const admSendRes = await sendProjectEmail({
+          recipient: { email: adm.email, name: adm.full_name },
+          type: 'stage2_approved',
+          projectId: project.id,
+          projectTitle: project.project_title,
+          subject: admEmail.subject,
+          htmlBody: admEmail.htmlBody,
+          plainTextBody: admEmail.plainText,
+        });
+
+        if (admSendRes.success) {
+          adminEmailSent = true;
+        }
+        if (admSendRes.gmailComposeUrl) {
+          adminGmailUrl = admSendRes.gmailComposeUrl;
+        }
+      }
+    }
+
+    // 4. Send Email to Creator
     const creatorEmail = generateProjectEmailTemplate({
       type,
       projectTitle: project.project_title,
@@ -360,9 +423,127 @@ export async function notifyStage2Decision(
       }
     }
 
-    return { success: true, gmailUrl: sendRes.gmailComposeUrl };
+    return { success: true, adminEmailSent, gmailUrl: adminGmailUrl || sendRes.gmailComposeUrl };
   } catch (err) {
     console.error('Error in notifyStage2Decision:', err);
+    return { success: false };
+  }
+}
+
+/**
+ * Dispatches notifications and emails when Stage 3 Chapter Administrator decision is recorded
+ * (Final Chapter Authorization)
+ */
+export async function notifyStage3Decision(
+  project: ProjectProposal,
+  decision: 'approved' | 'rejected',
+  administrator: Profile,
+  notes?: string
+): Promise<{ success: boolean; gmailUrl?: string }> {
+  try {
+    const isApproved = decision === 'approved';
+    const type: 'stage3_approved' | 'project_rejected' = isApproved ? 'stage3_approved' : 'project_rejected';
+
+    // 1. In-App Notification to Creator
+    await createInAppNotification({
+      userId: project.creator_id,
+      projectId: project.id,
+      type,
+      title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
+      message: isApproved
+        ? `"${project.project_title}" has received final Level 3 authorization from Chapter Administrator ${administrator.full_name}. You may now recruit volunteers!`
+        : `Chapter Administrator review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,
+      linkTab: 'projects',
+    });
+
+    // 2. In-App Notifications for Co-Leaders
+    if (project.co_leader_emails && project.co_leader_emails.length > 0) {
+      const { data: coLeaderProfiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('email', project.co_leader_emails);
+
+      if (coLeaderProfiles && coLeaderProfiles.length > 0) {
+        const coLeaderNotifications = coLeaderProfiles.map(cl => ({
+          userId: cl.id,
+          projectId: project.id,
+          type,
+          title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
+          message: isApproved
+            ? `"${project.project_title}" has received final Level 3 authorization from Chapter Administrator ${administrator.full_name}. You may now recruit volunteers!`
+            : `Chapter Administrator review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,
+          linkTab: 'projects',
+        }));
+        await createBulkInAppNotifications(coLeaderNotifications);
+      }
+    }
+
+    // 3. In-App Notification to Leadership & Supervisor on final approval
+    if (isApproved) {
+      const { data: staffMembers } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role')
+        .in('role', ['leadership', 'supervisor'])
+        .eq('is_restricted', false);
+
+      if (staffMembers && staffMembers.length > 0) {
+        const staffNotifications = staffMembers.map(s => ({
+          userId: s.id,
+          projectId: project.id,
+          type: 'stage3_approved' as const,
+          title: 'Project Officially Approved (Stage 3)',
+          message: `"${project.project_title}" has received final Level 3 authorization from Chapter Administrator ${administrator.full_name}.`,
+          linkTab: 'review',
+        }));
+        await createBulkInAppNotifications(staffNotifications);
+      }
+    }
+
+    // 4. Send Email to Creator
+    const creatorEmail = generateProjectEmailTemplate({
+      type,
+      projectTitle: project.project_title,
+      creatorName: project.creator_name,
+      creatorEmail: project.creator_email,
+      coLeaderEmails: project.co_leader_emails,
+      eventDate: project.event_date,
+      location: project.location,
+      volunteersNeeded: project.volunteers_needed,
+      reviewerName: administrator.full_name,
+      reviewerRole: 'Chapter Administrator',
+      reviewerNotes: notes,
+      recipientName: project.creator_name,
+      isReviewerNotification: false,
+    });
+
+    const sendRes = await sendProjectEmail({
+      recipient: { email: project.creator_email, name: project.creator_name },
+      type,
+      projectId: project.id,
+      projectTitle: project.project_title,
+      subject: creatorEmail.subject,
+      htmlBody: creatorEmail.htmlBody,
+      plainTextBody: creatorEmail.plainText,
+    });
+
+    // Also send to co-leaders
+    if (project.co_leader_emails) {
+      for (const clEmail of project.co_leader_emails) {
+        await sendProjectEmail({
+          recipient: { email: clEmail },
+          type,
+          projectId: project.id,
+          projectTitle: project.project_title,
+          subject: creatorEmail.subject,
+          htmlBody: creatorEmail.htmlBody,
+          plainTextBody: creatorEmail.plainText,
+        });
+      }
+    }
+
+    return { success: true, gmailUrl: sendRes.gmailComposeUrl };
+  } catch (err) {
+    console.error('Error in notifyStage3Decision:', err);
     return { success: false };
   }
 }

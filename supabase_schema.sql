@@ -1459,3 +1459,50 @@ CREATE POLICY "Authenticated users can insert email logs"
   FOR INSERT
   TO authenticated
   WITH CHECK (true);
+
+-- -----------------------------------------------------------------------------
+-- Level 3 Approval Queue: Administrator Role & Three-Stage Review Pipeline
+-- -----------------------------------------------------------------------------
+
+-- 1. Extend user_role enum to include 'administrator'
+DO $$ BEGIN
+  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'administrator';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- 2. Add Administrator review audit columns to project_proposals
+ALTER TABLE public.project_proposals
+  ADD COLUMN IF NOT EXISTS administrator_decision text,
+  ADD COLUMN IF NOT EXISTS administrator_notes text,
+  ADD COLUMN IF NOT EXISTS administrator_reviewer_id uuid REFERENCES public.profiles(id),
+  ADD COLUMN IF NOT EXISTS administrator_reviewed_at timestamp with time zone;
+
+-- 3. Update project_proposals status check constraint to support 3-stage lifecycle:
+-- Stage 1: pending_leadership / rejected_leadership
+-- Stage 2: pending_supervisor / rejected_supervisor
+-- Stage 3: pending_administrator / rejected_administrator
+-- Finalized: approved / completed
+ALTER TABLE public.project_proposals DROP CONSTRAINT IF EXISTS project_proposals_status_check;
+ALTER TABLE public.project_proposals ADD CONSTRAINT project_proposals_status_check CHECK (
+  status IN (
+    'pending_leadership', 'rejected_leadership',
+    'pending_supervisor', 'rejected_supervisor',
+    'pending_administrator', 'rejected_administrator',
+    'approved', 'completed'
+  )
+);
+
+-- 4. Update email_logs select policy to include administrators
+DROP POLICY IF EXISTS "Leadership and supervisors can view all email logs" ON public.email_logs;
+CREATE POLICY "Leadership, supervisors and administrators can view all email logs"
+  ON public.email_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.role IN ('leadership', 'supervisor', 'administrator')
+    )
+  );

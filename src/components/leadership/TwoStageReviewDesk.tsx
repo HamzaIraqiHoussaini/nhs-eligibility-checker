@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
-import { notifyStage1Decision, notifyStage2Decision } from '../../lib/projectNotificationOrchestrator';
+import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision } from '../../lib/projectNotificationOrchestrator';
 import {
   CheckCircle2,
   XCircle,
@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Send,
   Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -24,7 +25,7 @@ function projectHasMonetaryCosts(project: ProjectProposal): boolean {
 }
 
 export const TwoStageReviewDesk: React.FC = () => {
-  const { user, profile, isLeadership, isSupervisor } = useAuth();
+  const { user, profile, isLeadership, isSupervisor, isAdministrator } = useAuth();
   const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<ProjectProposal | null>(null);
@@ -64,6 +65,7 @@ export const TwoStageReviewDesk: React.FC = () => {
 
       const wasStage1 = isLeadership && selectedProposal.status === 'pending_leadership';
       const wasStage2 = isSupervisor && selectedProposal.status === 'pending_supervisor';
+      const wasStage3 = isAdministrator && selectedProposal.status === 'pending_administrator';
 
       if (wasStage1) {
         updates.leadership_decision = decision;
@@ -76,7 +78,13 @@ export const TwoStageReviewDesk: React.FC = () => {
         updates.supervisor_notes = decisionNotes.trim() || undefined;
         updates.supervisor_reviewer_id = user.id;
         updates.supervisor_reviewed_at = new Date().toISOString();
-        updates.status = decision === 'approved' ? 'approved' : 'rejected_supervisor';
+        updates.status = decision === 'approved' ? 'pending_administrator' : 'rejected_supervisor';
+      } else if (wasStage3) {
+        updates.administrator_decision = decision;
+        updates.administrator_notes = decisionNotes.trim() || undefined;
+        updates.administrator_reviewer_id = user.id;
+        updates.administrator_reviewed_at = new Date().toISOString();
+        updates.status = decision === 'approved' ? 'approved' : 'rejected_administrator';
       }
 
       const { error } = await supabase
@@ -125,10 +133,21 @@ export const TwoStageReviewDesk: React.FC = () => {
           .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 2 decision:', err));
 
         await alert({
-          title: decision === 'approved' ? 'Project Officially Approved!' : 'Proposal Revision Requested',
+          title: decision === 'approved' ? 'Stage 2 Approved • Routed to Administrator' : 'Proposal Revision Requested',
           message: decision === 'approved'
-            ? `Stage 2 final approval granted for "${selectedProposal.project_title}"! Official approval emails and notifications have been dispatched to project leaders.`
+            ? `Stage 2 supervisor approval recorded for "${selectedProposal.project_title}"! The proposal has advanced to Level 3 for final administrative sign-off.`
             : `Decision recorded. Feedback notes and notifications have been dispatched to the project leadership team.`,
+          variant: decision === 'approved' ? 'success' : 'warning',
+        });
+      } else if (wasStage3) {
+        notifyStage3Decision(selectedProposal, decision, profile, decisionNotes.trim())
+          .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 3 decision:', err));
+
+        await alert({
+          title: decision === 'approved' ? '🎉 Project Officially Approved!' : 'Proposal Revision Requested by Administrator',
+          message: decision === 'approved'
+            ? `Stage 3 executive authorization granted for "${selectedProposal.project_title}"! Official approval emails and chapter notifications have been dispatched.`
+            : `Administrative decision recorded. Revision instructions have been dispatched to the project leadership team.`,
           variant: decision === 'approved' ? 'success' : 'warning',
         });
       }
@@ -271,11 +290,12 @@ export const TwoStageReviewDesk: React.FC = () => {
   // Filter queues
   const pendingStage1 = proposals.filter((p) => p.status === 'pending_leadership');
   const pendingStage2 = proposals.filter((p) => p.status === 'pending_supervisor');
+  const pendingStage3 = proposals.filter((p) => p.status === 'pending_administrator');
   const completedWithReceiptPending = proposals.filter(
     (p) => (p.is_completed || p.status === 'completed') && projectHasMonetaryCosts(p) && p.receipt_status === 'pending_review'
   );
   const resolvedProposals = proposals.filter(
-    (p) => !['pending_leadership', 'pending_supervisor'].includes(p.status)
+    (p) => !['pending_leadership', 'pending_supervisor', 'pending_administrator'].includes(p.status)
   );
 
   return (
@@ -283,20 +303,24 @@ export const TwoStageReviewDesk: React.FC = () => {
       
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
-          <Clock size={16} /> Two-Stage Approval Pipeline & Receipt Audits
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: isAdministrator ? '#4338CA' : 'var(--color-oxford)', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>
+          {isAdministrator ? <ShieldCheck size={16} /> : <Clock size={16} />}
+          {isAdministrator
+            ? 'Level 3 Executive Administration Review Desk'
+            : 'Three-Stage Chapter Approval Pipeline'}
         </div>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.4rem', color: 'var(--color-navy)', margin: 0 }}>
-          Project Proposal Review Desk
+          {isAdministrator ? 'Project Proposal Executive Review' : 'Project Proposal Review Desk'}
         </h1>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginTop: '0.35rem' }}>
-          {isLeadership ? 'Step 1: Leadership Review (Authorize Stage 1 approval & review completed project receipts)' : ''}
-          {isSupervisor ? 'Step 2: Chapter Advisor / Supervisor Review (Final project authorization)' : ''}
+          {isAdministrator && 'Step 3: Executive Administration Review (Final Chapter Authorization & Verification)'}
+          {isLeadership && 'Step 1: Leadership Review (Authorize Stage 1 approval & review completed project receipts)'}
+          {isSupervisor && 'Step 2: Faculty Advisor Review (Authorizes proposal to proceed to Level 3 Administrative Sign-off)'}
         </p>
       </div>
 
-      {/* Receipts Awaiting Audit Alert Queue */}
-      {completedWithReceiptPending.length > 0 && (
+      {/* Receipts Awaiting Audit Alert Queue (Excluded for Administrator accounts) */}
+      {!isAdministrator && completedWithReceiptPending.length > 0 && (
         <div style={{ marginBottom: '2rem', padding: '1.25rem', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <Receipt size={18} color="var(--color-gold-text)" />
@@ -321,6 +345,56 @@ export const TwoStageReviewDesk: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Level 3 Administrator Queue (Rendered at top if isAdministrator, or as Stage 3) */}
+      {isAdministrator && (
+        <div style={{ marginBottom: '2.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ display: 'inline-flex', padding: '2px 8px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>LEVEL 3</span>
+              Awaiting Administrative Final Sign-Off ({pendingStage3.length})
+            </h2>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4338CA', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <ShieldCheck size={14} /> Final Chapter Authorization
+            </span>
+          </div>
+
+          {pendingStage3.length === 0 ? (
+            <div className="sharp-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              No proposals currently awaiting Level 3 administrator final authorization.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {pendingStage3.map((p) => (
+                <div key={p.id} className="sharp-card" style={{ padding: '1.35rem', borderLeft: '4px solid #4338CA' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#4338CA', backgroundColor: '#EEF2FF', padding: '2px 6px', borderRadius: '3px' }}>
+                          Stage 1 & 2 Approved
+                        </span>
+                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+                          {p.project_title}
+                        </h3>
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                        Proposed by: <strong>{p.creator_name}</strong> • Leaders: {p.leaders} • Date: {p.event_date || 'TBD'} • Volunteers: {p.volunteers_needed}
+                      </div>
+                    </div>
+                    <button
+                      className="btn-primary"
+                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', backgroundColor: '#4338CA' }}
+                      onClick={() => setSelectedProposal(p)}
+                    >
+                      <Eye size={13} /> Review & Authorize (Level 3)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -368,7 +442,7 @@ export const TwoStageReviewDesk: React.FC = () => {
       <div style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0 }}>
-            Stage 2: Awaiting Advisor / Supervisor Final Approval ({pendingStage2.length})
+            Stage 2: Awaiting Advisor / Supervisor Sign-Off ({pendingStage2.length})
           </h2>
           {isSupervisor && (
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-oxford)', textTransform: 'uppercase' }}>
@@ -395,7 +469,7 @@ export const TwoStageReviewDesk: React.FC = () => {
                     </div>
                   </div>
                   <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
-                    <Eye size={13} /> {isSupervisor ? 'Review & Finalize (Stage 2)' : 'Inspect Proposal'}
+                    <Eye size={13} /> {isSupervisor ? 'Review & Sign Off (Stage 2)' : 'Inspect Proposal'}
                   </button>
                 </div>
               </div>
@@ -403,6 +477,44 @@ export const TwoStageReviewDesk: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Stage 3 Queue for non-administrator reviewers */}
+      {!isAdministrator && (
+        <div style={{ marginBottom: '2.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--color-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ display: 'inline-flex', padding: '2px 8px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700 }}>LEVEL 3</span>
+              Stage 3: Awaiting Administrator Final Authorization ({pendingStage3.length})
+            </h2>
+          </div>
+
+          {pendingStage3.length === 0 ? (
+            <div className="sharp-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              No proposals currently awaiting Stage 3 administrator authorization.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {pendingStage3.map((p) => (
+                <div key={p.id} className="sharp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #4338CA' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+                        {p.project_title}
+                      </h3>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        Approved by Leadership & Supervisor • Pending Final Administrator Sign-Off
+                      </div>
+                    </div>
+                    <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
+                      <Eye size={13} /> Inspect Proposal
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Concluded / Active Projects Queue */}
       <div>
@@ -715,33 +827,70 @@ export const TwoStageReviewDesk: React.FC = () => {
                   Stage 1: Awaiting Chapter Leadership Determination
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                  This proposal is currently in the first review stage conducted by student chapter leadership. Once approved by leadership, it will advance to Stage 2 for your final faculty determination.
+                  This proposal is currently in the first review stage conducted by student chapter leadership. Once approved by leadership, it will advance to Stage 2 for your faculty determination.
                 </div>
               </div>
             )}
 
-            {/* Informative banner for Leadership on Stage 2 proposal */}
-            {isLeadership && selectedProposal.status === 'pending_supervisor' && (
-              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px' }}>
+            {/* Informative banner for Administrator on Stage 1 or Stage 2 proposal */}
+            {isAdministrator && (selectedProposal.status === 'pending_leadership' || selectedProposal.status === 'pending_supervisor') && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                 <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
-                  Stage 2: Awaiting Faculty Supervisor Determination
+                  Awaiting Prior Round Approvals (Stage {selectedProposal.status === 'pending_leadership' ? '1: Leadership' : '2: Faculty Supervisor'})
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-                  Student leadership has approved this proposal for Stage 2. Final authorization is currently awaiting determination from the Chapter Faculty Advisor (Supervisor).
+                  As Chapter Administrator, your final authorization unlocks once the proposal passes Stage 1 (Leadership) and Stage 2 (Faculty Supervisor). You will receive an automated alert when it enters Level 3.
+                </div>
+              </div>
+            )}
+
+            {/* Informative banner for Leadership on Stage 2 or Stage 3 proposal */}
+            {isLeadership && (selectedProposal.status === 'pending_supervisor' || selectedProposal.status === 'pending_administrator') && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px' }}>
+                <div style={{ fontWeight: 600, color: 'var(--color-navy)', fontSize: '0.88rem' }}>
+                  {selectedProposal.status === 'pending_supervisor' ? 'Stage 2: Awaiting Faculty Supervisor Determination' : 'Stage 3: Awaiting Chapter Administrator Final Authorization'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
+                  {selectedProposal.status === 'pending_supervisor'
+                    ? 'Student leadership has approved this proposal for Stage 2. Authorization is currently awaiting determination from Chapter Faculty Supervisor Laura Hayes.'
+                    : 'This proposal has passed Stage 1 and Stage 2 and is currently in Level 3 awaiting final executive sign-off from Chapter Administrator.'}
+                </div>
+              </div>
+            )}
+
+            {/* Informative banner for Supervisor on Stage 3 proposal */}
+            {isSupervisor && selectedProposal.status === 'pending_administrator' && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', backgroundColor: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: '8px' }}>
+                <div style={{ fontWeight: 600, color: '#5B21B6', fontSize: '0.88rem' }}>
+                  Stage 3: Forwarded to Chapter Administrator for Final Authorization
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#4C1D95', marginTop: '0.25rem' }}>
+                  Faculty Supervisor authorization recorded. The proposal is currently under final check by the Chapter Administrator.
                 </div>
               </div>
             )}
 
             {/* Active Decision Controls */}
             {((isLeadership && selectedProposal.status === 'pending_leadership') ||
-              (isSupervisor && selectedProposal.status === 'pending_supervisor')) && (
+              (isSupervisor && selectedProposal.status === 'pending_supervisor') ||
+              (isAdministrator && selectedProposal.status === 'pending_administrator')) && (
               <div style={{ marginTop: '2rem', padding: '1.5rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)' }}>
                 <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-                  {isLeadership ? 'Stage 1 Leadership Determination (First Round)' : 'Stage 2 Faculty Supervisor Determination (Final Round)'}
+                  {isLeadership
+                    ? 'Stage 1 Leadership Determination (First Round)'
+                    : isSupervisor
+                    ? 'Stage 2 Faculty Supervisor Determination (Second Round)'
+                    : 'Stage 3 Executive Administrator Determination (Final Authorization)'}
                 </h3>
                 <textarea
                   rows={2}
-                  placeholder={isSupervisor ? 'Enter faculty guidance, venue/date approval, or review notes...' : 'Optional review feedback, notes, or required revisions...'}
+                  placeholder={
+                    isAdministrator
+                      ? 'Enter executive administrative notes, compliance check, or sign-off remarks...'
+                      : isSupervisor
+                      ? 'Enter faculty guidance, venue/date approval, or review notes...'
+                      : 'Optional review feedback, notes, or required revisions...'
+                  }
                   value={decisionNotes}
                   onChange={(e) => setDecisionNotes(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--color-border)', fontSize: '0.85rem', outline: 'none', marginBottom: '1rem', backgroundColor: '#FFFFFF' }}
@@ -759,9 +908,14 @@ export const TwoStageReviewDesk: React.FC = () => {
                     className="btn-primary"
                     disabled={actionLoading}
                     onClick={() => handleDecision('approved')}
+                    style={isAdministrator ? { backgroundColor: '#4338CA' } : undefined}
                   >
                     <CheckCircle2 size={14} />
-                    {isLeadership ? 'Approve for Stage 2 (Supervisor)' : 'Grant Final Chapter Approval'}
+                    {isLeadership
+                      ? 'Approve for Stage 2 (Supervisor)'
+                      : isSupervisor
+                      ? 'Approve for Stage 3 (Administrator)'
+                      : 'Grant Final Chapter Approval'}
                   </button>
                 </div>
               </div>

@@ -59,26 +59,64 @@ export async function checkEmailAllowlist(email: string): Promise<{
  * Fetch profile with automatic fallback creation if missing
  */
 export async function fetchUserProfile(userId: string, userEmail: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .maybeSingle();
+  const cleanEmail = (userEmail || '').trim().toLowerCase();
 
-  if (error) {
-    console.error('Error fetching profile:', error);
-    return null;
-  }
+  try {
+    // 1. Primary lookup by User UUID
+    let { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (!data) {
-    // If trigger didn't run, create default profile
-    const role: UserRole = userEmail.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'leadership' : 'member';
+    if (error) {
+      console.warn('[CAS NHS] Error fetching profile by id, attempting email fallback:', error.message);
+    }
+
+    // 2. Fallback lookup by email (case-insensitive) if ID lookup yielded no row
+    if (!data && cleanEmail) {
+      const { data: byEmail, error: emailErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (emailErr) {
+        console.warn('[CAS NHS] Error fetching profile by email:', emailErr.message);
+      } else if (byEmail) {
+        data = byEmail;
+      }
+    }
+
+    if (data) {
+      return data as Profile;
+    }
+
+    // 3. Fallback auto-provisioning: consult authoritative allowlist table to get assigned role & name
+    let assignedRole: UserRole = cleanEmail === 'hiraqihoussaini@cas.ac.ma' ? 'leadership' : 'member';
+    let assignedName: string = cleanEmail.split('@')[0];
+
+    try {
+      const { data: allowlistData } = await supabase
+        .from('allowlist')
+        .select('role, full_name')
+        .ilike('email', cleanEmail)
+        .maybeSingle();
+
+      if (allowlistData) {
+        if (allowlistData.role) assignedRole = allowlistData.role as UserRole;
+        if (allowlistData.full_name) assignedName = allowlistData.full_name;
+      }
+    } catch (alErr) {
+      console.warn('[CAS NHS] Could not inspect allowlist for profile synthesis:', alErr);
+    }
+
     const newProfile: Partial<Profile> = {
       id: userId,
-      email: userEmail,
-      full_name: userEmail.split('@')[0],
-      grade_level: 11,
-      role,
+      email: cleanEmail,
+      full_name: assignedName,
+      grade_level: (assignedRole === 'supervisor' || assignedRole === 'administrator') ? undefined : 11,
+      role: assignedRole,
       is_on_probation: false,
       probation_count: 0,
       is_restricted: false,
@@ -88,14 +126,15 @@ export async function fetchUserProfile(userId: string, userEmail: string): Promi
       .from('profiles')
       .upsert(newProfile)
       .select()
-      .single();
+      .maybeSingle();
 
     if (insertError) {
-      console.error('Error auto-creating profile:', insertError);
+      console.error('[CAS NHS] Error auto-creating profile:', insertError.message);
       return newProfile as Profile;
     }
-    return created as Profile;
+    return (created || newProfile) as Profile;
+  } catch (unexpected) {
+    console.error('[CAS NHS] Unexpected exception fetching user profile:', unexpected);
+    return null;
   }
-
-  return data as Profile;
 }

@@ -534,6 +534,12 @@ export const MyProjectsView: React.FC = () => {
             <Clock size={12} /> Stage 2: Pending Supervisor Review
           </span>
         );
+      case 'pending_administrator':
+        return (
+          <span className="status-pill" style={{ backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}>
+            <Clock size={12} /> Stage 3: Pending Administrator Review
+          </span>
+        );
       case 'approved':
         return (
           <span className="status-pill eligible">
@@ -555,7 +561,13 @@ export const MyProjectsView: React.FC = () => {
       case 'rejected_supervisor':
         return (
           <span className="status-pill ineligible">
-            <XCircle size={12} /> Rejected by Advisor
+            <XCircle size={12} /> Rejected by Supervisor
+          </span>
+        );
+      case 'rejected_administrator':
+        return (
+          <span className="status-pill ineligible">
+            <XCircle size={12} /> Rejected by Administrator
           </span>
         );
       default:

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { NotificationType, EmailStatus } from '../types/nhs';
+import type { NotificationType, EmailStatus, UserRole } from '../types/nhs';
 
 export interface EmailRecipient {
   email: string;
@@ -113,13 +113,37 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
       break;
 
     case 'stage2_approved':
-      subject = `🎉 [CAS NHS] Project Approved: "${params.projectTitle}"`;
+      if (params.isReviewerNotification) {
+        subject = `[CAS NHS Administrator Review Required] Stage 3 Final Sign-off: "${params.projectTitle}"`;
+        headline = 'Stage 3 Administrator Final Review Required';
+        badgeColor = '#4338CA';
+        badgeBg = '#EEF2FF';
+        badgeText = 'ADMINISTRATIVE FINAL CHECK';
+        primaryMessage = `Project proposal <strong>"${params.projectTitle}"</strong> (led by ${params.creatorName}) has passed Faculty Supervisor review and is now awaiting your final Level 3 Administrative authorization.`;
+        nextStepsText = 'Please open the Chapter Review Desk to inspect proposal details, confirm compliance, and issue the final chapter approval.';
+        ctaLink = reviewLink;
+        ctaText = 'Perform Final Review (Stage 3)';
+      } else {
+        subject = `[CAS NHS Update] Supervisor Approved • Advanced to Stage 3: "${params.projectTitle}"`;
+        headline = 'Faculty Supervisor Has Approved Your Proposal';
+        badgeColor = '#0284C7';
+        badgeBg = '#E0F2FE';
+        badgeText = 'STAGE 2 APPROVED • PENDING STAGE 3';
+        primaryMessage = `Great news! Chapter Faculty Supervisor <strong>${params.reviewerName || 'Laura Hayes'}</strong> has reviewed and approved <strong>"${params.projectTitle}"</strong>.`;
+        nextStepsText = 'The proposal has now reached Stage 3 for final check by the Chapter Administrator. You may continue refining your proposal until final administrator approval is recorded.';
+        ctaLink = projectsLink;
+        ctaText = 'View Proposal Progress';
+      }
+      break;
+
+    case 'stage3_approved':
+      subject = `🎉 [CAS NHS] Project Officially Approved: "${params.projectTitle}"`;
       headline = 'Your Project Is Officially Approved!';
       badgeColor = '#065F46';
       badgeBg = '#ECFDF5';
-      badgeText = 'OFFICIALLY APPROVED';
-      primaryMessage = `Congratulations! <strong>"${params.projectTitle}"</strong> has received final authorization from Chapter Faculty Supervisor <strong>${params.reviewerName || 'Laura Hayes'}</strong>.`;
-      nextStepsText = 'Your project is now officially registered on the CAS NHS Project Hub. You may begin recruiting chapter volunteers and proceed with project execution.';
+      badgeText = 'OFFICIALLY APPROVED (STAGE 3)';
+      primaryMessage = `Congratulations! <strong>"${params.projectTitle}"</strong> has received final authorization from Chapter Administrator <strong>${params.reviewerName || 'Administrator'}</strong>.`;
+      nextStepsText = 'Your project is now officially registered on the CAS NHS Project Hub and locked for execution. You may begin recruiting chapter volunteers and proceed with preparations.';
       ctaLink = projectsLink;
       ctaText = 'Manage Project & Volunteers';
       break;
@@ -130,7 +154,7 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
       badgeColor = '#991B1B';
       badgeBg = '#FEF2F2';
       badgeText = 'REVISION REQUIRED';
-      primaryMessage = `A review decision was recorded for <strong>"${params.projectTitle}"</strong> indicating that adjustments or additional details are needed before it can proceed.`;
+      primaryMessage = `A review decision was recorded for <strong>"${params.projectTitle}"</strong> by <strong>${params.reviewerName || 'Reviewer'} (${params.reviewerRole || 'Reviewer'})</strong> indicating that adjustments or additional details are needed before it can proceed.`;
       nextStepsText = 'Please review the feedback notes below, update your proposal accordingly on the portal, and resubmit for chapter review.';
       ctaLink = projectsLink;
       ctaText = 'Edit & Resubmit Proposal';
@@ -380,6 +404,307 @@ export async function sendProjectEmail(params: SendProjectEmailParams): Promise<
     });
   } catch (dbErr) {
     console.warn('Failed recording into email_logs:', dbErr);
+  }
+
+  return {
+    success: status === 'sent' || status === 'simulated',
+    status,
+    gmailComposeUrl: gmailUrl,
+    error: errorMessage || undefined,
+  };
+}
+
+export interface MemberWelcomeEmailParams {
+  fullName: string;
+  email: string;
+  role: UserRole;
+  code: string;
+  isReset?: boolean;
+  customNotes?: string;
+  portalUrl?: string;
+}
+
+export interface SendMemberWelcomeEmailParams {
+  recipientEmail: string;
+  recipientName: string;
+  role: UserRole;
+  code: string;
+  isReset?: boolean;
+  customNotes?: string;
+}
+
+export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailParams): {
+  subject: string;
+  htmlBody: string;
+  plainText: string;
+} {
+  const portalUrl = params.portalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://casnhs.vercel.app');
+
+  const roleLabel =
+    params.role === 'administrator'
+      ? 'Chapter Administrator'
+      : params.role === 'supervisor'
+      ? 'Chapter Advisor & Faculty Supervisor'
+      : params.role === 'leadership'
+      ? 'Chapter Officer (Student Leadership)'
+      : 'Active Chapter Member';
+
+  const roleBadgeBg =
+    params.role === 'administrator'
+      ? '#EEF2FF'
+      : params.role === 'supervisor'
+      ? '#E0F2FE'
+      : params.role === 'leadership'
+      ? '#FEF3C7'
+      : '#ECFDF5';
+
+  const roleBadgeColor =
+    params.role === 'administrator'
+      ? '#4338CA'
+      : params.role === 'supervisor'
+      ? '#0369A1'
+      : params.role === 'leadership'
+      ? '#92400E'
+      : '#065F46';
+
+  const isReset = Boolean(params.isReset);
+
+  const subject = isReset
+    ? `[CAS NHS Security] Your Chapter Portal Access Code Has Been Reset`
+    : `Welcome to Casablanca American School NHS Chapter • Your Access Credentials`;
+
+  const headline = isReset
+    ? `Your Access Code Has Been Reset`
+    : `Welcome to the CAS National Honor Society`;
+
+  const leadText = isReset
+    ? `A new one-time access code has been provisioned for your Casablanca American School National Honor Society account.`
+    : `You have been officially granted access to the Casablanca American School National Honor Society Portal as a <strong>${roleLabel}</strong>.`;
+
+  const customNotesHtml = params.customNotes?.trim()
+    ? `
+    <div style="margin: 20px 0; padding: 14px 18px; background-color: #F8FAFC; border-left: 4px solid #C59B27; border-radius: 4px;">
+      <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748B; margin-bottom: 6px;">
+        Note from Chapter Leadership:
+      </div>
+      <div style="font-size: 14px; color: #1E293B; line-height: 1.5; font-style: italic;">
+        "${params.customNotes.trim()}"
+      </div>
+    </div>
+    `
+    : '';
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F1F5F9; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card -->
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background-color: #0A1E3F; padding: 24px 30px; text-align: left; border-bottom: 3px solid #C59B27;">
+              <div style="color: #C59B27; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px;">
+                Casablanca American School
+              </div>
+              <div style="color: #FFFFFF; font-family: Georgia, serif; font-size: 20px; font-weight: bold; letter-spacing: -0.01em;">
+                National Honor Society Chapter
+              </div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 30px;">
+              
+              <!-- Role Badge -->
+              <div style="display: inline-block; padding: 4px 10px; background-color: ${roleBadgeBg}; color: ${roleBadgeColor}; border: 1px solid ${roleBadgeColor}33; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 3px; margin-bottom: 14px;">
+                ${roleLabel.toUpperCase()}
+              </div>
+
+              <!-- Title -->
+              <h1 style="font-family: Georgia, serif; font-size: 22px; color: #0A1E3F; margin: 0 0 16px 0; line-height: 1.3;">
+                ${headline}
+              </h1>
+
+              <!-- Greeting -->
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin: 0 0 16px 0;">
+                Dear <strong>${params.fullName}</strong>,
+              </p>
+              <p style="font-size: 15px; line-height: 1.6; color: #334155; margin: 0 0 20px 0;">
+                ${leadText}
+              </p>
+
+              ${customNotesHtml}
+
+              <!-- Credentials Box -->
+              <div style="margin: 24px 0; padding: 20px; background-color: #0F172A; border: 2px solid #C59B27; border-radius: 6px; text-align: center;">
+                <div style="color: #C59B27; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">
+                  Your One-Time Access Passcode
+                </div>
+                <div style="font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 20px; font-weight: 700; color: #38BDF8; letter-spacing: 0.08em; word-break: break-all; padding: 8px 12px; background-color: #1E293B; border-radius: 4px; display: inline-block; border: 1px solid #334155;">
+                  ${params.code}
+                </div>
+                <div style="color: #94A3B8; font-size: 12px; margin-top: 8px;">
+                  Associated Email: <strong style="color: #F8FAFC;">${params.email}</strong>
+                </div>
+              </div>
+
+              <!-- Steps Guide -->
+              <div style="margin: 24px 0; padding: 18px 20px; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;">
+                <div style="font-size: 13px; font-weight: 700; color: #0A1E3F; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
+                  How to Sign In
+                </div>
+                <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: #475569;">
+                  <li>Open the chapter portal: <a href="${portalUrl}" target="_blank" style="color: #0A1E3F; font-weight: 600;">${portalUrl}</a></li>
+                  <li>Click <strong>"Member Portal"</strong> and enter your CAS email: <strong>${params.email}</strong></li>
+                  <li>Paste your one-time passcode into the password field.</li>
+                  <li>Once logged in, you can personalize your passcode at any time via <strong>"Change Code"</strong> in the top header.</li>
+                </ol>
+              </div>
+
+              <!-- Primary CTA Button -->
+              <div style="margin: 28px 0 20px 0; text-align: center;">
+                <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #0A1E3F; color: #FFFFFF; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 32px; border-radius: 4px; box-shadow: 0 2px 4px rgba(10,30,63,0.2);">
+                  Sign In to CAS NHS Portal &rarr;
+                </a>
+              </div>
+
+              <!-- Security Notice -->
+              <div style="padding: 12px 16px; background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 4px; font-size: 12px; color: #92400E; line-height: 1.5;">
+                <strong>Security Reminder:</strong> Please keep this passcode confidential. If you suspect unauthorized access, reset your passcode immediately or reach out to chapter leadership at <a href="mailto:nhs@cas.ac.ma" style="color: #92400E; font-weight: 600;">nhs@cas.ac.ma</a>.
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; padding: 20px 30px; border-top: 1px solid #E2E8F0; text-align: center;">
+              <p style="font-size: 11px; color: #64748B; margin: 0 0 4px 0;">
+                Casablanca American School • Route de la Mecque, Casablanca, Morocco
+              </p>
+              <p style="font-size: 11px; color: #94A3B8; margin: 0;">
+                CAS National Honor Society Chapter Automated Identity & Access System
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const plainText = `
+CASABLANCA AMERICAN SCHOOL - NATIONAL HONOR SOCIETY
+====================================================
+${headline.toUpperCase()}
+Role: ${roleLabel}
+
+Dear ${params.fullName},
+
+${leadText.replace(/<[^>]+>/g, '')}
+${params.customNotes ? `\nNote from Leadership:\n"${params.customNotes}"\n` : ''}
+YOUR ACCESS CREDENTIALS:
+- Email: ${params.email}
+- One-Time Passcode: ${params.code}
+
+SIGN IN STEPS:
+1. Open the portal: ${portalUrl}
+2. Click "Member Portal" and enter your CAS email: ${params.email}
+3. Enter your one-time passcode above as your password.
+4. Once signed in, you can update your passcode at any time via "Change Code" in the top header.
+
+Direct Portal Link: ${portalUrl}
+
+Security Notice: Please keep this passcode confidential. Contact nhs@cas.ac.ma if you need assistance.
+
+---
+Casablanca American School National Honor Society Chapter
+  `.trim();
+
+  return { subject, htmlBody, plainText };
+}
+
+export async function sendMemberWelcomeEmail(params: SendMemberWelcomeEmailParams): Promise<{
+  success: boolean;
+  status: EmailStatus;
+  gmailComposeUrl: string;
+  error?: string;
+}> {
+  const template = generateMemberWelcomeEmailTemplate({
+    fullName: params.recipientName,
+    email: params.recipientEmail,
+    role: params.role,
+    code: params.code,
+    isReset: params.isReset,
+    customNotes: params.customNotes,
+  });
+
+  const gmailUrl = createGmailComposeUrl(
+    params.recipientEmail,
+    template.subject,
+    template.plainText
+  );
+
+  let status: EmailStatus = 'queued';
+  let errorMessage: string | null = null;
+
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: params.recipientEmail,
+        fromName: 'CAS NHS Chapter',
+        subject: template.subject,
+        html: template.htmlBody,
+        text: template.plainText,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      status = 'sent';
+    } else {
+      errorMessage = data.error || `Email dispatch notice (status ${res.status})`;
+      status = (res.status === 404 || res.status === 500) ? 'simulated' : 'failed';
+      console.warn('Member welcome email warning:', errorMessage);
+    }
+  } catch (apiErr: any) {
+    errorMessage = apiErr?.message || 'Network error calling /api/send-email';
+    status = 'simulated';
+  }
+
+  // Record into public.email_logs
+  try {
+    await supabase.from('email_logs').insert({
+      recipient_email: params.recipientEmail,
+      recipient_name: params.recipientName,
+      event_type: 'member_welcome',
+      project_title: 'Member Portal Access Credentials',
+      subject: template.subject,
+      html_body: template.htmlBody,
+      status: status,
+      error_message: errorMessage,
+      sent_at: status === 'sent' ? new Date().toISOString() : null,
+    });
+  } catch (dbErr) {
+    console.warn('Failed recording member_welcome into email_logs:', dbErr);
   }
 
   return {
