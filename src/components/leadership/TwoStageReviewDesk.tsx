@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
-import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision } from '../../lib/projectNotificationOrchestrator';
+import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision, notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
 import {
   CheckCircle2,
   XCircle,
@@ -209,12 +209,15 @@ export const TwoStageReviewDesk: React.FC = () => {
     if (!commentText.trim() || !user || !selectedProposal) return;
 
     setSubmittingComment(true);
+    const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+    const authorName = profile?.full_name || (isAdministrator ? 'Chapter Administrator' : isSupervisor ? 'Faculty Supervisor' : isLeadership ? 'Leadership Reviewer' : 'Reviewer');
+
     const newComment: ProjectComment = {
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       author_id: user.id,
-      author_name: profile?.full_name || (isLeadership ? 'Leadership Reviewer' : 'Supervisor'),
+      author_name: authorName,
       author_email: user.email || '',
-      author_role: (profile?.role || (isLeadership ? 'leadership' : 'supervisor')) as any,
+      author_role: authorRole as any,
       content: commentText.trim(),
       created_at: new Date().toISOString(),
     };
@@ -231,6 +234,13 @@ export const TwoStageReviewDesk: React.FC = () => {
       setCommentText('');
       setSelectedProposal({ ...selectedProposal, comments: updatedComments });
       await loadProposals();
+
+      // Trigger email and in-app notifications to project leader(s)
+      if (authorRole === 'leadership' || authorRole === 'supervisor' || authorRole === 'administrator') {
+        notifyProjectComment(selectedProposal, newComment).catch((notifyErr) => {
+          console.error('Failed to notify project leaders of new comment:', notifyErr);
+        });
+      }
     } catch (err: any) {
       await alert({
         title: 'Comment Failed',
@@ -771,15 +781,52 @@ export const TwoStageReviewDesk: React.FC = () => {
                           padding: '0.85rem 1rem',
                           backgroundColor: '#FFFFFF',
                           border: '1px solid var(--color-border)',
-                          borderLeft: c.author_role === 'leadership' || c.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                          borderLeft:
+                            c.author_role === 'administrator'
+                              ? '3px solid #4338CA'
+                              : c.author_role === 'supervisor'
+                              ? '3px solid #0284C7'
+                              : c.author_role === 'leadership'
+                              ? '3px solid var(--color-oxford)'
+                              : '1px solid var(--color-border)',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name || 'Reviewer'}</strong>
                             {c.author_role && (
-                              <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.65rem' }}>
-                                {c.author_role}
+                              <span
+                                className="grade-badge"
+                                style={{
+                                  textTransform: 'capitalize',
+                                  fontSize: '0.65rem',
+                                  backgroundColor:
+                                    c.author_role === 'administrator'
+                                      ? '#EEF2FF'
+                                      : c.author_role === 'supervisor'
+                                      ? '#E0F2FE'
+                                      : c.author_role === 'leadership'
+                                      ? '#FEF3C7'
+                                      : undefined,
+                                  color:
+                                    c.author_role === 'administrator'
+                                      ? '#4338CA'
+                                      : c.author_role === 'supervisor'
+                                      ? '#0369A1'
+                                      : c.author_role === 'leadership'
+                                      ? '#92400E'
+                                      : undefined,
+                                  borderColor:
+                                    c.author_role === 'administrator'
+                                      ? '#C7D2FE'
+                                      : c.author_role === 'supervisor'
+                                      ? '#BAE6FD'
+                                      : c.author_role === 'leadership'
+                                      ? '#FDE68A'
+                                      : undefined,
+                                }}
+                              >
+                                {c.author_role === 'administrator' ? 'Administrator' : c.author_role}
                               </span>
                             )}
                           </div>

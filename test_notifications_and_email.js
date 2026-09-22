@@ -131,6 +131,29 @@ function generateProjectEmailTemplate(params) {
       `;
       plainText = `Dear ${params.recipientName},\n\nRevisions are requested for your project proposal "${params.projectTitle}".\nFeedback: ${params.reviewerNotes || 'See portal for details.'}\n`;
       break;
+
+    case 'project_comment':
+      subject = `[CAS NHS Feedback] New Comment on "${params.projectTitle}"`;
+      headline = 'New Reviewer Feedback Posted';
+      badgeColor =
+        params.reviewerRole?.toLowerCase().includes('admin')
+          ? '#4338CA'
+          : params.reviewerRole?.toLowerCase().includes('supervisor')
+          ? '#0284C7'
+          : '#92400E';
+      badgeText =
+        params.reviewerRole?.toLowerCase().includes('admin')
+          ? 'ADMINISTRATIVE COMMENT'
+          : params.reviewerRole?.toLowerCase().includes('supervisor')
+          ? 'FACULTY SUPERVISOR COMMENT'
+          : 'LEADERSHIP COMMENT';
+      bodyHtml = `
+        <p>Dear ${safeRecipientName},</p>
+        <p><strong>${escapeHtml(params.reviewerName || 'A reviewer')}</strong> (${escapeHtml(params.reviewerRole || 'Reviewer')}) left a comment on your project proposal <strong>&ldquo;${safeProjectTitle}&rdquo;</strong>.</p>
+        ${safeNotes ? `<div style="background:#F8FAFC;border-left:4px solid #C59B27;padding:12px;margin:16px 0;"><strong>Comment:</strong><br/><em>&ldquo;${safeNotes}&rdquo;</em></div>` : ''}
+      `;
+      plainText = `Dear ${params.recipientName},\n\n${params.reviewerName || 'A reviewer'} (${params.reviewerRole || 'Reviewer'}) left a comment on "${params.projectTitle}":\n"${params.reviewerNotes || ''}"\n`;
+      break;
   }
 
   const html = `
@@ -369,6 +392,181 @@ test('Email failure or missing API key creates queued audit log without throwing
   assert.strictEqual(simulatedDbLog.status, 'queued');
   assert.strictEqual(simulatedDbLog.project_id, 'proj-456');
   assert.strictEqual(simulatedDbLog.recipient_email, 'member@cas.edu');
+});
+
+// ---------------------------------------------------------
+// 5. Reviewer Comment Notifications to Project Leaders
+// ---------------------------------------------------------
+console.log('\n--- 5. Reviewer Comment Notifications to Project Leaders ---');
+
+function resolveCommentNotificationRecipients(project, comment) {
+  if (
+    comment.author_role !== 'leadership' &&
+    comment.author_role !== 'supervisor' &&
+    comment.author_role !== 'administrator'
+  ) {
+    return { shouldNotify: false, recipientEmails: [] };
+  }
+
+  const commentAuthorEmail = (comment.author_email || '').trim().toLowerCase();
+  const recipientEmails = new Set();
+
+  if (project.creator_email && project.creator_email.trim().toLowerCase() !== commentAuthorEmail) {
+    recipientEmails.add(project.creator_email.trim().toLowerCase());
+  }
+
+  if (project.co_leader_emails && Array.isArray(project.co_leader_emails)) {
+    for (const cl of project.co_leader_emails) {
+      const clean = cl.trim().toLowerCase();
+      if (clean && clean !== commentAuthorEmail) {
+        recipientEmails.add(clean);
+      }
+    }
+  }
+
+  return {
+    shouldNotify: true,
+    recipientEmails: Array.from(recipientEmails),
+  };
+}
+
+test('Leadership comment email includes gold badge and reviewer feedback', () => {
+  const email = generateProjectEmailTemplate({
+    type: 'project_comment',
+    projectTitle: 'STEM Tutoring Hub',
+    creatorName: 'Aya Mansour',
+    creatorEmail: 'aya@cas.ac.ma',
+    recipientName: 'Aya Mansour',
+    reviewerName: 'Chapter President',
+    reviewerRole: 'Chapter Leadership',
+    reviewerNotes: 'Please confirm room reservations with the science department.',
+  });
+
+  assert.strictEqual(email.subject, '[CAS NHS Feedback] New Comment on "STEM Tutoring Hub"');
+  assert.strictEqual(email.htmlBody.includes('#92400E'), true, 'Must use Gold badge color for leadership');
+  assert.strictEqual(email.htmlBody.includes('LEADERSHIP COMMENT'), true);
+  assert.strictEqual(email.htmlBody.includes('Please confirm room reservations'), true);
+  assert.strictEqual(email.plainText.includes('Chapter President (Chapter Leadership) left a comment'), true);
+});
+
+test('Faculty Supervisor comment email includes sky badge', () => {
+  const email = generateProjectEmailTemplate({
+    type: 'project_comment',
+    projectTitle: 'STEM Tutoring Hub',
+    creatorName: 'Aya Mansour',
+    creatorEmail: 'aya@cas.ac.ma',
+    recipientName: 'Aya Mansour',
+    reviewerName: 'Laura Hayes',
+    reviewerRole: 'Faculty Supervisor',
+    reviewerNotes: 'Approved in principle, please provide teacher contact names.',
+  });
+
+  assert.strictEqual(email.htmlBody.includes('#0284C7'), true, 'Must use Sky badge color for supervisor');
+  assert.strictEqual(email.htmlBody.includes('FACULTY SUPERVISOR COMMENT'), true);
+  assert.strictEqual(email.htmlBody.includes('Laura Hayes'), true);
+});
+
+test('Administrator comment email includes indigo badge', () => {
+  const email = generateProjectEmailTemplate({
+    type: 'project_comment',
+    projectTitle: 'STEM Tutoring Hub',
+    creatorName: 'Aya Mansour',
+    creatorEmail: 'aya@cas.ac.ma',
+    recipientName: 'Aya Mansour',
+    reviewerName: 'Dr. Alami',
+    reviewerRole: 'Chapter Administrator',
+    reviewerNotes: 'Final administrative safety clearance noted.',
+  });
+
+  assert.strictEqual(email.htmlBody.includes('#4338CA'), true, 'Must use Indigo badge color for administrator');
+  assert.strictEqual(email.htmlBody.includes('ADMINISTRATIVE COMMENT'), true);
+  assert.strictEqual(email.htmlBody.includes('Dr. Alami'), true);
+});
+
+test('Comments by Leadership notify both project creator and all co-leaders', () => {
+  const project = {
+    creator_email: 'aya@cas.ac.ma',
+    co_leader_emails: ['karim@cas.ac.ma', 'nour@cas.ac.ma'],
+  };
+  const comment = {
+    author_email: 'officer@cas.ac.ma',
+    author_role: 'leadership',
+    content: 'Ensure all volunteers sign the safety waiver.',
+  };
+
+  const res = resolveCommentNotificationRecipients(project, comment);
+  assert.strictEqual(res.shouldNotify, true);
+  assert.strictEqual(res.recipientEmails.length, 3);
+  assert.strictEqual(res.recipientEmails.includes('aya@cas.ac.ma'), true);
+  assert.strictEqual(res.recipientEmails.includes('karim@cas.ac.ma'), true);
+  assert.strictEqual(res.recipientEmails.includes('nour@cas.ac.ma'), true);
+});
+
+test('Duplicate emails in creator and co_leader_emails are deduplicated', () => {
+  const project = {
+    creator_email: 'AYA@cas.ac.ma',
+    co_leader_emails: ['aya@cas.ac.ma', 'karim@cas.ac.ma', 'KARIM@cas.ac.ma'],
+  };
+  const comment = {
+    author_email: 'supervisor@cas.ac.ma',
+    author_role: 'supervisor',
+    content: 'Looks great!',
+  };
+
+  const res = resolveCommentNotificationRecipients(project, comment);
+  assert.strictEqual(res.recipientEmails.length, 2);
+  assert.strictEqual(res.recipientEmails.includes('aya@cas.ac.ma'), true);
+  assert.strictEqual(res.recipientEmails.includes('karim@cas.ac.ma'), true);
+});
+
+test('Comment author is excluded from receiving notification if author is creator or co-leader', () => {
+  const project = {
+    creator_email: 'lead-officer@cas.ac.ma',
+    co_leader_emails: ['co-lead@cas.ac.ma'],
+  };
+  // The lead officer (who is also creator) comments as leadership
+  const comment = {
+    author_email: 'lead-officer@cas.ac.ma',
+    author_role: 'leadership',
+    content: 'Adding internal notes on project schedule.',
+  };
+
+  const res = resolveCommentNotificationRecipients(project, comment);
+  assert.strictEqual(res.shouldNotify, true);
+  assert.strictEqual(res.recipientEmails.length, 1);
+  assert.strictEqual(res.recipientEmails[0], 'co-lead@cas.ac.ma', 'Author must not be notified');
+});
+
+test('Comments posted by standard member do NOT notify project leaders', () => {
+  const project = {
+    creator_email: 'aya@cas.ac.ma',
+    co_leader_emails: ['karim@cas.ac.ma'],
+  };
+  const comment = {
+    author_email: 'member@cas.ac.ma',
+    author_role: 'member',
+    content: 'Can I join as a photographer?',
+  };
+
+  const res = resolveCommentNotificationRecipients(project, comment);
+  assert.strictEqual(res.shouldNotify, false);
+  assert.strictEqual(res.recipientEmails.length, 0);
+});
+
+test('Comment with HTML injection is safely escaped in email body', () => {
+  const email = generateProjectEmailTemplate({
+    type: 'project_comment',
+    projectTitle: 'Robotics Workshop',
+    creatorName: 'Yassine',
+    creatorEmail: 'yassine@cas.ac.ma',
+    recipientName: 'Yassine',
+    reviewerName: 'Admin <script>',
+    reviewerRole: 'Chapter Administrator',
+    reviewerNotes: '<script>alert("hack")</script> <b>Review complete</b>',
+  });
+
+  assert.strictEqual(email.htmlBody.includes('<script>'), false);
+  assert.strictEqual(email.htmlBody.includes('&lt;script&gt;alert(&quot;hack&quot;)&lt;/script&gt;'), true);
 });
 
 console.log('\n================================================================');

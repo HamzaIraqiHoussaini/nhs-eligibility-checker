@@ -160,6 +160,33 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
       ctaText = 'Edit & Resubmit Proposal';
       break;
 
+    case 'project_comment':
+      subject = `[CAS NHS Feedback] New Comment on "${params.projectTitle}"`;
+      headline = 'New Reviewer Feedback Posted';
+      badgeColor =
+        params.reviewerRole?.toLowerCase().includes('admin')
+          ? '#4338CA'
+          : params.reviewerRole?.toLowerCase().includes('supervisor')
+          ? '#0284C7'
+          : '#92400E';
+      badgeBg =
+        params.reviewerRole?.toLowerCase().includes('admin')
+          ? '#EEF2FF'
+          : params.reviewerRole?.toLowerCase().includes('supervisor')
+          ? '#E0F2FE'
+          : '#FEF3C7';
+      badgeText =
+        params.reviewerRole?.toLowerCase().includes('admin')
+          ? 'ADMINISTRATIVE COMMENT'
+          : params.reviewerRole?.toLowerCase().includes('supervisor')
+          ? 'FACULTY SUPERVISOR COMMENT'
+          : 'LEADERSHIP COMMENT';
+      primaryMessage = `<strong>${params.reviewerName || 'A reviewer'}</strong> (${params.reviewerRole || 'Reviewer'}) left a comment on your project proposal <strong>"${params.projectTitle}"</strong>.`;
+      nextStepsText = 'Please open the chapter portal to review this comment on your proposal and reply or make any necessary updates in the revision thread.';
+      ctaLink = projectsLink;
+      ctaText = 'View Comment on Chapter Portal';
+      break;
+
     default:
       subject = `[CAS NHS Notification] Update on "${params.projectTitle}"`;
       headline = 'CAS NHS Project Notification';
@@ -169,11 +196,15 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
       break;
   }
 
+  const feedbackHeader = params.type === 'project_comment'
+    ? `Comment from ${params.reviewerRole || 'Reviewer'}:`
+    : `Reviewer Feedback & Notes (${params.reviewerRole || 'Reviewer'}):`;
+
   const notesHtml = params.reviewerNotes
     ? `
     <div style="margin: 20px 0; padding: 14px 18px; background-color: #F8FAFC; border-left: 4px solid var(--color-gold, #C59B27); border-radius: 4px;">
       <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748B; margin-bottom: 6px;">
-        Reviewer Feedback & Notes (${params.reviewerRole || 'Reviewer'}):
+        ${feedbackHeader}
       </div>
       <div style="font-size: 14px; color: #1E293B; line-height: 1.5; font-style: italic;">
         "${params.reviewerNotes}"

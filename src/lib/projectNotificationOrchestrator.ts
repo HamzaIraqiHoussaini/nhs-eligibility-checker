@@ -547,3 +547,159 @@ export async function notifyStage3Decision(
     return { success: false };
   }
 }
+
+/**
+ * Dispatches notifications and emails to project leader(s) (creator and co-leaders)
+ * whenever a comment is posted by Chapter Leadership, Faculty Supervisor, or Chapter Administrator.
+ */
+export async function notifyProjectComment(
+  project: {
+    id: string;
+    project_title: string;
+    creator_id: string;
+    creator_name: string;
+    creator_email: string;
+    co_leader_emails?: string[];
+    event_date?: string | null;
+    location?: string | null;
+    volunteers_needed?: number;
+  },
+  comment: {
+    author_id?: string;
+    author_name: string;
+    author_email: string;
+    author_role: 'leadership' | 'supervisor' | 'administrator' | 'member' | string;
+    content: string;
+  }
+): Promise<{ success: boolean; notifiedCount: number; emailsSent: number; gmailUrl?: string }> {
+  try {
+    // Only comments from leadership, supervisor, or administrator notify the project leader(s)
+    if (
+      comment.author_role !== 'leadership' &&
+      comment.author_role !== 'supervisor' &&
+      comment.author_role !== 'administrator'
+    ) {
+      return { success: true, notifiedCount: 0, emailsSent: 0 };
+    }
+
+    const commentAuthorEmail = (comment.author_email || '').trim().toLowerCase();
+
+    // 1. Gather distinct recipient emails for project leaders (creator + co-leaders), excluding the commenter
+    const recipientEmails = new Set<string>();
+    if (project.creator_email && project.creator_email.trim().toLowerCase() !== commentAuthorEmail) {
+      recipientEmails.add(project.creator_email.trim().toLowerCase());
+    }
+
+    if (project.co_leader_emails && Array.isArray(project.co_leader_emails)) {
+      for (const cl of project.co_leader_emails) {
+        const clean = cl.trim().toLowerCase();
+        if (clean && clean !== commentAuthorEmail) {
+          recipientEmails.add(clean);
+        }
+      }
+    }
+
+    const recipientList = Array.from(recipientEmails);
+    if (recipientList.length === 0) {
+      return { success: true, notifiedCount: 0, emailsSent: 0 };
+    }
+
+    const roleDisplay =
+      comment.author_role === 'administrator'
+        ? 'Chapter Administrator'
+        : comment.author_role === 'supervisor'
+        ? 'Faculty Supervisor'
+        : 'Chapter Leadership';
+
+    const commentSnippet =
+      comment.content.length > 90 ? `${comment.content.substring(0, 90)}...` : comment.content;
+
+    // 2. Look up recipient profile IDs for in-app bell notifications
+    const { data: recipientProfiles } = await supabase
+      .from('profiles')
+      .select('id, email, full_name')
+      .in('email', recipientList);
+
+    const profileMap = new Map<string, { id: string; name: string }>();
+    if (recipientProfiles) {
+      for (const p of recipientProfiles) {
+        profileMap.set(p.email.toLowerCase(), { id: p.id, name: p.full_name || p.email });
+      }
+    }
+
+    const inAppNotifications = recipientList
+      .map((recEmail) => {
+        const p = profileMap.get(recEmail);
+        const targetUserId =
+          p?.id || (recEmail === project.creator_email.toLowerCase() ? project.creator_id : null);
+        if (!targetUserId) return null;
+
+        return {
+          userId: targetUserId,
+          projectId: project.id,
+          type: 'project_comment' as const,
+          title: `New Comment: "${project.project_title}"`,
+          message: `${comment.author_name} (${roleDisplay}): "${commentSnippet}"`,
+          linkTab: 'projects',
+        };
+      })
+      .filter((n): n is NonNullable<typeof n> => n !== null);
+
+    if (inAppNotifications.length > 0) {
+      await createBulkInAppNotifications(inAppNotifications);
+    }
+
+    // 3. Dispatch automated emails to each project leader
+    let emailsSent = 0;
+    let lastGmailUrl: string | undefined;
+
+    for (const recEmail of recipientList) {
+      const p = profileMap.get(recEmail);
+      const recipientName =
+        p?.name || (recEmail === project.creator_email.toLowerCase() ? project.creator_name : 'Project Leader');
+
+      const emailContent = generateProjectEmailTemplate({
+        type: 'project_comment',
+        projectTitle: project.project_title,
+        creatorName: project.creator_name,
+        creatorEmail: project.creator_email,
+        coLeaderEmails: project.co_leader_emails,
+        eventDate: project.event_date,
+        location: project.location,
+        volunteersNeeded: project.volunteers_needed,
+        reviewerName: comment.author_name,
+        reviewerRole: roleDisplay,
+        reviewerNotes: comment.content,
+        recipientName,
+        isReviewerNotification: false,
+      });
+
+      const sendRes = await sendProjectEmail({
+        recipient: { email: recEmail, name: recipientName },
+        type: 'project_comment',
+        projectId: project.id,
+        projectTitle: project.project_title,
+        subject: emailContent.subject,
+        htmlBody: emailContent.htmlBody,
+        plainTextBody: emailContent.plainText,
+      });
+
+      if (sendRes.success) {
+        emailsSent++;
+      }
+      if (sendRes.gmailComposeUrl) {
+        lastGmailUrl = sendRes.gmailComposeUrl;
+      }
+    }
+
+    return {
+      success: true,
+      notifiedCount: recipientList.length,
+      emailsSent,
+      gmailUrl: lastGmailUrl,
+    };
+  } catch (err) {
+    console.error('Error in notifyProjectComment:', err);
+    return { success: false, notifiedCount: 0, emailsSent: 0 };
+  }
+}

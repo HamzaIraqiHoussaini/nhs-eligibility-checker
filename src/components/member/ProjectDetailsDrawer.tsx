@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment, ProjectVolunteer, VolunteerApplicationStatus } from '../../types/nhs';
+import { notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
 import {
   X,
   Calendar,
@@ -46,7 +47,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   onUpdated,
   onEdit,
 }) => {
-  const { user, profile, isLeadership, isSupervisor } = useAuth();
+  const { user, profile, isLeadership, isSupervisor, isAdministrator } = useAuth();
   const { confirm, alert } = useConfirm();
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -377,12 +378,15 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
     if (!commentText.trim() || !user) return;
 
     setSubmittingComment(true);
+    const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+    const authorName = profile?.full_name || (isAdministrator ? 'Chapter Administrator' : isSupervisor ? 'Faculty Supervisor' : isLeadership ? 'Leadership Reviewer' : user.email?.split('@')[0] || 'CAS Member');
+
     const newComment: ProjectComment = {
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       author_id: user.id,
-      author_name: profile?.full_name || user.email?.split('@')[0] || 'CAS Member',
+      author_name: authorName,
       author_email: user.email || '',
-      author_role: (profile?.role || (isLeadership ? 'leadership' : 'member')) as any,
+      author_role: authorRole as any,
       content: commentText.trim(),
       created_at: new Date().toISOString(),
     };
@@ -398,6 +402,13 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       if (error) throw error;
       setCommentText('');
       onUpdated();
+
+      // Trigger email and in-app notifications to project leader(s) if comment is from leadership, supervisor, or admin
+      if (authorRole === 'leadership' || authorRole === 'supervisor' || authorRole === 'administrator') {
+        notifyProjectComment(project, newComment).catch((notifyErr) => {
+          console.error('Failed to notify project leaders of new comment:', notifyErr);
+        });
+      }
     } catch (err: any) {
       await alert({
         title: 'Failed to Post Comment',
@@ -1206,7 +1217,14 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                         padding: '1rem',
                         backgroundColor: 'var(--color-canvas)',
                         border: '1px solid var(--color-border)',
-                        borderLeft: comment.author_role === 'leadership' || comment.author_role === 'supervisor' ? '3px solid var(--color-oxford)' : '1px solid var(--color-border)',
+                        borderLeft:
+                          comment.author_role === 'administrator'
+                            ? '3px solid #4338CA'
+                            : comment.author_role === 'supervisor'
+                            ? '3px solid #0284C7'
+                            : comment.author_role === 'leadership'
+                            ? '3px solid var(--color-oxford)'
+                            : '1px solid var(--color-border)',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -1215,8 +1233,43 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                             {comment.author_name || 'Anonymous Reviewer'}
                           </strong>
                           {comment.author_role && (
-                            <span className="grade-badge" style={{ textTransform: 'capitalize', fontSize: '0.68rem', padding: '0.1rem 0.4rem' }}>
-                              {comment.author_role}
+                            <span
+                              className="grade-badge"
+                              style={{
+                                textTransform: 'capitalize',
+                                fontSize: '0.68rem',
+                                padding: '0.1rem 0.4rem',
+                                backgroundColor:
+                                  comment.author_role === 'administrator'
+                                    ? '#EEF2FF'
+                                    : comment.author_role === 'supervisor'
+                                    ? '#E0F2FE'
+                                    : comment.author_role === 'leadership'
+                                    ? '#FEF3C7'
+                                    : undefined,
+                                color:
+                                  comment.author_role === 'administrator'
+                                    ? '#4338CA'
+                                    : comment.author_role === 'supervisor'
+                                    ? '#0369A1'
+                                    : comment.author_role === 'leadership'
+                                    ? '#92400E'
+                                    : undefined,
+                                borderColor:
+                                  comment.author_role === 'administrator'
+                                    ? '#C7D2FE'
+                                    : comment.author_role === 'supervisor'
+                                    ? '#BAE6FD'
+                                    : comment.author_role === 'leadership'
+                                    ? '#FDE68A'
+                                    : undefined,
+                              }}
+                            >
+                              {comment.author_role === 'administrator'
+                                ? 'Administrator'
+                                : comment.author_role === 'supervisor'
+                                ? 'Faculty Supervisor'
+                                : comment.author_role}
                             </span>
                           )}
                         </div>
