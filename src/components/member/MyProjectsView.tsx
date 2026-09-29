@@ -40,6 +40,8 @@ import {
   FileText,
   Archive,
   FileSpreadsheet,
+  Search,
+  Filter,
 } from 'lucide-react';
 import { parseVolunteeringConfig } from '../../lib/projectVolunteerHelper';
 
@@ -84,6 +86,15 @@ export const MyProjectsView: React.FC = () => {
 
   // Receipt uploading state
   const [uploadingReceiptId, setUploadingReceiptId] = useState<string | null>(null);
+
+  // Search & Filter state for QoL
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSubTab, setFilterSubTab] = useState<'all' | 'recruiting' | 'has_spots' | 'my_role' | 'approved' | 'pending' | 'revisions'>('all');
+
+  useEffect(() => {
+    setFilterSubTab('all');
+    setSearchQuery('');
+  }, [selectedTab]);
 
   const loadData = async () => {
     setLoading(true);
@@ -356,6 +367,73 @@ export const MyProjectsView: React.FC = () => {
 
   const activeProjects = allApprovedProjects.filter((p) => p.status === 'approved' && !p.is_completed);
   const pastProjects = allApprovedProjects.filter((p) => p.status === 'completed' || p.is_completed);
+
+  const recruitingActiveProjectsCount = activeProjects.filter((p) => {
+    const conf = parseVolunteeringConfig(p.comments);
+    return Boolean(conf.is_open ?? conf.recruitment_open);
+  }).length;
+
+  const filteredProposals = proposals.filter((p) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        p.project_title?.toLowerCase().includes(q) ||
+        p.background?.toLowerCase().includes(q) ||
+        p.leaders?.toLowerCase().includes(q) ||
+        p.advisor_name?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (filterSubTab === 'approved') return p.status === 'approved' || p.status === 'completed';
+    if (filterSubTab === 'pending') return p.status === 'pending_leadership' || p.status === 'pending_supervisor' || p.status === 'pending_administrator';
+    if (filterSubTab === 'revisions') return p.status === 'rejected_leadership' || p.status === 'rejected_supervisor' || p.status === 'rejected_administrator' || p.status === 'draft';
+    return true;
+  });
+
+  const filteredActiveProjects = activeProjects.filter((p) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        p.project_title?.toLowerCase().includes(q) ||
+        p.background?.toLowerCase().includes(q) ||
+        p.leaders?.toLowerCase().includes(q) ||
+        p.advisor_name?.toLowerCase().includes(q) ||
+        p.location?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (filterSubTab === 'recruiting') {
+      const conf = parseVolunteeringConfig(p.comments);
+      return Boolean(conf.is_open ?? conf.recruitment_open);
+    }
+    if (filterSubTab === 'has_spots') {
+      const acceptedCount = allVolunteers.filter((v) => v.project_id === p.id && (v.status === 'accepted' || v.status === 'confirmed')).length;
+      return (p.volunteers_needed || 0) > acceptedCount;
+    }
+    if (filterSubTab === 'my_role') {
+      const isLeading = p.creator_id === user?.id || (user?.email && (p.creator_email?.toLowerCase() === user.email.toLowerCase() || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.some((e: string) => e.toLowerCase() === user.email?.toLowerCase()))));
+      const isVolunteering = myVolunteers.some((v) => v.project_id === p.id);
+      return isLeading || isVolunteering;
+    }
+    return true;
+  });
+
+  const filteredPastProjects = pastProjects.filter((p) => {
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        p.project_title?.toLowerCase().includes(q) ||
+        p.background?.toLowerCase().includes(q) ||
+        p.leaders?.toLowerCase().includes(q) ||
+        p.advisor_name?.toLowerCase().includes(q) ||
+        p.completed_notes?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (filterSubTab === 'my_role') {
+      const isLeading = p.creator_id === user?.id || (user?.email && (p.creator_email?.toLowerCase() === user.email.toLowerCase() || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.some((e: string) => e.toLowerCase() === user.email?.toLowerCase()))));
+      const isVolunteering = myVolunteers.some((v) => v.project_id === p.id);
+      return isLeading || isVolunteering;
+    }
+    return true;
+  });
 
   const isSem2 = activeSemester?.semester_number === 2 || (activeSemester?.name && activeSemester.name.toLowerCase().includes('semester 2'));
   const targetAnnualYear = isSem2 ? getNextAcademicYear(activeSemester?.academic_year) : (activeSemester?.academic_year || '2026-2027');
@@ -681,37 +759,85 @@ export const MyProjectsView: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-border)', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           type="button"
           className={`filter-chip ${selectedTab === 'my_projects' ? 'active' : ''}`}
-          style={{ padding: '0.6rem 1.25rem' }}
+          style={{ padding: '0.6rem 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
           onClick={() => setSelectedTab('my_projects')}
         >
-          My Proposals & Led Projects ({proposals.length})
+          <span>My Proposals & Led Projects</span>
+          <span style={{
+            fontSize: '0.72rem',
+            padding: '0.1rem 0.45rem',
+            borderRadius: '10px',
+            backgroundColor: selectedTab === 'my_projects' ? '#FFFFFF' : '#E2E8F0',
+            color: selectedTab === 'my_projects' ? 'var(--color-navy)' : '#475569',
+            fontWeight: 700
+          }}>
+            {proposals.length}
+          </span>
         </button>
+
         <button
           type="button"
           className={`filter-chip ${selectedTab === 'active_projects' ? 'active' : ''}`}
-          style={{ padding: '0.6rem 1.25rem' }}
+          style={{ padding: '0.6rem 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
           onClick={() => setSelectedTab('active_projects')}
         >
-          Active Projects ({activeProjects.length})
+          <span>Active Projects</span>
+          <span style={{
+            fontSize: '0.72rem',
+            padding: '0.1rem 0.45rem',
+            borderRadius: '10px',
+            backgroundColor: selectedTab === 'active_projects' ? '#FFFFFF' : '#DCFCE7',
+            color: selectedTab === 'active_projects' ? '#166534' : '#15803D',
+            fontWeight: 700
+          }}>
+            {activeProjects.length}
+          </span>
+          {recruitingActiveProjectsCount > 0 && (
+            <span style={{
+              fontSize: '0.68rem',
+              padding: '0.12rem 0.45rem',
+              borderRadius: '10px',
+              backgroundColor: '#16A34A',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }} title={`${recruitingActiveProjectsCount} projects recruiting volunteers now`}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} /> Recruiting
+            </span>
+          )}
         </button>
+
         <button
           type="button"
           className={`filter-chip ${selectedTab === 'past_projects' ? 'active' : ''}`}
-          style={{ padding: '0.6rem 1.25rem' }}
+          style={{ padding: '0.6rem 1.15rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
           onClick={() => setSelectedTab('past_projects')}
         >
-          Past Projects ({pastProjects.length})
+          <span>Past Projects</span>
+          <span style={{
+            fontSize: '0.72rem',
+            padding: '0.1rem 0.45rem',
+            borderRadius: '10px',
+            backgroundColor: selectedTab === 'past_projects' ? '#FFFFFF' : '#EDE9FE',
+            color: selectedTab === 'past_projects' ? '#5B21B6' : '#6D28D9',
+            fontWeight: 700
+          }}>
+            {pastProjects.length}
+          </span>
         </button>
+
         {showAnnualTab && (
           <button
             type="button"
             className={`filter-chip ${selectedTab === 'annual_projects' ? 'active' : ''}`}
             style={{
-              padding: '0.6rem 1.25rem',
+              padding: '0.6rem 1.15rem',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
@@ -745,30 +871,182 @@ export const MyProjectsView: React.FC = () => {
         )}
       </div>
 
+      {/* Quick Search & Sub-Filter Bar (for QoL) */}
+      {selectedTab !== 'annual_projects' && (
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <div style={{ position: 'relative', flex: '1', minWidth: '220px', maxWidth: '380px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+            <input
+              type="text"
+              placeholder={
+                selectedTab === 'active_projects'
+                  ? 'Search active projects by title, leader, location...'
+                  : selectedTab === 'past_projects'
+                  ? 'Search archived projects...'
+                  : 'Search proposals by title, leader...'
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.75rem 0.45rem 2.2rem',
+                fontSize: '0.82rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '4px',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{ position: 'absolute', right: '0.6rem', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '0.9rem' }}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Quick Contextual Filter Chips */}
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            {selectedTab === 'active_projects' ? (
+              <>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'all' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('all')}
+                >
+                  All ({activeProjects.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'recruiting' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('recruiting')}
+                >
+                  Recruiting ({recruitingActiveProjectsCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'has_spots' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('has_spots')}
+                >
+                  Has Open Spots
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'my_role' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('my_role')}
+                >
+                  My Role / Applied
+                </button>
+              </>
+            ) : selectedTab === 'past_projects' ? (
+              <>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'all' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('all')}
+                >
+                  All Past ({pastProjects.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'my_role' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('my_role')}
+                >
+                  Projects I Led / Volunteered
+                </button>
+              </>
+            ) : selectedTab === 'my_projects' ? (
+              <>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'all' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('all')}
+                >
+                  All ({proposals.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'approved' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('approved')}
+                >
+                  Approved ({proposals.filter(p => p.status === 'approved' || p.status === 'completed').length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'pending' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('pending')}
+                >
+                  Pending Review ({proposals.filter(p => p.status.startsWith('pending_')).length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-chip ${filterSubTab === 'revisions' ? 'active' : ''}`}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem' }}
+                  onClick={() => setFilterSubTab('revisions')}
+                >
+                  Revisions Needed ({proposals.filter(p => p.status.startsWith('rejected_') || p.status === 'draft').length})
+                </button>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
           Loading project proposals...
         </div>
       ) : selectedTab === 'my_projects' ? (
-        proposals.length === 0 ? (
-          <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center' }}>
-            <Calendar size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-              No Project Proposals Yet
-            </h3>
-            <p style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
-              You haven't submitted any project proposals for this semester. Click below to start an official proposal.
-            </p>
-            {!isRestricted && (
-              <button className="btn-primary" onClick={() => setIsFormOpen(true)}>
-                <Plus size={16} /> Submit First Proposal
+        filteredProposals.length === 0 ? (
+          proposals.length === 0 ? (
+            <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center' }}>
+              <Calendar size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                No Project Proposals Yet
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto 1.5rem' }}>
+                You haven't submitted any project proposals for this semester. Click below to start an official proposal.
+              </p>
+              {!isRestricted && (
+                <button className="btn-primary" onClick={() => setIsFormOpen(true)}>
+                  <Plus size={16} /> Submit First Proposal
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="sharp-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Filter size={32} color="#94A3B8" style={{ margin: '0 auto 0.75rem' }} />
+              <h4 style={{ color: 'var(--color-navy)', margin: '0 0 0.35rem' }}>No Proposals Match Your Search or Filter</h4>
+              <p style={{ fontSize: '0.82rem', margin: '0 0 1rem' }}>Try clearing the search query or changing your filter selection.</p>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterSubTab('all');
+                }}
+              >
+                Reset Filters
               </button>
-            )}
-          </div>
+            </div>
+          )
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'stretch' }}>
-            {proposals.map((project) => {
+            {filteredProposals.map((project) => {
               const hasCosts = projectHasMonetaryCosts(project);
               const isCompleted = project.is_completed || project.status === 'completed';
               const isCreator = project.creator_id === user?.id;
@@ -1051,30 +1329,53 @@ export const MyProjectsView: React.FC = () => {
         )
       ) : selectedTab === 'active_projects' ? (
         /* Active Projects (Stage 3 Approved & Ongoing) */
-        activeProjects.length === 0 ? (
-          <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <Calendar size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-              No Active Projects Currently Ongoing
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
-              Active projects appear here after receiving final Stage 3 confirmation by the NHS Chapter Administrator.
-            </p>
-          </div>
+        filteredActiveProjects.length === 0 ? (
+          activeProjects.length === 0 ? (
+            <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Calendar size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                No Active Projects Currently Ongoing
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                Active projects appear here after receiving final Stage 3 confirmation by the NHS Chapter Administrator.
+              </p>
+            </div>
+          ) : (
+            <div className="sharp-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Filter size={32} color="#94A3B8" style={{ margin: '0 auto 0.75rem' }} />
+              <h4 style={{ color: 'var(--color-navy)', margin: '0 0 0.35rem' }}>No Active Projects Match Your Search or Filter</h4>
+              <p style={{ fontSize: '0.82rem', margin: '0 0 1rem' }}>Try changing your filter or clearing the search query.</p>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterSubTab('all');
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          )
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {activeProjects.map((project) => {
+            {filteredActiveProjects.map((project) => {
               const isLeading = project.creator_id === user?.id || (user?.email && (project.creator_email?.toLowerCase() === user.email.toLowerCase() || (Array.isArray(project.co_leader_emails) && project.co_leader_emails.some((e: string) => e.toLowerCase() === user.email?.toLowerCase()))));
               const acceptedCount = allVolunteers.filter((v) => v.project_id === project.id && (v.status === 'accepted' || v.status === 'confirmed')).length;
               const myVolRecord = myVolunteers.find((v) => v.project_id === project.id);
               const volConfig = parseVolunteeringConfig(project.comments);
               const isRecruiting = Boolean(volConfig.is_open ?? volConfig.recruitment_open);
+              const targetNeeded = project.volunteers_needed || 0;
+              const fillPct = targetNeeded > 0 ? Math.min(100, Math.round((acceptedCount / targetNeeded) * 100)) : 0;
+              const isFull = targetNeeded > 0 && acceptedCount >= targetNeeded;
+              const spotsRemaining = Math.max(0, targetNeeded - acceptedCount);
 
               return (
                 <div
                   key={project.id}
                   className="sharp-card"
-                  style={{ padding: '1.5rem', cursor: 'pointer', transition: 'border-color 0.15s ease' }}
+                  style={{ padding: '1.5rem', cursor: 'pointer', transition: 'border-color 0.15s ease, box-shadow 0.15s ease' }}
                   onClick={() => {
                     setDrawerInitialSection('details');
                     setSelectedProject(project);
@@ -1129,8 +1430,30 @@ export const MyProjectsView: React.FC = () => {
                         )}
                       </div>
 
-                      <div style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem', lineHeight: '1.5' }}>
+                      <div style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', lineHeight: '1.5' }}>
                         {project.background}
+                      </div>
+
+                      {/* Visual Volunteer Capacity Bar */}
+                      <div style={{ margin: '0.6rem 0 0.85rem', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.55rem 0.8rem', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', marginBottom: '0.35rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--color-navy)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <Users size={13} color="var(--color-oxford)" /> Volunteer Roster: {acceptedCount} of {targetNeeded} spots filled
+                          </span>
+                          <span style={{ color: isFull ? '#B45309' : '#166534', fontWeight: 600 }}>
+                            {isFull ? '● Capacity Reached' : `${spotsRemaining} spot${spotsRemaining === 1 ? '' : 's'} available`}
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${fillPct}%`,
+                              height: '100%',
+                              backgroundColor: isFull ? '#F59E0B' : '#10B981',
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1142,18 +1465,26 @@ export const MyProjectsView: React.FC = () => {
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           <MapPin size={13} /> {project.location}
                         </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600, color: 'var(--color-navy)' }}>
-                          <Users size={13} /> {acceptedCount} / {project.volunteers_needed || 0} volunteers filled
-                        </span>
                         {volConfig.questionnaire_url && (
                           <a
                             href={volConfig.questionnaire_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--color-oxford)', fontSize: '0.76rem', fontWeight: 600 }}
+                            className="btn-secondary"
+                            style={{
+                              fontSize: '0.74rem',
+                              padding: '0.2rem 0.6rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#1E40AF',
+                              backgroundColor: '#EFF6FF',
+                              borderColor: '#BFDBFE',
+                              textDecoration: 'none'
+                            }}
                           >
-                            <FileSpreadsheet size={13} /> Questionnaire Attached <ExternalLink size={11} />
+                            <FileSpreadsheet size={12} color="#2563EB" /> Google Form Questionnaire <ExternalLink size={11} />
                           </a>
                         )}
                       </div>
@@ -1211,19 +1542,38 @@ export const MyProjectsView: React.FC = () => {
         )
       ) : selectedTab === 'past_projects' ? (
         /* Past Projects (Concluded & Archived) */
-        pastProjects.length === 0 ? (
-          <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            <Archive size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
-            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
-              No Concluded Projects in Chapter Archives
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
-              When active projects finish and chapter leaders mark them as concluded, their complete historical records, dates, and volunteer quotas will be archived here.
-            </p>
-          </div>
+        filteredPastProjects.length === 0 ? (
+          pastProjects.length === 0 ? (
+            <div className="sharp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Archive size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 1rem' }} />
+              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.5rem' }}>
+                No Concluded Projects in Chapter Archives
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
+                When active projects finish and chapter leaders mark them as concluded, their complete historical records, dates, and volunteer quotas will be archived here.
+              </p>
+            </div>
+          ) : (
+            <div className="sharp-card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+              <Filter size={32} color="#94A3B8" style={{ margin: '0 auto 0.75rem' }} />
+              <h4 style={{ color: 'var(--color-navy)', margin: '0 0 0.35rem' }}>No Archived Projects Match Your Search or Filter</h4>
+              <p style={{ fontSize: '0.82rem', margin: '0 0 1rem' }}>Try clearing your search query or switching filters.</p>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterSubTab('all');
+                }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          )
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {pastProjects.map((project) => {
+            {filteredPastProjects.map((project) => {
               const isLeading = project.creator_id === user?.id || (user?.email && (project.creator_email?.toLowerCase() === user.email.toLowerCase() || (Array.isArray(project.co_leader_emails) && project.co_leader_emails.some((e: string) => e.toLowerCase() === user.email?.toLowerCase()))));
               const confirmedCount = allVolunteers.filter((v) => v.project_id === project.id && (v.attended === true || v.status === 'confirmed')).length;
               const myVolRecord = myVolunteers.find((v) => v.project_id === project.id);
@@ -1276,9 +1626,15 @@ export const MyProjectsView: React.FC = () => {
                         )}
                       </div>
 
-                      <div style={{ fontSize: '0.84rem', color: '#475569', marginBottom: '0.65rem', lineHeight: '1.5' }}>
+                      <div style={{ fontSize: '0.84rem', color: '#475569', marginBottom: '0.5rem', lineHeight: '1.5' }}>
                         {project.background}
                       </div>
+
+                      {project.completed_notes && (
+                        <div style={{ fontSize: '0.78rem', color: '#5B21B6', backgroundColor: '#F5F3FF', border: '1px dashed #DDD6FE', padding: '0.45rem 0.75rem', borderRadius: '4px', marginBottom: '0.65rem', fontStyle: 'italic' }}>
+                          <strong>Execution Summary:</strong> "{project.completed_notes}"
+                        </div>
+                      )}
 
                       {/* Preserved Milestone Dates */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.65rem', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', padding: '0.65rem 0.85rem', marginBottom: '0.65rem', borderRadius: '4px' }}>
@@ -1296,7 +1652,7 @@ export const MyProjectsView: React.FC = () => {
                         </div>
                         <div>
                           <span style={{ display: 'block', fontSize: '0.68rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 600 }}>Credited Volunteers</span>
-                          <strong style={{ fontSize: '0.82rem', color: '#166534' }}>{confirmedCount} students</strong>
+                          <strong style={{ fontSize: '0.82rem', color: '#166534' }}>{confirmedCount} students (+1 quota)</strong>
                         </div>
                       </div>
 
@@ -1317,7 +1673,7 @@ export const MyProjectsView: React.FC = () => {
                           setSelectedProject(project);
                         }}
                       >
-                        <Eye size={13} /> View Historical Record
+                        <Eye size={13} /> View Historical Record & Roster
                       </button>
                     </div>
                   </div>

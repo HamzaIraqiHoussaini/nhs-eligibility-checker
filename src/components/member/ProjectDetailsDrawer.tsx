@@ -33,6 +33,8 @@ import {
   RotateCcw,
   Save,
   FileSpreadsheet,
+  Search,
+  ArrowRight,
 } from 'lucide-react';
 import {
   parseVolunteeringConfig,
@@ -72,6 +74,9 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const [applyingVolunteer, setApplyingVolunteer] = useState(false);
   const [updatingVolId, setUpdatingVolId] = useState<string | null>(null);
   const [concludingProject, setConcludingProject] = useState(false);
+  const [confirmedQuestionnaireDone, setConfirmedQuestionnaireDone] = useState(false);
+  const [rosterFilter, setRosterFilter] = useState<'all' | 'applied' | 'accepted' | 'confirmed' | 'declined'>('all');
+  const [rosterSearch, setRosterSearch] = useState('');
 
   // Profiles resolution for reviewer attribution
   const [profilesMap, setProfilesMap] = useState<Record<string, { full_name: string; role: string; email?: string }>>({});
@@ -192,7 +197,25 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   );
   const acceptedVolunteers = volunteers.filter((v) => v.status === 'accepted' || v.status === 'confirmed');
   const pendingApplicants = volunteers.filter((v) => v.status === 'applied' || !v.status);
-  const confirmedVolunteers = volunteers.filter((v) => v.attended === true);
+  const confirmedVolunteers = volunteers.filter((v) => v.attended === true || v.status === 'confirmed');
+
+  const filteredVolunteers = volunteers.filter((v) => {
+    if (rosterFilter === 'applied' && (v.status !== 'applied' && v.status)) return false;
+    if (rosterFilter === 'accepted' && (v.status !== 'accepted' && v.status !== 'confirmed')) return false;
+    if (rosterFilter === 'confirmed' && (!v.attended && v.status !== 'confirmed')) return false;
+    if (rosterFilter === 'declined' && v.status !== 'declined') return false;
+
+    if (rosterSearch.trim()) {
+      const q = rosterSearch.toLowerCase();
+      const name = (v.student_name || '').toLowerCase();
+      const email = (v.student_email || '').toLowerCase();
+      const note = (v.role_description || '').toLowerCase();
+      if (!name.includes(q) && !email.includes(q) && !note.includes(q)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Non-leader: Apply to Volunteer
   const handleApplyVolunteer = async () => {
@@ -244,6 +267,15 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       return;
     }
 
+    if (volunteeringConfig.questionnaire_url && !confirmedQuestionnaireDone) {
+      await alert({
+        title: 'Questionnaire Confirmation Required',
+        message: 'Please complete the required volunteer questionnaire Google Form and confirm by checking the acknowledgment box before submitting your application.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Apply to Volunteer',
       message: `Submit your request to volunteer for "${project.project_title}" on ${project.event_date}?`,
@@ -275,6 +307,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
         variant: 'success',
       });
       setVolunteerRoleNote('');
+      setConfirmedQuestionnaireDone(false);
       await loadVolunteers();
       onUpdated();
     } catch (err: any) {
@@ -490,11 +523,30 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       return;
     }
 
+    if (!editAdvisorName.trim()) {
+      await alert({
+        title: 'Validation Required',
+        message: 'Please provide a valid faculty supervisor / advisor name before saving.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (!editEventDate) {
+      await alert({
+        title: 'Validation Required',
+        message: 'Please specify an event date before saving.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     setSavingSchedule(true);
     try {
-      const updateData: { event_date?: string; advisor_name?: string } = {};
-      if (editEventDate.trim()) updateData.event_date = editEventDate.trim();
-      if (editAdvisorName.trim()) updateData.advisor_name = editAdvisorName.trim();
+      const updateData: { event_date?: string; advisor_name?: string } = {
+        event_date: editEventDate.trim(),
+        advisor_name: editAdvisorName.trim(),
+      };
 
       const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
       const authorName = profile?.full_name || user?.email || 'Leader';
@@ -861,46 +913,143 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
         {/* Scrollable Content Body */}
         <div style={{ padding: '2rem', overflowY: 'auto', flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
-          {/* Official Review Determinations & Attribution Audit */}
-          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem', borderRadius: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldCheck size={16} color="var(--color-oxford)" />
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Official Review Determinations & Approval Attribution
-                </span>
-              </div>
-              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                3-Tier Chapter Governance Protocol
-              </span>
-            </div>
+          {/* Official Three-Tier Chapter Governance Stepper */}
+          {(() => {
+            const s1 = resolveStageReviewer(1, project, profilesMap);
+            const s1Approved = s1.decision === 'approved' || project.status === 'pending_supervisor' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
+            const s1Rejected = s1.decision === 'rejected' || project.status === 'rejected_leadership';
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-              {/* Stage 1: Leadership Committee */}
-              {(() => {
-                const s1 = resolveStageReviewer(1, project, profilesMap);
-                const isApproved = s1.decision === 'approved' || project.status === 'pending_supervisor' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
-                const isRejected = s1.decision === 'rejected' || project.status === 'rejected_leadership';
+            const s2 = resolveStageReviewer(2, project, profilesMap);
+            const s2Approved = s2.decision === 'approved' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
+            const s2Rejected = s2.decision === 'rejected' || project.status === 'rejected_supervisor';
+            const s2Waiting = project.status === 'draft' || project.status === 'pending_leadership' || project.status === 'rejected_leadership';
+            const s2Pending = !s2Approved && !s2Rejected && !s2Waiting;
 
-                return (
+            const s3 = resolveStageReviewer(3, project, profilesMap);
+            const s3Approved = project.status === 'approved' || project.status === 'completed' || s3.decision === 'approved';
+            const s3Rejected = s3.decision === 'rejected' || project.status === 'rejected_administrator';
+            const s3Waiting = !s3Approved && !s3Rejected && project.status !== 'pending_administrator';
+            const s3Pending = !s3Approved && !s3Rejected && !s3Waiting;
+
+            return (
+              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <ShieldCheck size={18} color="var(--color-oxford)" />
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        Three-Tier Chapter Governance Stepper
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '0.1rem' }}>
+                        Sequential Sign-Off: Student Leadership &rarr; Faculty Supervisor &rarr; NHS Chapter Administrator
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '12px', backgroundColor: s3Approved ? '#DCFCE7' : '#FEF3C7', color: s3Approved ? '#15803D' : '#92400E', border: '1px solid', borderColor: s3Approved ? '#86EFAC' : '#FDE68A' }}>
+                    {s3Approved ? 'Fully Ratified Protocol' : s1Rejected || s2Rejected || s3Rejected ? 'Revision / Action Required' : 'Governance In Progress'}
+                  </span>
+                </div>
+
+                {/* Visual Step Progress Tracker */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', padding: '0.75rem 1rem', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '4px', gap: '0.5rem', overflowX: 'auto' }}>
+                  {/* Step 1 Node */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <div style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      backgroundColor: s1Approved ? '#16A34A' : s1Rejected ? '#DC2626' : '#D97706',
+                      color: '#FFFFFF',
+                    }}>
+                      {s1Approved ? <Check size={14} /> : s1Rejected ? <X size={14} /> : '1'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 1: Leadership</div>
+                      <div style={{ fontSize: '0.68rem', color: s1Approved ? '#16A34A' : s1Rejected ? '#DC2626' : '#B45309', fontWeight: 600 }}>
+                        {s1Approved ? 'Screened & Approved' : s1Rejected ? 'Declined' : 'In Screening'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <ArrowRight size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
+
+                  {/* Step 2 Node */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <div style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      backgroundColor: s2Approved ? '#16A34A' : s2Rejected ? '#DC2626' : s2Pending ? '#2563EB' : '#CBD5E1',
+                      color: s2Waiting ? '#64748B' : '#FFFFFF',
+                    }}>
+                      {s2Approved ? <Check size={14} /> : s2Rejected ? <X size={14} /> : '2'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 2: Faculty Supervisor</div>
+                      <div style={{ fontSize: '0.68rem', color: s2Approved ? '#16A34A' : s2Rejected ? '#DC2626' : s2Pending ? '#1D4ED8' : '#64748B', fontWeight: 600 }}>
+                        {s2Approved ? 'Sponsorship Confirmed' : s2Rejected ? 'Declined' : s2Pending ? 'Awaiting Signature' : 'Awaiting Tier 1'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <ArrowRight size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
+
+                  {/* Step 3 Node */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <div style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      backgroundColor: s3Approved ? '#16A34A' : s3Rejected ? '#DC2626' : s3Pending ? '#4F46E5' : '#CBD5E1',
+                      color: s3Waiting ? '#64748B' : '#FFFFFF',
+                    }}>
+                      {s3Approved ? <Check size={14} /> : s3Rejected ? <X size={14} /> : '3'}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 3: NHS Administrator</div>
+                      <div style={{ fontSize: '0.68rem', color: s3Approved ? '#16A34A' : s3Rejected ? '#DC2626' : s3Pending ? '#4338CA' : '#64748B', fontWeight: 600 }}>
+                        {s3Approved ? 'Ratified & Active' : s3Rejected ? 'Declined' : s3Pending ? 'Final Review' : 'Awaiting Tier 2'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage Cards Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.85rem' }}>
+                  {/* Stage 1: Leadership Committee Card */}
                   <div style={{
                     padding: '0.85rem 1rem',
                     backgroundColor: '#FFFFFF',
                     border: '1px solid',
-                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#FDE68A',
+                    borderColor: s1Approved ? '#BBF7D0' : s1Rejected ? '#FECACA' : '#FDE68A',
                     borderLeftWidth: '4px',
-                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : '#D97706',
-                    borderRadius: '2px',
+                    borderLeftColor: s1Approved ? '#16A34A' : s1Rejected ? '#DC2626' : '#D97706',
+                    borderRadius: '4px',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Stage 1: Leadership Committee
                       </span>
-                      {isApproved ? (
+                      {s1Approved ? (
                         <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Approved
                         </span>
-                      ) : isRejected ? (
+                      ) : s1Rejected ? (
                         <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Rejected
                         </span>
@@ -933,39 +1082,30 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       </div>
                     )}
                   </div>
-                );
-              })()}
 
-              {/* Stage 2: Faculty Supervisor */}
-              {(() => {
-                const s2 = resolveStageReviewer(2, project, profilesMap);
-                const isApproved = s2.decision === 'approved' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
-                const isRejected = s2.decision === 'rejected' || project.status === 'rejected_supervisor';
-                const isWaiting = project.status === 'draft' || project.status === 'pending_leadership' || project.status === 'rejected_leadership';
-
-                return (
+                  {/* Stage 2: Faculty Supervisor Card */}
                   <div style={{
                     padding: '0.85rem 1rem',
                     backgroundColor: '#FFFFFF',
                     border: '1px solid',
-                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#BFDBFE',
+                    borderColor: s2Approved ? '#BBF7D0' : s2Rejected ? '#FECACA' : s2Pending ? '#BFDBFE' : '#E2E8F0',
                     borderLeftWidth: '4px',
-                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : isWaiting ? '#94A3B8' : '#2563EB',
-                    borderRadius: '2px',
+                    borderLeftColor: s2Approved ? '#16A34A' : s2Rejected ? '#DC2626' : s2Waiting ? '#94A3B8' : '#2563EB',
+                    borderRadius: '4px',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Stage 2: Faculty Supervisor
                       </span>
-                      {isApproved ? (
+                      {s2Approved ? (
                         <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Approved
                         </span>
-                      ) : isRejected ? (
+                      ) : s2Rejected ? (
                         <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Rejected
                         </span>
-                      ) : isWaiting ? (
+                      ) : s2Waiting ? (
                         <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#F1F5F9', color: '#64748B' }}>
                           Awaiting Stage 1
                         </span>
@@ -980,7 +1120,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                         <span>Reviewed by: <strong>{s2.reviewerName}</strong></span>
                       ) : (
                         <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                          {isWaiting ? 'Awaiting Stage 1' : `Assigned: ${project.advisor_name || 'Faculty Advisor'}`}
+                          {s2Waiting ? 'Awaiting Stage 1' : `Assigned: ${project.advisor_name || 'Faculty Advisor'}`}
                         </span>
                       )}
                     </div>
@@ -1000,39 +1140,30 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       </div>
                     )}
                   </div>
-                );
-              })()}
 
-              {/* Stage 3: NHS Administrator (Final Confirmation) */}
-              {(() => {
-                const s3 = resolveStageReviewer(3, project, profilesMap);
-                const isApproved = project.status === 'approved' || project.status === 'completed' || s3.decision === 'approved';
-                const isRejected = s3.decision === 'rejected' || project.status === 'rejected_administrator';
-                const isWaiting = !isApproved && !isRejected && project.status !== 'pending_administrator';
-
-                return (
+                  {/* Stage 3: NHS Administrator Card */}
                   <div style={{
                     padding: '0.85rem 1rem',
                     backgroundColor: '#FFFFFF',
                     border: '1px solid',
-                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#C7D2FE',
+                    borderColor: s3Approved ? '#BBF7D0' : s3Rejected ? '#FECACA' : s3Pending ? '#C7D2FE' : '#E2E8F0',
                     borderLeftWidth: '4px',
-                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : isWaiting ? '#94A3B8' : '#4F46E5',
-                    borderRadius: '2px',
+                    borderLeftColor: s3Approved ? '#16A34A' : s3Rejected ? '#DC2626' : s3Waiting ? '#94A3B8' : '#4F46E5',
+                    borderRadius: '4px',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
                         Stage 3: NHS Admin Confirmation
                       </span>
-                      {isApproved ? (
+                      {s3Approved ? (
                         <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Fully Approved
                         </span>
-                      ) : isRejected ? (
+                      ) : s3Rejected ? (
                         <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
                           Rejected
                         </span>
-                      ) : isWaiting ? (
+                      ) : s3Waiting ? (
                         <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#F1F5F9', color: '#64748B' }}>
                           Awaiting Stage 2
                         </span>
@@ -1045,11 +1176,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                     <div style={{ fontSize: '0.82rem', color: 'var(--color-navy)', fontWeight: 600 }}>
                       {s3.reviewerName ? (
                         <span>Confirmed by: <strong>{s3.reviewerName}</strong></span>
-                      ) : isApproved ? (
+                      ) : s3Approved ? (
                         <span>Confirmed by: <strong>Chapter Administrator</strong></span>
                       ) : (
                         <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                          {isWaiting ? 'Awaiting Stage 2' : 'Pending NHS Admin Final Confirmation'}
+                          {s3Waiting ? 'Awaiting Stage 2' : 'Pending NHS Admin Final Confirmation'}
                         </span>
                       )}
                     </div>
@@ -1069,10 +1200,10 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       </div>
                     )}
                   </div>
-                );
-              })()}
-            </div>
-          </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Active vs Concluded / Archived Banner & Schedule Modification */}
           {(project.status === 'approved' || project.status === 'completed') && (
@@ -1622,24 +1753,47 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
 
                         {/* Optional Google Form Questionnaire Link for Applicants */}
                         {volunteeringConfig.questionnaire_url && (
-                          <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.85rem 1rem', marginBottom: '0.85rem', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-oxford)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                <FileSpreadsheet size={14} /> Volunteer Questionnaire Required
+                          <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.85rem 1rem', marginBottom: '0.85rem', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-oxford)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                  <FileSpreadsheet size={14} /> Volunteer Questionnaire Required
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: '#1E40AF', marginTop: '0.15rem' }}>
+                                  {volunteeringConfig.instructions || 'Please complete the questionnaire form before submitting your volunteer request.'}
+                                </div>
                               </div>
-                              <div style={{ fontSize: '0.78rem', color: '#1E40AF', marginTop: '0.15rem' }}>
-                                {volunteeringConfig.instructions || 'Please complete the questionnaire form before or alongside submitting your volunteer request.'}
-                              </div>
+                              <a
+                                href={volunteeringConfig.questionnaire_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-primary"
+                                style={{ fontSize: '0.74rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                Open Google Form <ExternalLink size={12} />
+                              </a>
                             </div>
-                            <a
-                              href={volunteeringConfig.questionnaire_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn-primary"
-                              style={{ fontSize: '0.74rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              Open Google Form <ExternalLink size={12} />
-                            </a>
+
+                            <label style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.55rem',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem',
+                              color: '#1E3A8A',
+                              fontWeight: 600,
+                              borderTop: '1px dashed #BFDBFE',
+                              paddingTop: '0.55rem',
+                              userSelect: 'none',
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={confirmedQuestionnaireDone}
+                                onChange={(e) => setConfirmedQuestionnaireDone(e.target.checked)}
+                                style={{ accentColor: 'var(--color-oxford)', width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              <span>I confirm that I have opened and filled out the Google Form questionnaire for this project.</span>
+                            </label>
                           </div>
                         )}
 
@@ -1759,18 +1913,97 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
 
                   {/* Applicants List */}
                   <div style={{ border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-navy)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>
+                    <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-navy)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Users size={15} color="var(--color-oxford)" />
                         Volunteer Applicants & Roster ({volunteers.length})
                         {pendingApplicants.length > 0 && (
-                          <span style={{ marginLeft: '0.4rem', color: '#B45309', fontWeight: 600, fontSize: '0.72rem' }}>
-                            ({pendingApplicants.length} pending review)
+                          <span style={{ marginLeft: '0.25rem', backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.45rem', borderRadius: '10px', fontWeight: 700, fontSize: '0.7rem', border: '1px solid #FDE68A' }}>
+                            {pendingApplicants.length} pending
                           </span>
                         )}
                       </span>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-muted)' }}>
-                        Target: {project.volunteers_needed || 0} students
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                        Target Capacity: {project.volunteers_needed || 0} students
                       </span>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div style={{ padding: '0.65rem 1rem', backgroundColor: '#FAFAFA', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                      <div style={{ position: 'relative', flex: '1', minWidth: '200px' }}>
+                        <Search size={13} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                        <input
+                          type="text"
+                          value={rosterSearch}
+                          onChange={(e) => setRosterSearch(e.target.value)}
+                          placeholder="Search applicant by name, email, or note..."
+                          style={{
+                            width: '100%',
+                            padding: '0.35rem 0.6rem 0.35rem 1.9rem',
+                            fontSize: '0.76rem',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '3px',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        />
+                        {rosterSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setRosterSearch('')}
+                            style={{
+                              position: 'absolute',
+                              right: '0.5rem',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: '#94A3B8',
+                              fontSize: '0.85rem',
+                              lineHeight: 1,
+                            }}
+                            title="Clear search"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Filter Chips */}
+                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        {(
+                          [
+                            { id: 'all', label: `All (${volunteers.length})` },
+                            { id: 'applied', label: `Pending (${pendingApplicants.length})` },
+                            { id: 'accepted', label: `Accepted (${acceptedVolunteers.length})` },
+                            { id: 'confirmed', label: `Credited (${confirmedVolunteers.length})` },
+                            { id: 'declined', label: 'Declined' },
+                          ] as const
+                        ).map((tab) => {
+                          const active = rosterFilter === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => setRosterFilter(tab.id)}
+                              style={{
+                                fontSize: '0.7rem',
+                                fontWeight: active ? 700 : 500,
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '12px',
+                                border: '1px solid',
+                                borderColor: active ? 'var(--color-oxford)' : 'var(--color-border)',
+                                backgroundColor: active ? 'var(--color-oxford)' : '#FFFFFF',
+                                color: active ? '#FFFFFF' : 'var(--color-navy)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {tab.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {loadingVolunteers ? (
@@ -1781,9 +2014,26 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                         No members have submitted volunteer requests for this project yet.
                       </div>
+                    ) : filteredVolunteers.length === 0 ? (
+                      <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '0.5rem' }}>
+                          No applicants match the current filter or search query.
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem' }}
+                          onClick={() => {
+                            setRosterFilter('all');
+                            setRosterSearch('');
+                          }}
+                        >
+                          Reset Roster Filters
+                        </button>
+                      </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {volunteers.map((v) => {
+                        {filteredVolunteers.map((v) => {
                           const isUpdating = updatingVolId === v.id;
                           const isAccepted = v.status === 'accepted' || v.status === 'confirmed';
                           const isConfirmed = v.attended === true || v.status === 'confirmed';
