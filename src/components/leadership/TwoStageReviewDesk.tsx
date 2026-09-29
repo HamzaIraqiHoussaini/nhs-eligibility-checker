@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
 import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision, notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
+import { resolveStageReviewer, getDisplayComments } from '../../lib/projectVolunteerHelper';
 import {
   CheckCircle2,
   XCircle,
@@ -28,6 +29,7 @@ export const TwoStageReviewDesk: React.FC = () => {
   const { user, profile, isLeadership, isSupervisor, isAdministrator } = useAuth();
   const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Record<string, { full_name: string; role: string; email?: string }>>({});
   const [selectedProposal, setSelectedProposal] = useState<ProjectProposal | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -41,12 +43,24 @@ export const TwoStageReviewDesk: React.FC = () => {
 
   const loadProposals = async () => {
     try {
-      const { data, error } = await supabase
-        .from('project_proposals')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [{ data, error }, { data: profData }] = await Promise.all([
+        supabase
+          .from('project_proposals')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id, full_name, role, email'),
+      ]);
       if (error) throw error;
       setProposals((data as ProjectProposal[]) || []);
+      if (profData) {
+        const map: Record<string, { full_name: string; role: string; email?: string }> = {};
+        for (const pr of profData) {
+          map[pr.id] = { full_name: pr.full_name || pr.email?.split('@')[0] || 'Member', role: pr.role, email: pr.email };
+        }
+        setProfilesMap(map);
+      }
     } catch (err) {
       console.error('Error fetching proposals for review:', err);
     }
@@ -67,6 +81,23 @@ export const TwoStageReviewDesk: React.FC = () => {
       const wasStage2 = isSupervisor && selectedProposal.status === 'pending_supervisor';
       const wasStage3 = isAdministrator && selectedProposal.status === 'pending_administrator';
 
+      const reviewerFullName = profile.full_name || (isAdministrator ? 'Chapter Administrator' : isSupervisor ? 'Faculty Supervisor' : 'Leadership Reviewer');
+      const reviewerRole = profile.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : 'leadership');
+      const stageName = wasStage1 ? 'Stage 1 Leadership Determination' : wasStage2 ? 'Stage 2 Faculty Supervisor Sign-Off' : 'Stage 3 Administrator Final Authorization';
+
+      const auditComment: ProjectComment = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        author_id: user.id,
+        author_name: reviewerFullName,
+        author_email: user.email || '',
+        author_role: reviewerRole as any,
+        content: `${stageName}: ${decision.toUpperCase()} by ${reviewerFullName}${decisionNotes.trim() ? ` — Notes: "${decisionNotes.trim()}"` : ''}`,
+        created_at: new Date().toISOString(),
+      };
+
+      const updatedComments = [...(selectedProposal.comments || []), auditComment];
+      updates.comments = updatedComments;
+
       if (wasStage1) {
         updates.leadership_decision = decision;
         updates.leadership_notes = decisionNotes.trim() || undefined;
@@ -80,10 +111,7 @@ export const TwoStageReviewDesk: React.FC = () => {
         updates.supervisor_reviewed_at = new Date().toISOString();
         updates.status = decision === 'approved' ? 'pending_administrator' : 'rejected_supervisor';
       } else if (wasStage3) {
-        updates.administrator_decision = decision;
-        updates.administrator_notes = decisionNotes.trim() || undefined;
-        updates.administrator_reviewer_id = user.id;
-        updates.administrator_reviewed_at = new Date().toISOString();
+        // Stage 3 finalizes to approved or rejected
         updates.status = decision === 'approved' ? 'approved' : 'rejected_administrator';
       }
 
@@ -377,32 +405,48 @@ export const TwoStageReviewDesk: React.FC = () => {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {pendingStage3.map((p) => (
-                <div key={p.id} className="sharp-card" style={{ padding: '1.35rem', borderLeft: '4px solid #4338CA' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#4338CA', backgroundColor: '#EEF2FF', padding: '2px 6px', borderRadius: '3px' }}>
-                          Stage 1 & 2 Approved
-                        </span>
-                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
-                          {p.project_title}
-                        </h3>
+              {pendingStage3.map((p) => {
+                const rev1 = resolveStageReviewer(1, p, profilesMap);
+                const rev2 = resolveStageReviewer(2, p, profilesMap);
+                return (
+                  <div key={p.id} className="sharp-card" style={{ padding: '1.35rem', borderLeft: '4px solid #4338CA' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#4338CA', backgroundColor: '#EEF2FF', padding: '2px 6px', borderRadius: '3px' }}>
+                            Stage 1 & 2 Approved
+                          </span>
+                          <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.3rem', color: 'var(--color-navy)', margin: 0 }}>
+                            {p.project_title}
+                          </h3>
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
+                          Proposed by: <strong>{p.creator_name}</strong> • Leaders: {p.leaders} • Date: {p.event_date || 'TBD'} • Volunteers: {p.volunteers_needed}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.4rem', fontSize: '0.75rem' }}>
+                          {rev1.isDecided && (
+                            <span style={{ color: '#166534', backgroundColor: '#F0FDF4', padding: '0.15rem 0.5rem', borderRadius: '3px' }}>
+                              Stage 1 Approved by <strong>{rev1.reviewerName}</strong>
+                            </span>
+                          )}
+                          {rev2.isDecided && (
+                            <span style={{ color: '#0369A1', backgroundColor: '#E0F2FE', padding: '0.15rem 0.5rem', borderRadius: '3px' }}>
+                              Stage 2 Approved by <strong>{rev2.reviewerName}</strong>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-                        Proposed by: <strong>{p.creator_name}</strong> • Leaders: {p.leaders} • Date: {p.event_date || 'TBD'} • Volunteers: {p.volunteers_needed}
-                      </div>
+                      <button
+                        className="btn-primary"
+                        style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', backgroundColor: '#4338CA' }}
+                        onClick={() => setSelectedProposal(p)}
+                      >
+                        <Eye size={13} /> Review & Authorize (Level 3)
+                      </button>
                     </div>
-                    <button
-                      className="btn-primary"
-                      style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', backgroundColor: '#4338CA' }}
-                      onClick={() => setSelectedProposal(p)}
-                    >
-                      <Eye size={13} /> Review & Authorize (Level 3)
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -467,23 +511,32 @@ export const TwoStageReviewDesk: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {pendingStage2.map((p) => (
-              <div key={p.id} className="sharp-card" style={{ padding: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-                      {p.project_title}
-                    </h3>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                      Approved by Leadership • Sponsor: {p.advisor_name} • Date: {p.event_date}
+            {pendingStage2.map((p) => {
+              const rev1 = resolveStageReviewer(1, p, profilesMap);
+              return (
+                <div key={p.id} className="sharp-card" style={{ padding: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+                        {p.project_title}
+                      </h3>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                        Sponsor: {p.advisor_name} • Date: {p.event_date}
+                      </div>
+                      {rev1.isDecided && (
+                        <div style={{ fontSize: '0.76rem', color: '#166534', backgroundColor: '#F0FDF4', padding: '0.2rem 0.5rem', borderRadius: '3px', marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckCircle2 size={12} /> Stage 1 Approved by <strong>{rev1.reviewerName}</strong> ({rev1.reviewerRole})
+                          {rev1.reviewedAt && ` • ${new Date(rev1.reviewedAt).toLocaleDateString()}`}
+                        </div>
+                      )}
                     </div>
+                    <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
+                      <Eye size={13} /> {isSupervisor ? 'Review & Sign Off (Stage 2)' : 'Inspect Proposal'}
+                    </button>
                   </div>
-                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
-                    <Eye size={13} /> {isSupervisor ? 'Review & Sign Off (Stage 2)' : 'Inspect Proposal'}
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -504,23 +557,39 @@ export const TwoStageReviewDesk: React.FC = () => {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {pendingStage3.map((p) => (
-                <div key={p.id} className="sharp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #4338CA' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-                        {p.project_title}
-                      </h3>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                        Approved by Leadership & Supervisor • Pending Final Administrator Sign-Off
+              {pendingStage3.map((p) => {
+                const rev1 = resolveStageReviewer(1, p, profilesMap);
+                const rev2 = resolveStageReviewer(2, p, profilesMap);
+                return (
+                  <div key={p.id} className="sharp-card" style={{ padding: '1.25rem', borderLeft: '4px solid #4338CA' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
+                          {p.project_title}
+                        </h3>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                          Approved by Leadership & Supervisor • Pending Final Administrator Sign-Off
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.35rem', fontSize: '0.75rem' }}>
+                          {rev1.isDecided && (
+                            <span style={{ color: '#166534', backgroundColor: '#F0FDF4', padding: '0.15rem 0.5rem', borderRadius: '3px' }}>
+                              Stage 1: <strong>{rev1.reviewerName}</strong>
+                            </span>
+                          )}
+                          {rev2.isDecided && (
+                            <span style={{ color: '#0369A1', backgroundColor: '#E0F2FE', padding: '0.15rem 0.5rem', borderRadius: '3px' }}>
+                              Stage 2: <strong>{rev2.reviewerName}</strong>
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
+                        <Eye size={13} /> Inspect Proposal
+                      </button>
                     </div>
-                    <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }} onClick={() => setSelectedProposal(p)}>
-                      <Eye size={13} /> Inspect Proposal
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -535,6 +604,9 @@ export const TwoStageReviewDesk: React.FC = () => {
           {resolvedProposals.map((p) => {
             const hasCosts = projectHasMonetaryCosts(p);
             const isCompleted = p.is_completed || p.status === 'completed';
+            const rev1 = resolveStageReviewer(1, p, profilesMap);
+            const rev2 = resolveStageReviewer(2, p, profilesMap);
+            const rev3 = resolveStageReviewer(3, p, profilesMap);
 
             return (
               <div key={p.id} className="sharp-card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -542,6 +614,11 @@ export const TwoStageReviewDesk: React.FC = () => {
                   <div style={{ fontWeight: 600, color: 'var(--color-navy)' }}>{p.project_title}</div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                     Leaders: {p.leaders} • Date: {p.event_date} • Status: <strong style={{ textTransform: 'capitalize' }}>{p.status.replace('_', ' ')}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.73rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {rev1.isDecided && <span>Stage 1: <strong>{rev1.reviewerName}</strong></span>}
+                    {rev2.isDecided && <span>• Stage 2: <strong>{rev2.reviewerName}</strong></span>}
+                    {rev3.isDecided && <span>• Stage 3: <strong>{rev3.reviewerName}</strong></span>}
                   </div>
                 </div>
 
@@ -603,6 +680,93 @@ export const TwoStageReviewDesk: React.FC = () => {
             </h2>
             <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
               Proposed by: <strong>{selectedProposal.leaders}</strong> • Advisor: <strong>{selectedProposal.advisor_name}</strong>
+            </div>
+
+            {/* Multi-Stage Review Attribution & Audit Card */}
+            <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1rem 1.25rem', marginBottom: '1.5rem', borderRadius: '4px' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-navy)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={16} color="var(--color-oxford)" />
+                Official Review Determination Audit
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                {/* Stage 1 */}
+                {(() => {
+                  const r1 = resolveStageReviewer(1, selectedProposal, profilesMap);
+                  return (
+                    <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderLeft: r1.decision === 'approved' ? '3px solid #10B981' : r1.decision === 'rejected' ? '3px solid #EF4444' : '3px solid #F59E0B' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Stage 1: Leadership</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.82rem', color: r1.decision === 'approved' ? '#166534' : r1.decision === 'rejected' ? '#991B1B' : '#92400E', textTransform: 'capitalize', marginTop: '0.15rem' }}>
+                        {r1.decision ? `${r1.decision}` : 'Pending Determination'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                        Reviewer: <strong>{r1.reviewerName}</strong>
+                      </div>
+                      {r1.reviewedAt && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                          {new Date(r1.reviewedAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      {r1.notes && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+                          "{r1.notes}"
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Stage 2 */}
+                {(() => {
+                  const r2 = resolveStageReviewer(2, selectedProposal, profilesMap);
+                  return (
+                    <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderLeft: r2.decision === 'approved' ? '3px solid #10B981' : r2.decision === 'rejected' ? '3px solid #EF4444' : '3px solid #94A3B8' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Stage 2: Supervisor</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.82rem', color: r2.decision === 'approved' ? '#166534' : r2.decision === 'rejected' ? '#991B1B' : '#64748B', textTransform: 'capitalize', marginTop: '0.15rem' }}>
+                        {r2.decision ? `${r2.decision}` : 'Pending Determination'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                        Reviewer: <strong>{r2.reviewerName}</strong>
+                      </div>
+                      {r2.reviewedAt && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                          {new Date(r2.reviewedAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      {r2.notes && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+                          "{r2.notes}"
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Stage 3 */}
+                {(() => {
+                  const r3 = resolveStageReviewer(3, selectedProposal, profilesMap);
+                  return (
+                    <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderLeft: r3.decision === 'approved' ? '3px solid #4338CA' : r3.decision === 'rejected' ? '3px solid #EF4444' : '3px solid #94A3B8' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Stage 3: Administrator</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.82rem', color: r3.decision === 'approved' ? '#4338CA' : r3.decision === 'rejected' ? '#991B1B' : '#64748B', textTransform: 'capitalize', marginTop: '0.15rem' }}>
+                        {r3.decision ? `${r3.decision}` : 'Pending Determination'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-navy)', marginTop: '0.2rem' }}>
+                        Reviewer: <strong>{r3.reviewerName}</strong>
+                      </div>
+                      {r3.reviewedAt && (
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                          {new Date(r3.reviewedAt).toLocaleDateString()}
+                        </div>
+                      )}
+                      {r3.notes && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+                          "{r3.notes}"
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Event Specs */}
@@ -755,26 +919,30 @@ export const TwoStageReviewDesk: React.FC = () => {
 
             {/* Revision Feedback & Discussion Thread */}
             <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <MessageSquare size={16} color="var(--color-oxford)" />
-                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
-                  Revision Feedback & Comments ({Array.isArray(selectedProposal.comments) ? selectedProposal.comments.length : 0})
-                </h3>
-              </div>
+              {(() => {
+                const displayComments = getDisplayComments(selectedProposal.comments);
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <MessageSquare size={16} color="var(--color-oxford)" />
+                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
+                        Revision Feedback & Comments ({displayComments.length})
+                      </h3>
+                    </div>
 
-              {/* Comments list */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                {(!Array.isArray(selectedProposal.comments) || selectedProposal.comments.length === 0) ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', backgroundColor: '#F8FAFC', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                    No feedback comments posted yet. Add instructions or required modifications below.
-                  </div>
-                ) : (
-                  selectedProposal.comments.map((c, idx) => {
-                    const cDate = c.created_at ? new Date(c.created_at) : null;
-                    const cDateFormatted = cDate && !isNaN(cDate.getTime())
-                      ? `${cDate.toLocaleDateString()} ${cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : '';
-                    return (
+                    {/* Comments list */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                      {displayComments.length === 0 ? (
+                        <div style={{ padding: '1rem', textAlign: 'center', backgroundColor: '#F8FAFC', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                          No feedback comments posted yet. Add instructions or required modifications below.
+                        </div>
+                      ) : (
+                        displayComments.map((c, idx) => {
+                          const cDate = c.created_at ? new Date(c.created_at) : null;
+                          const cDateFormatted = cDate && !isNaN(cDate.getTime())
+                            ? `${cDate.toLocaleDateString()} ${cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            : '';
+                          return (
                       <div
                         key={c.id || `comment-${idx}`}
                         style={{
@@ -844,6 +1012,9 @@ export const TwoStageReviewDesk: React.FC = () => {
                   })
                 )}
               </div>
+            </>
+          );
+        })()}
 
               {/* Add comment input */}
               <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

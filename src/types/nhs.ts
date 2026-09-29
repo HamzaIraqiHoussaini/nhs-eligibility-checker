@@ -158,6 +158,12 @@ export interface ProjectProposal {
   administrator_notes?: string;
   administrator_reviewer_id?: string;
   administrator_reviewed_at?: string;
+  leadership_reviewer_name?: string;
+  supervisor_reviewer_name?: string;
+  administrator_reviewer_name?: string;
+  volunteering_open?: boolean;
+  volunteering_questionnaire_url?: string | null;
+  volunteering_instructions?: string | null;
   is_completed: boolean;
   completed_notes?: string;
   completed_at?: string;
@@ -178,7 +184,7 @@ export interface ProjectComment {
   author_id?: string;
   author_name: string;
   author_email: string;
-  author_role: UserRole;
+  author_role: UserRole | 'system';
   content: string;
   created_at: string;
 }

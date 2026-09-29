@@ -24,11 +24,22 @@ import {
   UserCheck,
   UserX,
   Check,
-  CheckCheck,
   FileText,
   ShieldAlert,
   ShieldCheck,
+  Sliders,
+  Lock,
+  Archive,
+  RotateCcw,
+  Save,
+  FileSpreadsheet,
 } from 'lucide-react';
+import {
+  parseVolunteeringConfig,
+  createCommentsWithVolunteeringUpdate,
+  getDisplayComments,
+  resolveStageReviewer,
+} from '../../lib/projectVolunteerHelper';
 
 interface ProjectDetailsDrawerProps {
   project: ProjectProposal | null;
@@ -61,6 +72,46 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const [applyingVolunteer, setApplyingVolunteer] = useState(false);
   const [updatingVolId, setUpdatingVolId] = useState<string | null>(null);
   const [concludingProject, setConcludingProject] = useState(false);
+
+  // Profiles resolution for reviewer attribution
+  const [profilesMap, setProfilesMap] = useState<Record<string, { full_name: string; role: string; email?: string }>>({});
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, role, email').then(({ data }) => {
+      if (data) {
+        const map: Record<string, { full_name: string; role: string; email?: string }> = {};
+        for (const p of data) {
+          map[p.id] = { full_name: p.full_name || p.email?.split('@')[0] || 'Member', role: p.role, email: p.email };
+        }
+        setProfilesMap(map);
+      }
+    });
+  }, []);
+
+  // Post-approval schedule modification state (Event Date & Supervisor)
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+  const [editEventDate, setEditEventDate] = useState(project?.event_date || '');
+  const [editAdvisorName, setEditAdvisorName] = useState(project?.advisor_name || '');
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  useEffect(() => {
+    if (project) {
+      setEditEventDate(project.event_date || '');
+      setEditAdvisorName(project.advisor_name || '');
+    }
+  }, [project]);
+
+  // Volunteering configuration state
+  const volunteeringConfig = parseVolunteeringConfig(project?.comments);
+  const [isEditingVolConfig, setIsEditingVolConfig] = useState(false);
+  const [volQuestionnaireUrl, setVolQuestionnaireUrl] = useState(volunteeringConfig.questionnaire_url || '');
+  const [volInstructions, setVolInstructions] = useState(volunteeringConfig.instructions || '');
+  const [savingVolConfig, setSavingVolConfig] = useState(false);
+
+  useEffect(() => {
+    setVolQuestionnaireUrl(volunteeringConfig.questionnaire_url || '');
+    setVolInstructions(volunteeringConfig.instructions || '');
+  }, [project?.comments]);
 
   // Load volunteers for this project
   const loadVolunteers = async () => {
@@ -131,6 +182,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       })()
     : [];
 
+  const displayComments = getDisplayComments(comments);
+
   const myVolunteerRecord = volunteers.find(
     (v) => Boolean(
       (user?.id && v.user_id === user.id) ||
@@ -173,11 +226,31 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       return;
     }
 
+    if (project.status !== 'approved' && project.status !== 'completed') {
+      await alert({
+        title: 'Action Unavailable',
+        message: 'Volunteering requests are only permitted on projects that have received final confirmation by the NHS Chapter Administrator (Stage 3).',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (!volunteeringConfig.recruitment_open) {
+      await alert({
+        title: 'Recruitment Closed',
+        message: 'Volunteer recruitment for this project is currently closed by project leaders.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Apply to Volunteer',
-      message: `Submit your application to volunteer for "${project.project_title}" on ${project.event_date}?`,
-      details: 'The project leader will review your application. If accepted and confirmed after the project concludes, this will fulfill 1 of your 2 required semester volunteer quotas.',
-      confirmText: 'Submit Application',
+      message: `Submit your request to volunteer for "${project.project_title}" on ${project.event_date}?`,
+      details: volunteeringConfig.questionnaire_url
+        ? 'Please ensure you have completed the required volunteer questionnaire form. If accepted and participation is confirmed by leaders, this will fulfill 1 of your semester volunteer quotas.'
+        : 'The project leader will review your application. If accepted and your participation is verified after the event, this will fulfill 1 of your semester volunteer quotas.',
+      confirmText: 'Submit Request',
       variant: 'info',
     });
     if (!confirmed) return;
@@ -331,45 +404,219 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
     }
   };
 
-  // Leader: Conclude project
-  const handleConcludeProject = async () => {
+  // Leader: Conclude / Archive or Reopen project
+  const handleToggleProjectStatus = async (toCompleted: boolean) => {
+    if (!project) return;
+    const actionLabel = toCompleted ? 'Conclude & Archive' : 'Reopen as Active';
     const confirmed = await confirm({
-      title: 'Conclude Project',
-      message: `Has the project "${project.project_title}" concluded?`,
-      details: 'Marking the project as ended allows you to verify and confirm volunteer attendance so volunteers receive semester credit.',
-      confirmText: 'Mark Project as Ended',
-      variant: 'info',
+      title: `${actionLabel} Project`,
+      message: toCompleted
+        ? `Are you sure you want to conclude and archive "${project.project_title}"? All proposal dates, event details, and participant records will be permanently preserved in Past Projects.`
+        : `Are you sure you want to reopen "${project.project_title}" as an active project?`,
+      confirmText: actionLabel,
+      variant: toCompleted ? 'info' : 'warning',
     });
     if (!confirmed) return;
 
     setConcludingProject(true);
     try {
+      const now = new Date().toISOString();
+      const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+      const authorName = profile?.full_name || user?.email || 'Leader';
+
+      const updatePayload: Record<string, any> = toCompleted
+        ? {
+            status: 'completed',
+            is_completed: true,
+            completed_at: now,
+            completed_notes: `Project concluded and archived by ${authorName} (${authorRole}).`,
+          }
+        : {
+            status: 'approved',
+            is_completed: false,
+            completed_at: null,
+            completed_notes: null,
+          };
+
+      const auditComment: ProjectComment = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        author_id: user?.id || '',
+        author_name: authorName,
+        author_email: user?.email || '',
+        author_role: authorRole as any,
+        content: toCompleted
+          ? `[Project Concluded & Archived] Concluded and archived by ${authorName} (${authorRole}). All proposal details preserved.`
+          : `[Project Restored] Reopened as an active project by ${authorName} (${authorRole}).`,
+        created_at: now,
+      };
+
+      updatePayload.comments = [...comments, auditComment];
+
+      const { error } = await supabase
+        .from('project_proposals')
+        .update(updatePayload)
+        .eq('id', project.id);
+
+      if (error) throw error;
+
+      await alert({
+        title: toCompleted ? 'Project Archived' : 'Project Reopened',
+        message: toCompleted
+          ? 'Project marked as concluded and archived into Past Projects.'
+          : 'Project restored to Active Projects.',
+        variant: 'success',
+      });
+      onUpdated();
+    } catch (err: any) {
+      await alert({
+        title: 'Action Failed',
+        message: err.message || 'Failed to update project status.',
+        variant: 'danger',
+      });
+    } finally {
+      setConcludingProject(false);
+    }
+  };
+
+  // Leader: Modify Event Date and Supervisor (only while active & approved, locked once completed)
+  const handleSaveSchedule = async () => {
+    if (!project) return;
+    if (project.is_completed || project.status === 'completed') {
+      await alert({
+        title: 'Action Prohibited',
+        message: 'This project is finished and archived. Event date and supervisor modifications are locked.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setSavingSchedule(true);
+    try {
+      const updateData: { event_date?: string; advisor_name?: string } = {};
+      if (editEventDate.trim()) updateData.event_date = editEventDate.trim();
+      if (editAdvisorName.trim()) updateData.advisor_name = editAdvisorName.trim();
+
+      const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+      const authorName = profile?.full_name || user?.email || 'Leader';
+
+      const auditComment: ProjectComment = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        author_id: user?.id || '',
+        author_name: authorName,
+        author_email: user?.email || '',
+        author_role: authorRole as any,
+        content: `[Schedule & Supervisor Modified] Event date set to "${editEventDate.trim()}" and supervisor set to "${editAdvisorName.trim()}" by ${authorName}.`,
+        created_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase
         .from('project_proposals')
         .update({
-          status: 'completed',
-          is_completed: true,
-          completed_notes: 'Project successfully concluded by leader.',
-          completed_at: new Date().toISOString(),
+          ...updateData,
+          comments: [...comments, auditComment],
         })
         .eq('id', project.id);
 
       if (error) throw error;
 
       await alert({
-        title: 'Project Ended',
-        message: 'Project marked as concluded! You can now verify volunteer attendance below.',
+        title: 'Schedule Updated',
+        message: 'Event date and designated supervisor have been updated.',
+        variant: 'success',
+      });
+      setIsEditingSchedule(false);
+      onUpdated();
+    } catch (err: any) {
+      await alert({
+        title: 'Update Failed',
+        message: err.message || 'Failed to update event schedule.',
+        variant: 'danger',
+      });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  // Leader: Toggle Volunteering Recruitment Open / Closed
+  const handleToggleVolunteering = async (open: boolean) => {
+    if (!project) return;
+    try {
+      const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+      const authorName = profile?.full_name || user?.email || 'Leader';
+
+      const updatedComments = createCommentsWithVolunteeringUpdate(
+        project.comments,
+        { recruitment_open: open, is_open: open },
+        user,
+        profile,
+        `Volunteering recruitment ${open ? 'opened' : 'closed'} by ${authorName} (${authorRole}).`
+      );
+
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', project.id);
+
+      if (error) throw error;
+
+      await alert({
+        title: open ? 'Recruitment Opened' : 'Recruitment Closed',
+        message: open
+          ? 'Members can now submit requests to volunteer on this active project.'
+          : 'Volunteering requests are now closed for this project.',
         variant: 'success',
       });
       onUpdated();
     } catch (err: any) {
       await alert({
-        title: 'Update Error',
-        message: err.message || 'Failed to conclude project.',
+        title: 'Update Failed',
+        message: err.message || 'Failed to toggle volunteering recruitment.',
+        variant: 'danger',
+      });
+    }
+  };
+
+  // Leader: Save Volunteering Questionnaire Configuration (Google Forms link, notes)
+  const handleSaveVolQuestionnaire = async () => {
+    if (!project) return;
+    setSavingVolConfig(true);
+    try {
+      const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
+      const authorName = profile?.full_name || user?.email || 'Leader';
+
+      const updatedComments = createCommentsWithVolunteeringUpdate(
+        project.comments,
+        {
+          questionnaire_url: volQuestionnaireUrl.trim() || undefined,
+          instructions: volInstructions.trim() || undefined,
+        },
+        user,
+        profile,
+        `Volunteering questionnaire updated by ${authorName} (${authorRole}).`
+      );
+
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', project.id);
+
+      if (error) throw error;
+
+      await alert({
+        title: 'Questionnaire Saved',
+        message: 'Volunteering questionnaire settings updated.',
+        variant: 'success',
+      });
+      setIsEditingVolConfig(false);
+      onUpdated();
+    } catch (err: any) {
+      await alert({
+        title: 'Save Failed',
+        message: err.message || 'Failed to save questionnaire settings.',
         variant: 'danger',
       });
     } finally {
-      setConcludingProject(false);
+      setSavingVolConfig(false);
     }
   };
 
@@ -564,7 +811,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
                 ID: {project.id ? String(project.id).slice(0, 8) : ''}
               </span>
-              {comments.length > 0 && (
+              {displayComments.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -585,7 +832,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   }}
                   title="Jump to revision feedback comments"
                 >
-                  <MessageSquare size={12} /> {comments.length} Comment{comments.length > 1 ? 's' : ''}
+                  <MessageSquare size={12} /> {displayComments.length} Comment{displayComments.length > 1 ? 's' : ''}
                 </button>
               )}
             </div>
@@ -613,6 +860,378 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
 
         {/* Scrollable Content Body */}
         <div style={{ padding: '2rem', overflowY: 'auto', flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+          
+          {/* Official Review Determinations & Attribution Audit */}
+          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldCheck size={16} color="var(--color-oxford)" />
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Official Review Determinations & Approval Attribution
+                </span>
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                3-Tier Chapter Governance Protocol
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+              {/* Stage 1: Leadership Committee */}
+              {(() => {
+                const s1 = resolveStageReviewer(1, project, profilesMap);
+                const isApproved = s1.decision === 'approved' || project.status === 'pending_supervisor' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
+                const isRejected = s1.decision === 'rejected' || project.status === 'rejected_leadership';
+
+                return (
+                  <div style={{
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid',
+                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#FDE68A',
+                    borderLeftWidth: '4px',
+                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : '#D97706',
+                    borderRadius: '2px',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                        Stage 1: Leadership Committee
+                      </span>
+                      {isApproved ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Approved
+                        </span>
+                      ) : isRejected ? (
+                        <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Rejected
+                        </span>
+                      ) : (
+                        <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-navy)', fontWeight: 600 }}>
+                      {s1.reviewerName ? (
+                        <span>Reviewed by: <strong>{s1.reviewerName}</strong></span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Pending Leadership Review</span>
+                      )}
+                    </div>
+                    {s1.reviewerRole && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-oxford)', marginTop: '0.15rem' }}>
+                        Role: {s1.reviewerRole}
+                      </div>
+                    )}
+                    {s1.reviewedAt && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
+                        {new Date(s1.reviewedAt).toLocaleString()}
+                      </div>
+                    )}
+                    {s1.notes && (
+                      <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic', borderTop: '1px dashed #E2E8F0', paddingTop: '0.3rem' }}>
+                        "{s1.notes}"
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Stage 2: Faculty Supervisor */}
+              {(() => {
+                const s2 = resolveStageReviewer(2, project, profilesMap);
+                const isApproved = s2.decision === 'approved' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
+                const isRejected = s2.decision === 'rejected' || project.status === 'rejected_supervisor';
+                const isWaiting = project.status === 'draft' || project.status === 'pending_leadership' || project.status === 'rejected_leadership';
+
+                return (
+                  <div style={{
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid',
+                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#BFDBFE',
+                    borderLeftWidth: '4px',
+                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : isWaiting ? '#94A3B8' : '#2563EB',
+                    borderRadius: '2px',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                        Stage 2: Faculty Supervisor
+                      </span>
+                      {isApproved ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Approved
+                        </span>
+                      ) : isRejected ? (
+                        <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Rejected
+                        </span>
+                      ) : isWaiting ? (
+                        <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#F1F5F9', color: '#64748B' }}>
+                          Awaiting Stage 1
+                        </span>
+                      ) : (
+                        <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#DBEAFE', color: '#1E40AF' }}>
+                          In Review
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-navy)', fontWeight: 600 }}>
+                      {s2.reviewerName ? (
+                        <span>Reviewed by: <strong>{s2.reviewerName}</strong></span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                          {isWaiting ? 'Awaiting Stage 1' : `Assigned: ${project.advisor_name || 'Faculty Advisor'}`}
+                        </span>
+                      )}
+                    </div>
+                    {s2.reviewerRole && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-oxford)', marginTop: '0.15rem' }}>
+                        Role: {s2.reviewerRole}
+                      </div>
+                    )}
+                    {s2.reviewedAt && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
+                        {new Date(s2.reviewedAt).toLocaleString()}
+                      </div>
+                    )}
+                    {s2.notes && (
+                      <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic', borderTop: '1px dashed #E2E8F0', paddingTop: '0.3rem' }}>
+                        "{s2.notes}"
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Stage 3: NHS Administrator (Final Confirmation) */}
+              {(() => {
+                const s3 = resolveStageReviewer(3, project, profilesMap);
+                const isApproved = project.status === 'approved' || project.status === 'completed' || s3.decision === 'approved';
+                const isRejected = s3.decision === 'rejected' || project.status === 'rejected_administrator';
+                const isWaiting = !isApproved && !isRejected && project.status !== 'pending_administrator';
+
+                return (
+                  <div style={{
+                    padding: '0.85rem 1rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid',
+                    borderColor: isApproved ? '#BBF7D0' : isRejected ? '#FECACA' : '#C7D2FE',
+                    borderLeftWidth: '4px',
+                    borderLeftColor: isApproved ? '#16A34A' : isRejected ? '#DC2626' : isWaiting ? '#94A3B8' : '#4F46E5',
+                    borderRadius: '2px',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                        Stage 3: NHS Admin Confirmation
+                      </span>
+                      {isApproved ? (
+                        <span className="status-pill eligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Fully Approved
+                        </span>
+                      ) : isRejected ? (
+                        <span className="status-pill ineligible" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem' }}>
+                          Rejected
+                        </span>
+                      ) : isWaiting ? (
+                        <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#F1F5F9', color: '#64748B' }}>
+                          Awaiting Stage 2
+                        </span>
+                      ) : (
+                        <span className="status-pill" style={{ fontSize: '0.66rem', padding: '0.1rem 0.4rem', backgroundColor: '#EEF2FF', color: '#4338CA' }}>
+                          Pending Final Approval
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-navy)', fontWeight: 600 }}>
+                      {s3.reviewerName ? (
+                        <span>Confirmed by: <strong>{s3.reviewerName}</strong></span>
+                      ) : isApproved ? (
+                        <span>Confirmed by: <strong>Chapter Administrator</strong></span>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                          {isWaiting ? 'Awaiting Stage 2' : 'Pending NHS Admin Final Confirmation'}
+                        </span>
+                      )}
+                    </div>
+                    {s3.reviewerRole && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-oxford)', marginTop: '0.15rem' }}>
+                        Role: {s3.reviewerRole}
+                      </div>
+                    )}
+                    {s3.reviewedAt && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
+                        {new Date(s3.reviewedAt).toLocaleString()}
+                      </div>
+                    )}
+                    {s3.notes && (
+                      <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.35rem', fontStyle: 'italic', borderTop: '1px dashed #E2E8F0', paddingTop: '0.3rem' }}>
+                        "{s3.notes}"
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Active vs Concluded / Archived Banner & Schedule Modification */}
+          {(project.status === 'approved' || project.status === 'completed') && (
+            <div style={{
+              backgroundColor: project.status === 'completed' || project.is_completed ? '#F5F3FF' : '#F0FDF4',
+              border: '1px solid',
+              borderColor: project.status === 'completed' || project.is_completed ? '#DDD6FE' : '#BBF7D0',
+              padding: '1.25rem',
+              borderRadius: '4px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                    {project.status === 'completed' || project.is_completed ? (
+                      <>
+                        <Archive size={17} color="#6D28D9" />
+                        <strong style={{ fontSize: '0.95rem', color: '#5B21B6' }}>
+                          Past Project: Concluded & Archived
+                        </strong>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={17} color="#16A34A" />
+                        <strong style={{ fontSize: '0.95rem', color: '#166534' }}>
+                          Active Project: Stage 3 Final Confirmation Completed
+                        </strong>
+                      </>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: project.status === 'completed' || project.is_completed ? '#6D28D9' : '#15803D', lineHeight: '1.5' }}>
+                    {project.status === 'completed' || project.is_completed
+                      ? `This project successfully concluded${project.completed_at ? ` on ${new Date(project.completed_at).toLocaleDateString()}` : ''}. Proposal dates and historical attendance are locked in Past Projects.`
+                      : 'This project is live and ongoing. Leaders may adjust the event schedule or designated supervisor below, or conclude and archive the project when finished.'}
+                  </p>
+                </div>
+
+                {/* Leader Actions: Conclude/Archive or Reopen */}
+                {isProjectLeader && (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {project.status === 'approved' && !project.is_completed ? (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                        disabled={concludingProject}
+                        onClick={() => handleToggleProjectStatus(true)}
+                      >
+                        <Archive size={13} /> {concludingProject ? 'Archiving...' : 'Conclude & Archive Project'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                        disabled={concludingProject}
+                        onClick={() => handleToggleProjectStatus(false)}
+                      >
+                        <RotateCcw size={13} /> Reopen as Active
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Schedule & Supervisor Edit Controls (ONLY while project is approved & active, locked once completed) */}
+              <div style={{ borderTop: '1px solid', borderColor: project.status === 'completed' || project.is_completed ? '#E9D5FF' : '#DCFCE7', paddingTop: '0.85rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-navy)', fontWeight: 600 }}>
+                    Event Date & Designated Supervisor:
+                  </div>
+
+                  {isProjectLeader && project.status === 'approved' && !project.is_completed && !isEditingSchedule && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => setIsEditingSchedule(true)}
+                    >
+                      <Edit3 size={12} /> Modify Date & Supervisor
+                    </button>
+                  )}
+
+                  {(project.status === 'completed' || project.is_completed) && (
+                    <span style={{ fontSize: '0.72rem', color: '#6B21A8', fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Lock size={12} /> Schedule locked (project concluded)
+                    </span>
+                  )}
+                </div>
+
+                {isEditingSchedule ? (
+                  <div style={{ marginTop: '0.75rem', backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                          Event Date:
+                        </label>
+                        <input
+                          type="date"
+                          value={editEventDate}
+                          onChange={(e) => setEditEventDate(e.target.value)}
+                          style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.82rem', border: '1px solid var(--color-border)' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                          Designated Supervisor:
+                        </label>
+                        <input
+                          type="text"
+                          value={editAdvisorName}
+                          onChange={(e) => setEditAdvisorName(e.target.value)}
+                          placeholder="e.g. Mr. Smith or Dr. Davis"
+                          style={{ width: '100%', padding: '0.4rem 0.6rem', fontSize: '0.82rem', border: '1px solid var(--color-border)' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                        onClick={() => {
+                          setEditEventDate(project.event_date || '');
+                          setEditAdvisorName(project.advisor_name || '');
+                          setIsEditingSchedule(false);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        disabled={savingSchedule}
+                        onClick={handleSaveSchedule}
+                      >
+                        <Save size={13} /> {savingSchedule ? 'Saving...' : 'Save Schedule Changes'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '0.4rem', fontSize: '0.82rem', color: '#334155', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                    <span><strong>Date:</strong> {project.event_date || '—'}</span>
+                    <span><strong>Supervisor:</strong> {project.advisor_name || 'Faculty Advisor'}</span>
+                    {project.created_at && (
+                      <span style={{ color: 'var(--color-text-muted)' }}>
+                        <strong>Proposed on:</strong> {new Date(project.created_at).toLocaleDateString()}
+                      </span>
+                    )}
+                    {project.completed_at && (
+                      <span style={{ color: '#6B21A8' }}>
+                        <strong>Concluded on:</strong> {new Date(project.completed_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Rejection / Action Banner */}
           {(project.status === 'rejected_leadership' || project.status === 'rejected_supervisor') && (
@@ -840,24 +1459,117 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           {/* Volunteer Roster & Recruitment (Active for approved & completed projects) */}
           {(project.status === 'approved' || project.status === 'completed') && (
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Users size={16} color="var(--color-oxford)" />
                   <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', color: 'var(--color-navy)', margin: '0' }}>
                     Volunteer Recruitment & Attendance
                   </h3>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {volunteeringConfig.recruitment_open ? (
+                    <span className="status-pill eligible" style={{ fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <UserPlus size={11} /> Recruitment Open
+                    </span>
+                  ) : (
+                    <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: '#64748B', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Lock size={11} /> Recruitment Closed
+                    </span>
+                  )}
+
                   <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', fontSize: '0.72rem', border: '1px solid #BFDBFE' }}>
                     {acceptedVolunteers.length} / {project.volunteers_needed || 0} Volunteers Accepted
                   </span>
-                  {project.status === 'completed' && (
-                    <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
-                      {confirmedVolunteers.length} Confirmed Volunteered
-                    </span>
+
+                  <span className="status-pill eligible" style={{ fontSize: '0.72rem' }}>
+                    {confirmedVolunteers.length} Confirmed Volunteered (+1 Quota)
+                  </span>
+
+                  {/* Leader Quick Controls */}
+                  {isProjectLeader && (
+                    <div style={{ display: 'flex', gap: '0.4rem', marginLeft: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={volunteeringConfig.recruitment_open ? 'btn-secondary' : 'btn-primary'}
+                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem' }}
+                        onClick={() => handleToggleVolunteering(!volunteeringConfig.recruitment_open)}
+                      >
+                        {volunteeringConfig.recruitment_open ? 'Close Recruitment' : 'Open Recruitment'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: '0.74rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setIsEditingVolConfig(!isEditingVolConfig)}
+                      >
+                        <Sliders size={12} /> {volunteeringConfig.questionnaire_url ? 'Edit Questionnaire' : 'Attach Questionnaire'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
+
+              {/* Leader Questionnaire Configuration Panel */}
+              {isProjectLeader && isEditingVolConfig && (
+                <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1rem', marginBottom: '1.25rem', borderRadius: '4px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                    Volunteer Application Questionnaire (Google Forms / Survey)
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '0 0 0.75rem' }}>
+                    You can optionally attach a Google Form or survey link that members must complete when requesting to volunteer. Leave empty if no questionnaire is required.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.2rem' }}>
+                        Google Form / Questionnaire URL (Optional):
+                      </label>
+                      <input
+                        type="url"
+                        value={volQuestionnaireUrl}
+                        onChange={(e) => setVolQuestionnaireUrl(e.target.value)}
+                        placeholder="https://forms.google.com/..."
+                        style={{ width: '100%', padding: '0.45rem 0.65rem', fontSize: '0.82rem', border: '1px solid var(--color-border)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-navy)', marginBottom: '0.2rem' }}>
+                        Volunteer Instructions / Guidelines:
+                      </label>
+                      <input
+                        type="text"
+                        value={volInstructions}
+                        onChange={(e) => setVolInstructions(e.target.value)}
+                        placeholder="e.g. Please fill out the form before signing up; arrive 15 minutes before the event."
+                        style={{ width: '100%', padding: '0.45rem 0.65rem', fontSize: '0.82rem', border: '1px solid var(--color-border)' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: '0.74rem', padding: '0.3rem 0.7rem' }}
+                        onClick={() => setIsEditingVolConfig(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.74rem', padding: '0.3rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        disabled={savingVolConfig}
+                        onClick={handleSaveVolQuestionnaire}
+                      >
+                        <Save size={12} /> {savingVolConfig ? 'Saving...' : 'Save Questionnaire Settings'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* NON-LEADER VIEW: Application / Standing */}
               {!isProjectLeader && (
@@ -890,44 +1602,80 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       </p>
                     </div>
                   ) : !myVolunteerRecord ? (
-                    <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
-                        Apply to Volunteer on this Project
+                    !volunteeringConfig.recruitment_open ? (
+                      <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem', borderRadius: '4px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                          <Lock size={15} /> Volunteer Requests Currently Closed
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+                          The project leaders have not opened volunteering requests for this project yet or the roster has been closed. Please check back later.
+                        </p>
                       </div>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: '0 0 0.85rem' }}>
-                        Join this chapter project team! Fulfills 1 of your 2 required semester volunteer quotas once confirmed by the project leader after the event concludes.
-                      </p>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          value={volunteerRoleNote}
-                          onChange={(e) => setVolunteerRoleNote(e.target.value)}
-                          placeholder="Optional note / specific skills or role..."
-                          style={{
-                            flex: '1',
-                            minWidth: '220px',
-                            padding: '0.45rem 0.75rem',
-                            fontSize: '0.82rem',
-                            border: '1px solid var(--color-border)',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          disabled={applyingVolunteer}
-                          onClick={handleApplyVolunteer}
-                        >
-                          <UserPlus size={14} /> {applyingVolunteer ? 'Submitting...' : 'Apply to Volunteer'}
-                        </button>
+                    ) : (
+                      <div style={{ backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', padding: '1.25rem', borderRadius: '4px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--color-navy)', marginBottom: '0.25rem' }}>
+                          Request to Volunteer on this Project
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', margin: '0 0 0.85rem' }}>
+                          Join this chapter project team! Fulfills 1 semester volunteer quota once confirmed by chapter leaders after the event concludes.
+                        </p>
+
+                        {/* Optional Google Form Questionnaire Link for Applicants */}
+                        {volunteeringConfig.questionnaire_url && (
+                          <div style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', padding: '0.85rem 1rem', marginBottom: '0.85rem', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--color-oxford)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <FileSpreadsheet size={14} /> Volunteer Questionnaire Required
+                              </div>
+                              <div style={{ fontSize: '0.78rem', color: '#1E40AF', marginTop: '0.15rem' }}>
+                                {volunteeringConfig.instructions || 'Please complete the questionnaire form before or alongside submitting your volunteer request.'}
+                              </div>
+                            </div>
+                            <a
+                              href={volunteeringConfig.questionnaire_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-primary"
+                              style={{ fontSize: '0.74rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              Open Google Form <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            value={volunteerRoleNote}
+                            onChange={(e) => setVolunteerRoleNote(e.target.value)}
+                            placeholder="Optional note / specific skills or role..."
+                            style={{
+                              flex: '1',
+                              minWidth: '220px',
+                              padding: '0.45rem 0.75rem',
+                              fontSize: '0.82rem',
+                              border: '1px solid var(--color-border)',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            disabled={applyingVolunteer}
+                            onClick={handleApplyVolunteer}
+                          >
+                            <UserPlus size={14} /> {applyingVolunteer ? 'Submitting...' : 'Request to Volunteer'}
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : (
                     <div style={{
                       padding: '1.15rem',
                       border: '1px solid',
                       borderColor: myVolunteerRecord.status === 'confirmed' || myVolunteerRecord.attended ? '#A7F3D0' : myVolunteerRecord.status === 'accepted' ? '#BFDBFE' : myVolunteerRecord.status === 'declined' ? '#E2E8F0' : '#FDE68A',
                       backgroundColor: myVolunteerRecord.status === 'confirmed' || myVolunteerRecord.attended ? 'var(--color-sage-bg)' : myVolunteerRecord.status === 'accepted' ? '#EFF6FF' : myVolunteerRecord.status === 'declined' ? '#F8FAFC' : '#FFFBEB',
+                      borderRadius: '4px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <div>
@@ -937,11 +1685,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                             </span>
                             {myVolunteerRecord.attended || myVolunteerRecord.status === 'confirmed' ? (
                               <span className="status-pill eligible" style={{ fontSize: '0.75rem' }}>
-                                <CheckCircle2 size={12} /> Confirmed Volunteered
+                                <CheckCircle2 size={12} /> Confirmed Volunteered (+1 Quota Credited)
                               </span>
                             ) : myVolunteerRecord.status === 'accepted' ? (
                               <span className="status-pill" style={{ backgroundColor: '#DBEAFE', color: '#1E40AF', fontSize: '0.75rem' }}>
-                                <UserCheck size={12} /> Accepted Volunteer
+                                <UserCheck size={12} /> Accepted Volunteer (Awaiting Attendance Verification)
                               </span>
                             ) : myVolunteerRecord.status === 'declined' ? (
                               <span className="status-pill" style={{ backgroundColor: '#E2E8F0', color: '#64748B', fontSize: '0.75rem' }}>
@@ -955,13 +1703,18 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                           </div>
                           <p style={{ fontSize: '0.82rem', margin: 0, color: 'var(--color-text-primary)' }}>
                             {myVolunteerRecord.attended || myVolunteerRecord.status === 'confirmed'
-                              ? 'Your service attendance has been verified by the project leader! This project counts toward your chapter semester volunteer quota.'
+                              ? 'Your service attendance has been verified by chapter leadership! This project counts +1 toward your official chapter semester volunteer quota.'
                               : myVolunteerRecord.status === 'accepted'
-                              ? 'You have been selected for this project! Please coordinate with the project leader. Attendance will be verified after the project ends.'
+                              ? 'You have been selected to volunteer! Quota credit will be granted once chapter leaders confirm your participation.'
                               : myVolunteerRecord.status === 'declined'
                               ? 'The volunteer roster for this event has reached capacity.'
-                              : 'Your application is waiting for review by the project leader.'}
+                              : 'Your request has been received with timestamp. The project leader will review your submission.'}
                           </p>
+                          {myVolunteerRecord.created_at && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                              Requested on {new Date(myVolunteerRecord.created_at).toLocaleDateString()} at {new Date(myVolunteerRecord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
                         </div>
                         {myVolunteerRecord.status === 'applied' && (
                           <button
@@ -970,7 +1723,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                             style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
                             onClick={handleWithdrawApplication}
                           >
-                            Withdraw Application
+                            Withdraw Request
                           </button>
                         )}
                       </div>
@@ -982,56 +1735,33 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               {/* LEADER VIEW: Management & Verification */}
               {isProjectLeader && (
                 <div style={{ marginBottom: '1.5rem' }}>
-                  {/* Project completion trigger for leader */}
-                  {project.status === 'approved' && (
-                    <div style={{ backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', padding: '1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {/* Bulk attendance verification bar */}
+                  {acceptedVolunteers.length > 0 && (
+                    <div style={{ backgroundColor: 'var(--color-sage-bg)', border: '1px solid #A7F3D0', padding: '0.85rem 1.15rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderRadius: '4px' }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-navy)' }}>
-                          Has this project concluded?
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                          When the project event is finished, mark it ended to confirm volunteer attendance so volunteers receive quota credit.
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem' }}
-                        disabled={concludingProject}
-                        onClick={handleConcludeProject}
-                      >
-                        <CheckCheck size={14} /> {concludingProject ? 'Concluding...' : 'Mark Project as Ended'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Post-project verification banner */}
-                  {project.status === 'completed' && acceptedVolunteers.length > 0 && (
-                    <div style={{ backgroundColor: 'var(--color-sage-bg)', border: '1px solid #A7F3D0', padding: '1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-sage-text)' }}>
-                          Post-Project Attendance Verification
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-sage-text)' }}>
+                          Attendance Verification & Quota Confirmation
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--color-sage-text)' }}>
-                          Project has ended. Please confirm which accepted volunteers showed up and completed service.
+                          Volunteers add +1 to their quota only when leaders approve of the fact that they participated.
                         </div>
                       </div>
                       <button
                         type="button"
                         className="btn-primary"
-                        style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem' }}
+                        style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onClick={handleConfirmAllAccepted}
                       >
-                        <Check size={13} /> Confirm All Accepted
+                        <Check size={13} /> Confirm All Accepted (+1 Quota to each)
                       </button>
                     </div>
                   )}
 
                   {/* Applicants List */}
-                  <div style={{ border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}>
+                  <div style={{ border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)', fontWeight: 700, fontSize: '0.8rem', color: 'var(--color-navy)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>
-                        Volunteer Applicants ({volunteers.length})
+                        Volunteer Applicants & Roster ({volunteers.length})
                         {pendingApplicants.length > 0 && (
                           <span style={{ marginLeft: '0.4rem', color: '#B45309', fontWeight: 600, fontSize: '0.72rem' }}>
                             ({pendingApplicants.length} pending review)
@@ -1049,7 +1779,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       </div>
                     ) : volunteers.length === 0 ? (
                       <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                        No members have applied to volunteer on this project yet.
+                        No members have submitted volunteer requests for this project yet.
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1057,49 +1787,56 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                           const isUpdating = updatingVolId === v.id;
                           const isAccepted = v.status === 'accepted' || v.status === 'confirmed';
                           const isConfirmed = v.attended === true || v.status === 'confirmed';
+                          const reqDate = v.created_at ? new Date(v.created_at) : null;
+                          const formattedReqDate = reqDate && !isNaN(reqDate.getTime())
+                            ? `${reqDate.toLocaleDateString()} at ${reqDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            : 'Timestamp unavailable';
 
                           return (
                             <div
                               key={v.id}
                               style={{
-                                padding: '0.75rem 1rem',
+                                padding: '0.85rem 1rem',
                                 borderBottom: '1px solid var(--color-border)',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flexWrap: 'wrap',
-                                gap: '0.5rem',
+                                gap: '0.75rem',
                               }}
                             >
                               <div>
-                                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  {v.student_name}
+                                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <span>{v.student_name}</span>
                                   {isConfirmed ? (
-                                    <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.15rem 0.4rem' }}>
-                                      Confirmed
+                                    <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}>
+                                      <CheckCircle2 size={11} /> Participation Confirmed (+1 Quota)
                                     </span>
                                   ) : isAccepted ? (
-                                    <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', fontSize: '0.68rem', padding: '0.15rem 0.4rem', border: '1px solid #BFDBFE' }}>
-                                      Accepted
+                                    <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: 'var(--color-navy)', fontSize: '0.68rem', padding: '0.15rem 0.45rem', border: '1px solid #BFDBFE' }}>
+                                      <UserCheck size={11} /> Accepted Volunteer
                                     </span>
                                   ) : v.status === 'declined' ? (
-                                    <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.68rem', padding: '0.15rem 0.4rem' }}>
+                                    <span className="status-pill" style={{ backgroundColor: '#F1F5F9', color: 'var(--color-text-muted)', fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}>
                                       Declined
                                     </span>
                                   ) : (
-                                    <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.15rem 0.4rem' }}>
+                                    <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.15rem 0.45rem' }}>
                                       Pending Review
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
                                   {v.student_email} {v.role_description ? `• Note: "${v.role_description}"` : ''}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.2rem', fontFamily: 'monospace' }}>
+                                  Requested on: {formattedReqDate}
                                 </div>
                               </div>
 
                               {/* Leader Actions */}
-                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                                {/* Before project ends: Accept / Decline applications */}
+                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {/* Pending applicants: Accept or Decline */}
                                 {v.status === 'applied' && (
                                   <>
                                     <button
@@ -1123,44 +1860,43 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                                   </>
                                 )}
 
-                                {/* If accepted & project NOT ended yet: can decline if plans change */}
-                                {v.status === 'accepted' && project.status !== 'completed' && (
+                                {/* Accepted volunteers: Confirm participation (+1 Quota) or remove */}
+                                {v.status === 'accepted' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn-primary"
+                                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                      disabled={isUpdating}
+                                      onClick={() => handleUpdateVolunteerStatus(v.id, 'confirmed', true)}
+                                      title="Confirm attendance — adds +1 to volunteer quota"
+                                    >
+                                      <Check size={12} /> Confirm Participation (+1 Quota)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-secondary"
+                                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
+                                      disabled={isUpdating}
+                                      onClick={() => handleUpdateVolunteerStatus(v.id, 'declined', false)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* Confirmed volunteers: Option to revoke if marked in error */}
+                                {isConfirmed && (
                                   <button
                                     type="button"
                                     className="btn-secondary"
-                                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
+                                    style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem', color: 'var(--color-text-muted)' }}
                                     disabled={isUpdating}
-                                    onClick={() => handleUpdateVolunteerStatus(v.id, 'declined', false)}
+                                    onClick={() => handleUpdateVolunteerStatus(v.id, 'accepted', false)}
+                                    title="Revoke attendance verification"
                                   >
-                                    Remove
+                                    Revoke
                                   </button>
-                                )}
-
-                                {/* After project has ended: Verify attendance */}
-                                {project.status === 'completed' && isAccepted && (
-                                  <>
-                                    {!isConfirmed ? (
-                                      <button
-                                        type="button"
-                                        className="btn-primary"
-                                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.65rem' }}
-                                        disabled={isUpdating}
-                                        onClick={() => handleUpdateVolunteerStatus(v.id, 'confirmed', true)}
-                                      >
-                                        <Check size={12} /> Confirm Volunteered
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        className="btn-secondary"
-                                        style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
-                                        disabled={isUpdating}
-                                        onClick={() => handleUpdateVolunteerStatus(v.id, 'accepted', false)}
-                                      >
-                                        Revoke
-                                      </button>
-                                    )}
-                                  </>
                                 )}
 
                                 {v.status === 'declined' && (
@@ -1191,18 +1927,18 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
               <MessageSquare size={16} color="var(--color-oxford)" />
               <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
-                Revision Feedback & Comments ({comments.length})
+                Revision Feedback & Comments ({displayComments.length})
               </h3>
             </div>
 
             {/* Comments List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.25rem' }}>
-              {comments.length === 0 ? (
+              {displayComments.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--color-canvas)', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
                   No comments or revision feedback posted yet. Leadership and supervisors can leave instructions here.
                 </div>
               ) : (
-                comments.map((comment, index) => {
+                displayComments.map((comment, index) => {
                   const commentKey = comment.id || `comment-${index}`;
                   const commentDate = comment.created_at ? new Date(comment.created_at) : null;
                   const isValidDate = commentDate && !isNaN(commentDate.getTime());
