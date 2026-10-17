@@ -235,78 +235,55 @@ function PortalContent() {
   // Standalone Public Screener Page (No login required, no dashboard sidebar)
   if (activeTab === 'screener') {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', backgroundColor: 'var(--color-bg-base)' }}>
-        {/* Clean Header */}
-        <header
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 100,
-            backgroundColor: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(10px)',
-            borderBottom: '1px solid #E2E8F0',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: '1280px',
-              margin: '0 auto',
-              padding: '0.85rem 1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '1.5rem',
-            }}
-          >
+      <div className="min-h-screen w-full bg-[#FBFBFA]">
+        {/* Clean Editorial Header */}
+        <header className="sticky top-0 z-50 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between gap-4">
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }}
+              className="flex items-center gap-3 cursor-pointer group"
               onClick={() => navigateTo('home')}
             >
-              <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
+              <div className="w-9 h-9 flex items-center justify-center bg-white border border-slate-200 rounded p-1 flex-shrink-0 group-hover:border-[#B8860B] transition-colors">
                 <img
                   src="/cas-logo.png"
                   alt="Casablanca American School"
-                  style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+                  className="w-7 h-7 object-contain"
                 />
               </div>
               <div>
-                <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', lineHeight: 1, marginBottom: '3px' }}>
+                <div className="text-[10px] font-mono font-semibold uppercase tracking-[0.08em] text-slate-500 leading-tight">
                   Casablanca American School
                 </div>
-                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
+                <div className="font-serif text-base font-bold text-[#06101E] leading-tight group-hover:text-[#0C1D38] transition-colors">
                   National Honor Society
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="flex items-center gap-2.5">
               {user ? (
                 <button
                   type="button"
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
                 >
-                  <LayoutDashboard size={14} />
+                  <LayoutDashboard size={13} />
                   <span>{(isAdministrator || isSupervisor) ? 'Review Desk' : 'Member Portal'}</span>
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => setIsAuthModalOpen(true)}
                 >
-                  <LogIn size={14} />
+                  <LogIn size={13} />
                   <span>Sign In</span>
                 </button>
               )}
 
               <button
                 type="button"
-                className="btn-secondary"
-                style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+                className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                 onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'home')}
               >
                 {(isAdministrator || isSupervisor) ? 'Back to Portal' : 'Back to Homepage'}
@@ -316,7 +293,7 @@ function PortalContent() {
         </header>
 
         {/* Screener View */}
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+        <main className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
           <ScreenerView />
         </main>
 
@@ -332,20 +309,21 @@ function PortalContent() {
   // Public Legal Terms & Privacy View (accessible to unauthenticated visitors):
   if (!user && activeTab === 'legal') {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', backgroundColor: 'var(--color-surface)' }}>
-        <header style={{ backgroundColor: 'var(--color-navy)', padding: '1rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => navigateTo('home')}>
-              <img src="/cas-logo.png" alt="CAS" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+      <div className="min-h-screen w-full bg-[#FFFFFF]">
+        <header className="h-16 bg-[#06101E] border-b border-white/10 px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto h-full flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigateTo('home')}>
+              <div className="w-8 h-8 p-1 bg-white rounded flex items-center justify-center">
+                <img src="/cas-logo.png" alt="CAS" className="w-6 h-6 object-contain" />
+              </div>
               <div>
-                <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '0.95rem', fontFamily: 'var(--font-serif)' }}>Casablanca American School</div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--color-gold)' }}>National Honor Society Chapter Portal</div>
+                <div className="text-white font-serif font-bold text-base leading-tight">Casablanca American School</div>
+                <div className="text-[11px] font-mono text-[#E7C979]">National Honor Society Chapter Portal</div>
               </div>
             </div>
             <button
               type="button"
-              className="btn-secondary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white border border-white/20 hover:border-white/40 rounded transition-colors"
               onClick={() => navigateTo('home')}
             >
               Back to Homepage
@@ -353,7 +331,7 @@ function PortalContent() {
           </div>
         </header>
 
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+        <main className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
           <TermsAndPrivacyView
             initialTab={window.location.pathname.includes('privacy') ? 'privacy' : 'terms'}
             onBack={() => navigateTo('home')}
@@ -418,18 +396,18 @@ function PortalContent() {
           onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
           title="Return to Portal"
         >
-          <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
+          <div className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded p-1 flex-shrink-0 shadow-2xs">
             <img
               src="/cas-logo.png"
               alt="CAS NHS Crest"
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+              className="w-6 h-6 object-contain"
             />
           </div>
-          <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
+          <div className="min-w-0">
+            <div className="font-serif text-sm font-bold text-[#06101E] leading-tight truncate">
               CAS NHS Portal
             </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginTop: '3px' }}>
+            <div className="text-[10px] font-mono font-medium text-slate-400 tracking-wider truncate">
               Casablanca American School
             </div>
           </div>
@@ -620,33 +598,38 @@ function PortalContent() {
         </nav>
 
         {/* Sidebar Footer User Info */}
-        <div style={{ borderTop: '1px solid var(--color-border)', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC' }}>
+        <div className="border-t border-slate-200 p-3.5 bg-[#FAFBFB]">
           {user ? (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-xs font-semibold text-[#06101E] truncate">
                   {profile?.full_name || (user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'Hamza Iraqi Houssaini' : user?.email?.split('@')[0] || 'Member')}
                 </span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: isAdministrator ? '#4338CA' : isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
+                <span className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded tracking-wide ${
+                  isAdministrator ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                  isLeadership ? 'bg-[#FAF6ED] text-[#8B6508] border border-[#E5CB91]' :
+                  isSupervisor ? 'bg-slate-100 text-slate-800 border border-slate-200' :
+                  'bg-slate-100 text-slate-600 border border-slate-200'
+                }`}>
                   {role || (user?.user_metadata?.role as string) || 'Member'}
                 </span>
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="text-[11px] text-slate-400 font-mono truncate mb-2">
                 {user.email}
               </div>
-              <div style={{ marginTop: '0.65rem', borderTop: '1px dashed var(--color-border)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+              <div className="pt-2 border-t border-slate-200/80 flex justify-between items-center text-[10px] text-slate-400">
                 <button
                   type="button"
                   onClick={() => navigateTo('legal')}
-                  style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-oxford)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}
+                  className="hover:text-[#06101E] underline cursor-pointer"
                 >
                   Terms & Privacy
                 </button>
-                <span style={{ color: '#94A3B8' }}>Account Holder Liable</span>
+                <span className="font-mono">Account Liable</span>
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+            <div className="text-xs text-slate-400 font-mono">
               Guest Session
             </div>
           )}
@@ -657,30 +640,37 @@ function PortalContent() {
       {/* Stitch Fixed Top Header */}
       <header className="stitch-top-header">
         
-        {/* Left: Academic Year Indicator with Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)' }} />
-          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            Academic Year {activeAcademicYear ? activeAcademicYear.replace('-', ' — ') : '2026 — 2027'}
-          </span>
+        {/* Left: Academic Year Indicator with Live Dot */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B]" />
+            <span className="text-xs font-mono font-medium text-slate-600 tracking-wide uppercase">
+              Academic Cycle {activeAcademicYear ? activeAcademicYear.replace('-', ' — ') : '2026 — 2027'}
+            </span>
+          </div>
+          {isSemester2 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+              Semester 2 Active
+            </span>
+          )}
         </div>
 
         {/* Right: Actions & Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="flex items-center gap-2.5">
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="flex items-center gap-2.5">
               
-              {/* Standing Badge - only show when on probation, restricted, or graduated */}
+              {/* Standing Badge */}
               {isGraduated ? (
-                <span className="status-pill" style={{ backgroundColor: '#EDE9FE', color: '#6D28D9', fontSize: '0.72rem', border: '1px solid #DDD6FE' }}>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-xs font-medium">
                   <Award size={12} /> Graduate Honors
                 </span>
               ) : isRestricted ? (
-                <span className="status-pill ineligible" style={{ fontSize: '0.72rem' }}>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 text-xs font-medium">
                   <ShieldAlert size={12} /> Restricted
                 </span>
               ) : profile?.is_on_probation ? (
-                <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem' }}>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium">
                   <AlertTriangle size={12} /> Probation
                 </span>
               ) : null}
@@ -690,31 +680,31 @@ function PortalContent() {
 
               <button
                 type="button"
-                className="btn-secondary"
-                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded shadow-2xs transition-colors cursor-pointer"
                 onClick={() => setIsChangePasswordOpen(true)}
                 title="Change your personal passcode"
               >
-                <Key size={13} /> Change Code
+                <Key size={13} className="text-slate-500" />
+                <span>Change Code</span>
               </button>
 
               <button
                 type="button"
-                className="btn-secondary"
-                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded shadow-2xs transition-colors cursor-pointer"
                 onClick={signOut}
               >
-                <LogOut size={13} /> Sign Out
+                <LogOut size={13} className="text-slate-500" />
+                <span>Sign Out</span>
               </button>
             </div>
           ) : (
             <button
               type="button"
-              className="btn-primary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded shadow-2xs transition-colors cursor-pointer"
               onClick={() => setIsAuthModalOpen(true)}
             >
-              <LogIn size={14} /> Sign In
+              <LogIn size={13} />
+              <span>Sign In</span>
             </button>
           )}
         </div>

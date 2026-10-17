@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import {
   ArrowRight,
   CheckCircle2,
-  Compass,
-  Shield,
-  Users,
-  GraduationCap,
   ChevronRight,
   LogIn,
   LayoutDashboard,
   Lock,
+  FileCheck,
+  Sparkles,
 } from 'lucide-react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 import { useChapterRules } from '../../hooks/useChapterRules';
@@ -41,88 +39,105 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
   };
 
   return (
-    <div className="min-h-screen bg-[#fbfbfa] text-[#0a1e3f] font-sans selection:bg-[#c59b27]/20 selection:text-[#0a1e3f]">
+    <div className="min-h-screen bg-[#FBFBFA] text-[#06101E] font-sans selection:bg-[#B8860B]/15 selection:text-[#06101E]">
       
-      {/* Fixed Public Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_rgba(10,30,63,0.03)] transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-3 flex items-center justify-between gap-4">
+      {/* Editorial Chapter Masthead Bar */}
+      <div className="bg-[#06101E] text-slate-300 text-[11px] font-mono tracking-wider border-b border-white/10 py-1.5 px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B]" />
+            <span className="uppercase text-slate-300">Chartered Chapter · Casablanca American School</span>
+            <span className="text-slate-500 hidden sm:inline">|</span>
+            <span className="text-slate-400 hidden sm:inline">Affiliated with National Honor Society (NASSP)</span>
+          </div>
+          <div className="text-slate-400 flex items-center gap-3">
+            <span>Academic Year 2026–2027</span>
+            <span className="text-slate-600 hidden sm:inline">·</span>
+            <span className="text-[#E7C979] hidden sm:inline font-sans font-semibold">Standard: 5.80 GPA</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky Institutional Navigation Bar */}
+      <header className="sticky top-0 z-50 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-slate-200 shadow-[0_1px_2px_rgba(6,16,30,0.03)] transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           
-          {/* Logo & Brand */}
+          {/* Official Emblem & Chapter Brand */}
           <div
-            className="flex items-center gap-3.5 cursor-pointer group"
+            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer group min-w-0"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center p-1 rounded-lg border border-slate-200 bg-white shadow-2xs group-hover:border-[#c59b27] transition-colors">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center p-1 rounded-md border border-slate-200 bg-white shadow-xs group-hover:border-[#B8860B] transition-colors">
               <img
                 src="/cas-logo.png"
                 alt="Casablanca American School"
-                className="w-7 h-7 object-contain"
+                className="w-6 h-6 sm:w-7 sm:h-7 object-contain"
                 style={{ width: '28px', height: '28px' }}
               />
             </div>
-            <div>
-              <div className="text-[11px] font-sans font-semibold uppercase tracking-[0.08em] text-slate-500 leading-tight mb-0.5">
+            <div className="min-w-0">
+              <div className="hidden sm:block text-[10px] font-mono font-semibold uppercase tracking-[0.1em] text-slate-500 leading-tight">
                 Casablanca American School
               </div>
-              <div className="font-serif text-lg sm:text-xl font-bold text-[#0a1e3f] tracking-tight leading-tight group-hover:text-[#16325c] transition-colors">
+              <div className="font-serif text-base sm:text-lg font-bold text-[#06101E] tracking-tight leading-tight group-hover:text-[#0C1D38] transition-colors truncate">
                 National Honor Society
               </div>
             </div>
           </div>
 
-          {/* Center Navigation */}
-          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-slate-600">
+          {/* Editorial Section Navigation */}
+          <nav className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-slate-600">
             <button
               onClick={() => scrollToSection('about')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
+              className="hover:text-[#06101E] transition-colors cursor-pointer py-1"
             >
-              About
+              Charter Overview
             </button>
             <button
               onClick={() => scrollToSection('pillars')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
+              className="hover:text-[#06101E] transition-colors cursor-pointer py-1"
             >
-              The 4 Pillars
+              Constitutional Pillars
             </button>
             <button
               onClick={() => scrollToSection('requirements')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
+              className="hover:text-[#06101E] transition-colors cursor-pointer py-1"
             >
-              Academic Requirements
+              Academic Standard
             </button>
             <button
               onClick={() => scrollToSection('rules')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
+              className="hover:text-[#06101E] transition-colors cursor-pointer py-1"
             >
-              Rules
+              Chapter Bylaws
             </button>
           </nav>
 
-          {/* Header Action Buttons */}
-          <div className="flex items-center gap-3">
+          {/* Action Cluster */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-xs font-semibold text-[#06101E] bg-[#FFFFFF] hover:bg-slate-50 border border-slate-300 rounded-md shadow-2xs hover:border-slate-400 transition-all cursor-pointer whitespace-nowrap"
               onClick={() => onNavigate('screener')}
             >
-              <CheckCircle2 size={14} className="text-[#c59b27]" />
-              <span className="hidden sm:inline">Check Academic Eligibility</span>
-              <span className="sm:hidden">Eligibility</span>
+              <FileCheck size={14} className="text-[#B8860B]" />
+              <span className="hidden sm:inline">Audit Eligibility</span>
+              <span className="sm:hidden">Screener</span>
             </button>
 
             {user ? (
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                 onClick={() => onNavigate('dashboard')}
               >
                 <LayoutDashboard size={14} />
-                <span>Member Portal</span>
+                <span>Portal</span>
               </button>
             ) : (
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 text-xs font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                 onClick={onOpenAuth}
               >
                 <LogIn size={14} />
@@ -133,67 +148,105 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero: Institutional Broadsheet Masthead */}
       <section
         id="about"
-        className="relative pt-14 pb-18 md:pt-22 md:pb-26 bg-gradient-to-b from-white via-[#fcfbf9] to-[#fbfbfa] border-b border-slate-200/80"
+        className="relative pt-10 pb-14 md:pt-20 md:pb-24 border-b border-slate-200 bg-[#FFFFFF]"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
             
-            {/* Left Content */}
+            {/* Left Broadsheet Article Column */}
             <div className="lg:col-span-7">
-              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#0a1e3f] leading-[1.08] tracking-tight mb-5">
-                Scholarship. Leadership.<br />
-                Service. Character.
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#FAF6ED] border border-[#E5CB91] text-[#8B6508] text-[11px] font-mono uppercase tracking-wider mb-4 sm:mb-5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#B8860B]" />
+                <span>Official Chapter Portal · Est. 1973</span>
+              </div>
+
+              <h1 className="font-serif text-[20px] sm:text-4xl lg:text-[50px] font-bold text-[#06101E] leading-[1.25] tracking-tight mb-4 sm:mb-5 break-normal hyphens-none">
+                The Standards of Academic Distinction & Exemplary Character
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl mb-9">
-                The Casablanca American School chapter of the National Honor Society recognizes students
-                who demonstrate distinction in academic achievement, leadership, community service, and character.
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mb-6 sm:mb-8 font-normal">
+                Chartered under the authority of the National Association of Secondary School Principals, 
+                the Casablanca American School chapter honors scholars who embody intellectual distinction, 
+                ethical leadership, voluntary community service, and impeccable integrity.
               </p>
 
-              {/* Action Buttons with Generous, Balanced Spacing */}
-              <div className="flex flex-wrap items-center gap-3.5">
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#06101E] hover:bg-[#0C1D38] rounded-md shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => handleAction('dashboard')}
                 >
-                  {!user && <Lock size={15} className="text-white/80" />}
+                  {!user && <Lock size={14} className="text-white/80" />}
                   <span>Enter Member Portal</span>
-                  <ArrowRight size={16} />
+                  <ArrowRight size={15} />
                 </button>
 
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-sm font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold text-[#06101E] bg-[#FFFFFF] hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => onNavigate('screener')}
                 >
-                  <CheckCircle2 size={16} className="text-[#c59b27]" />
-                  <span>Check Academic Eligibility</span>
+                  <FileCheck size={15} className="text-[#B8860B]" />
+                  <span>Audit Academic Eligibility</span>
                 </button>
 
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold text-slate-700 hover:text-[#0a1e3f] transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center sm:justify-start gap-1 px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-[#06101E] transition-colors cursor-pointer"
                   onClick={() => scrollToSection('rules')}
                 >
-                  <span>Rules</span>
-                  <ChevronRight size={15} />
+                  <span>Bylaws Codex</span>
+                  <ChevronRight size={14} />
                 </button>
+              </div>
+
+              {/* Institutional Ledger Rules Digest */}
+              <div className="mt-8 pt-6 border-t border-slate-200/90 grid grid-cols-2 sm:grid-cols-3 gap-4 text-left">
+                <div>
+                  <div className="text-[10px] sm:text-[11px] font-mono uppercase text-slate-400 tracking-wider">GPA Threshold</div>
+                  <div className="font-serif text-base sm:text-lg font-bold text-[#06101E] mt-0.5">5.80 / 7.00</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">4-HL Scale: 5.60</div>
+                </div>
+                <div>
+                  <div className="text-[10px] sm:text-[11px] font-mono uppercase text-slate-400 tracking-wider">Project Mandate</div>
+                  <div className="font-serif text-base sm:text-lg font-bold text-[#06101E] mt-0.5">1 Led / Sem</div>
+                  <div className="text-[10px] sm:text-[11px] text-slate-500 mt-0.5">Capped at 2 per sem</div>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <div className="text-[10px] sm:text-[11px] font-mono uppercase text-slate-400 tracking-wider">Civic Service</div>
+                  <div className="font-serif text-lg font-bold text-[#06101E] mt-0.5">2 Volunteered</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Peer initiatives</div>
+                </div>
               </div>
             </div>
 
-            {/* Right: NHS Official Keystone Emblem */}
+            {/* Right: National Honor Society Archival Keystone Emblem Plate */}
             <div className="lg:col-span-5 flex justify-center lg:justify-end">
-              <div className="relative p-6 sm:p-8 bg-white/80 rounded-2xl border border-slate-200/90 shadow-[0_8px_24px_rgba(10,30,63,0.06)] flex items-center justify-center">
-                <img
-                  src="/nhs-logo-bw.png"
-                  alt="National Honor Society Keystone Emblem"
-                  className="w-auto max-h-[290px] sm:max-h-[330px] object-contain drop-shadow-sm"
-                  style={{ maxHeight: '310px', width: 'auto', objectFit: 'contain' }}
-                />
+              <div className="relative w-full max-w-md bg-[#FAF6ED]/70 rounded-xl border border-[#E5CB91] p-6 sm:p-8 flex flex-col items-center text-center shadow-xs">
+                
+                <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#8B6508] mb-4 font-semibold">
+                  Official Insignia of the Society
+                </div>
+
+                <div className="p-4 bg-white rounded-lg border border-slate-200/90 shadow-2xs mb-5 flex items-center justify-center">
+                  <img
+                    src="/nhs-logo-bw.png"
+                    alt="National Honor Society Keystone Emblem"
+                    className="w-auto max-h-[220px] sm:max-h-[250px] object-contain"
+                    style={{ maxHeight: '240px', width: 'auto', objectFit: 'contain' }}
+                  />
+                </div>
+
+                <div className="font-serif text-sm font-semibold text-[#06101E] italic mb-1">
+                  "Noblesse Oblige — To Whom Much is Given, Much is Required"
+                </div>
+                <div className="text-[11px] text-slate-500 font-sans max-w-xs">
+                  Casablanca American School Chapter · Accredited by the Middle States Association of Colleges & Schools
+                </div>
               </div>
             </div>
 
@@ -201,118 +254,172 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
         </div>
       </section>
 
-      {/* The Four Pillars */}
-      <section id="pillars" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-10 sm:mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-            The Four Pillars of NHS
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-            The four foundational standards required for induction and continuous active membership.
+      {/* The Four Pillars Broadsheet Ledger (Codex Articles - No AI-Slop Icon Squares) */}
+      <section id="pillars" className="py-14 md:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-[#B8860B] font-semibold mb-1">
+              Constitutional Framework
+            </div>
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#06101E] tracking-tight">
+              The Four Pillars of the Society
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md">
+            The permanent, audited constitutional tenets governing candidacy, initial induction, and active member tenure.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-          {/* Pillar 1 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
-              <GraduationCap size={22} className="text-[#c59b27]" />
+        {/* 4-Column Architectural Broadsheet Ledger */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 bg-white border border-slate-200 rounded-xl divide-y md:divide-y-0 md:divide-x divide-slate-200 shadow-2xs overflow-hidden">
+          
+          {/* Article I */}
+          <div className="p-6 sm:p-7 flex flex-col justify-between hover:bg-[#FAFAF8] transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-serif text-2xl font-bold text-[#B8860B]">I</span>
+                <span className="text-[10px] font-mono uppercase text-slate-400 tracking-widest">Codex § 1.1</span>
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#06101E] mb-2">
+                Scholarship
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                Commitment to intellectual mastery and scholarly rigor. Candidates maintain an audited cumulative 5.80 GPA standard across all core academic disciplines without deficiency marks.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Scholarship
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Commitment to learning, intellectual curiosity, and maintaining a minimum 5.80 cumulative GPA standard.
-            </p>
+            <div className="pt-4 border-t border-slate-100">
+              <div className="text-[10px] font-mono uppercase text-slate-400">Statutory Benchmark</div>
+              <div className="text-xs font-semibold text-[#06101E] mt-0.5">5.80 / 7.00 Cumulative</div>
+            </div>
           </div>
 
-          {/* Pillar 2 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-4 border border-slate-200">
-              <Compass size={22} className="text-[#0a1e3f]" />
+          {/* Article II */}
+          <div className="p-6 sm:p-7 flex flex-col justify-between hover:bg-[#FAFAF8] transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-serif text-2xl font-bold text-[#B8860B]">II</span>
+                <span className="text-[10px] font-mono uppercase text-slate-400 tracking-widest">Codex § 1.2</span>
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#06101E] mb-2">
+                Leadership
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                Taking ethical initiative and guiding peers with accountability. Members conceive, propose, and spearhead student-directed competitions, workshops, and institutional initiatives.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Leadership
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Taking proactive initiative, guiding peers ethically, and spearheading impactful student-led chapter initiatives.
-            </p>
+            <div className="pt-4 border-t border-slate-100">
+              <div className="text-[10px] font-mono uppercase text-slate-400">Statutory Benchmark</div>
+              <div className="text-xs font-semibold text-[#06101E] mt-0.5">1 Project Led / Semester</div>
+            </div>
           </div>
 
-          {/* Pillar 3 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-4 border border-[#a7f3d0]">
-              <Users size={22} className="text-[#059669]" />
+          {/* Article III */}
+          <div className="p-6 sm:p-7 flex flex-col justify-between hover:bg-[#FAFAF8] transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-serif text-2xl font-bold text-[#B8860B]">III</span>
+                <span className="text-[10px] font-mono uppercase text-slate-400 tracking-widest">Codex § 1.3</span>
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#06101E] mb-2">
+                Service
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                Voluntary dedication to community welfare and mutual advancement without seeking financial remuneration, commercial gain, or self-aggrandizement.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Service
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Voluntary contributions to school and community welfare without seeking monetary compensation or recognition.
-            </p>
+            <div className="pt-4 border-t border-slate-100">
+              <div className="text-[10px] font-mono uppercase text-slate-400">Statutory Benchmark</div>
+              <div className="text-xs font-semibold text-[#06101E] mt-0.5">2 Volunteering / Semester</div>
+            </div>
           </div>
 
-          {/* Pillar 4 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
-              <Shield size={22} className="text-[#c59b27]" />
+          {/* Article IV */}
+          <div className="p-6 sm:p-7 flex flex-col justify-between hover:bg-[#FAFAF8] transition-colors">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-serif text-2xl font-bold text-[#B8860B]">IV</span>
+                <span className="text-[10px] font-mono uppercase text-slate-400 tracking-widest">Codex § 1.4</span>
+              </div>
+              <h3 className="font-serif text-xl font-bold text-[#06101E] mb-2">
+                Character
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-6">
+                Uncompromising personal integrity, punctuality, and adherence to the CAS Honor Code. Fostering a chapter culture of mutual respect, reliability, and academic honesty.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Character
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Upholding strict academic honesty, demonstrating reliability, integrity, and fostering a culture of mutual respect.
-            </p>
+            <div className="pt-4 border-t border-slate-100">
+              <div className="text-[10px] font-mono uppercase text-slate-400">Statutory Benchmark</div>
+              <div className="text-xs font-semibold text-[#06101E] mt-0.5">Exemplary Conduct Record</div>
+            </div>
           </div>
+
         </div>
       </section>
 
-      {/* Academic Requirements */}
-      <section id="requirements" className="py-16 md:py-24 bg-white border-y border-slate-200/80">
+      {/* Academic Standards Ledger & Screener Dispatch */}
+      <section id="requirements" className="py-14 md:py-20 bg-white border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 sm:mb-12">
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-              Academic Requirements
-            </h2>
-            <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-              Official grade requirements from the Casablanca American School chapter bylaws.
+          
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-[#B8860B] font-semibold mb-1">
+                Chapter Standards
+              </div>
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#06101E] tracking-tight">
+                Academic Eligibility Ledger
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md">
+              Official grade point averages and conduct standards mandated by the Casablanca American School chapter constitution.
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             
             {/* Standards Table */}
-            <div className="lg:col-span-7 bg-[#fbfbfa] p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-card flex flex-col justify-between">
+            <div className="lg:col-span-7 bg-[#FBFBFA] p-6 sm:p-7 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
               <div>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-3">Grade Level</th>
-                        <th className="py-3 px-3">GPA Requirement</th>
-                        <th className="py-3 px-3">Rules</th>
+                      <tr className="border-b border-slate-200 text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Grade Tier</th>
+                        <th className="py-2.5 px-3">Standard</th>
+                        <th className="py-2.5 px-3">Curricular Rules</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200/70 text-slate-700">
+                    <tbody className="divide-y divide-slate-200/80 text-slate-700">
                       <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grade 10</td>
-                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          Core academic courses only (PE & Design excluded). No AE or BE marks.
+                        <td className="py-4 px-3 font-semibold text-[#06101E]">
+                          Grade 10
+                        </td>
+                        <td className="py-4 px-3 font-serif font-bold text-[#06101E] whitespace-nowrap">
+                          5.80 / 7.00
+                        </td>
+                        <td className="py-4 px-3 text-xs text-slate-600 leading-relaxed">
+                          Core academic disciplines only (English, Math, Sciences, Humanities, Languages). Physical Education and Design are strictly excluded. Zero AE or BE marks permitted.
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grades 11 & 12 (IB)</td>
-                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          Calculated across 6 IB courses. Reduced to <strong className="text-slate-900 font-semibold">5.60</strong> if taking 4 IB Higher Level courses.
+                        <td className="py-4 px-3 font-semibold text-[#06101E]">
+                          Grades 11 & 12 (IB DP)
+                        </td>
+                        <td className="py-4 px-3 font-serif font-bold text-[#06101E] whitespace-nowrap">
+                          5.80 / 7.00
+                        </td>
+                        <td className="py-4 px-3 text-xs text-slate-600 leading-relaxed">
+                          Calculated across 6 IB Diploma courses. Adjusted to <strong className="text-[#06101E] font-semibold">5.60</strong> for candidates undertaking 4 Higher Level courses.
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Conduct</td>
-                        <td className="py-3.5 px-3 font-bold text-[#059669]">Good Standing</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          No school disciplinary actions or academic dishonesty.
+                        <td className="py-4 px-3 font-semibold text-[#06101E]">
+                          Citizenship & Conduct
+                        </td>
+                        <td className="py-4 px-3 font-serif font-bold text-[#0D684D] whitespace-nowrap">
+                          Good Standing
+                        </td>
+                        <td className="py-4 px-3 text-xs text-slate-600 leading-relaxed">
+                          No suspensions, formal disciplinary referrals, or infractions of the CAS Academic Honesty Policy on institutional record.
                         </td>
                       </tr>
                     </tbody>
@@ -320,50 +427,50 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                 </div>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-slate-200 text-xs text-slate-500">
-                Academic standing is verified at each semester report card period.
+              <div className="mt-6 pt-4 border-t border-slate-200 text-[11px] text-slate-500 font-mono">
+                Official audits occur at the conclusion of each semester report card cycle.
               </div>
             </div>
 
-            {/* Screener Prompt Card */}
-            <div className="lg:col-span-5 bg-[#0a1e3f] text-white p-6 sm:p-8 rounded-xl shadow-lg border border-[#c59b27]/30 flex flex-col justify-between">
+            {/* Screener Interactive Dispatch Card */}
+            <div className="lg:col-span-5 bg-[#06101E] text-white p-6 sm:p-7 rounded-xl border border-white/10 shadow-sm flex flex-col justify-between">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#c59b27] text-xs font-semibold tracking-wide mb-5">
-                  <CheckCircle2 size={14} className="text-[#c59b27]" />
-                  <span>Academic Eligibility Screener</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/10 text-[#E7C979] text-[11px] font-mono uppercase tracking-wider mb-5">
+                  <Sparkles size={13} className="text-[#E7C979]" />
+                  <span>Automated Transcript Audit</span>
                 </div>
                 
-                <h3 className="font-serif text-2xl font-bold text-white mb-3">
-                  Check Your Eligibility
+                <h3 className="font-serif text-2xl font-bold text-white mb-2.5">
+                  Audit Your Academic Standing
                 </h3>
                 
-                <p className="text-sm text-slate-200 leading-relaxed mb-6">
-                  Upload your report card PDF or enter your marks into our screener tool to immediately check your GPA against chapter rules.
+                <p className="text-xs text-slate-300 leading-relaxed mb-6">
+                  Upload your semester report card PDF or enter individual course marks to audit your GPA instantly against official chapter bylaws.
                 </p>
                 
-                <ul className="space-y-2.5 text-xs text-slate-200 mb-8">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Calculates Grade 10 vs. IB Grade 11/12 scale</span>
+                <ul className="space-y-3 text-xs text-slate-200 mb-8 font-sans">
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 size={15} className="text-[#B8860B] mt-0.5 flex-shrink-0" />
+                    <span>Optical PDF extraction with verified CAS course mapping</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Applies 4 IB Higher Level adjustment (5.60 threshold)</span>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 size={15} className="text-[#B8860B] mt-0.5 flex-shrink-0" />
+                    <span>Automatic 4-HL IB course threshold dispensation (5.60 GPA)</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Filters excluded courses (PE and Design)</span>
+                  <li className="flex items-start gap-2.5">
+                    <CheckCircle2 size={15} className="text-[#B8860B] mt-0.5 flex-shrink-0" />
+                    <span>Filtering of non-core courses (PE and Design excluded per bylaws)</span>
                   </li>
                 </ul>
               </div>
 
               <button
                 type="button"
-                className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-6 font-bold text-sm bg-[#c59b27] hover:bg-[#b58b1e] text-[#0a1e3f] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+                className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 font-semibold text-xs uppercase tracking-wider bg-[#B8860B] hover:bg-[#946800] text-white rounded-md shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                 onClick={() => onNavigate('screener')}
               >
-                <span>Check Academic Eligibility</span>
-                <ArrowRight size={16} />
+                <span>Launch Eligibility Screener</span>
+                <ArrowRight size={15} />
               </button>
             </div>
 
@@ -371,93 +478,125 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
         </div>
       </section>
 
-      {/* Rules Section */}
-      <section id="rules" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-10 sm:mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-            Rules to Maintain Membership
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-            The official rules required to remain in good standing in the chapter.
+      {/* Chapter Bylaws Codex (§ Sections - No AI-Slop Generic Cards) */}
+      <section id="rules" className="py-14 md:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-[#B8860B] font-semibold mb-1">
+              Chapter Governance
+            </div>
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#06101E] tracking-tight">
+              Official Chapter Bylaws Codex
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md">
+            The codified statutes governing member standing, attendance requirements, and probation thresholds.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Academic Standing
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Maintain a minimum 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Levels).
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.1</span>
+              <span className="text-[10px] font-mono text-slate-400">Academic Rule</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Grade Point Maintenance
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Members must maintain a minimum 5.80 GPA on every semester report card. Students enrolled in 4 IB Higher Level courses qualify for the 5.60 statutory threshold.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Project Leadership
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Lead at least 1 approved project per semester, with a maximum cap of 2 projects per semester (4 per year).
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.2</span>
+              <span className="text-[10px] font-mono text-slate-400">Leadership Rule</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Project Leadership Mandate
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Every active member must chair at least 1 approved chapter project each semester. To maintain academic balance, proposals are capped at a maximum of 2 projects per semester.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Volunteering
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Volunteer in at least 2 other members' projects each semester.
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.3</span>
+              <span className="text-[10px] font-mono text-slate-400">Service Rule</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Peer Service Commitment
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              In addition to leading an initiative, members must actively volunteer in at least 2 distinct peer-led chapter projects during each semester cycle.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Meeting Attendance
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Attend all general chapter meetings. Accumulating {rules.absences_for_probation || 2} unexcused absences ({rules.tardies_per_absence || 3} tardies = 1 absence) in a semester results in chapter probation.
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.4</span>
+              <span className="text-[10px] font-mono text-slate-400">Attendance Protocol</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Assembly Attendance & Tardies
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Mandatory attendance at general chapter meetings. Accumulating {rules.absences_for_probation || 2} unexcused absences ({rules.tardies_per_absence || 3} tardies aggregate to 1 absence) in a semester results in chapter probation.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Probation & Dismissal
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Failing to meet academic or project requirements results in probation. Incurring 2 probations results in chapter dismissal.
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.5</span>
+              <span className="text-[10px] font-mono text-slate-400">Discipline Rule</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Probation & Chapter Dismissal
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Failure to satisfy academic, project, or attendance quotas incurs official Chapter Probation. Incurring a second probation triggers permanent chapter dismissal.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Senior Graduation
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Grade 12 members who meet requirements through Semester 1 graduate in good standing as NHS Graduates.
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs hover:border-[#B8860B]/50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-mono font-semibold text-[#B8860B]">§ 3.6</span>
+              <span className="text-[10px] font-mono text-slate-400">Honors Rule</span>
+            </div>
+            <h3 className="text-[#06101E] font-serif text-base font-bold mb-2">
+              Senior Honors Conferral
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Grade 12 candidates in good standing through Semester 1 conclude active duties and receive official National Honor Society Honors at Casablanca American School graduation.
             </p>
           </div>
+
         </div>
       </section>
 
-      {/* Institutional Footer */}
-      <footer className="bg-[#0a1e3f] text-slate-300 pt-12 pb-8 border-t border-slate-800">
+      {/* Institutional Editorial Footer */}
+      <footer className="bg-[#06101E] text-slate-300 pt-12 pb-8 border-t border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 p-1 bg-white rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 p-1 bg-white rounded-md flex items-center justify-center">
                 <img
                   src="/cas-logo.png"
-                  alt="CAS"
+                  alt="Casablanca American School"
                   className="w-7 h-7 object-contain"
                   style={{ width: '28px', height: '28px' }}
                 />
               </div>
               <div>
-                <div className="text-white font-serif font-bold text-base">
+                <div className="text-white font-serif font-bold text-base leading-tight">
                   Casablanca American School
                 </div>
-                <div className="text-xs text-[#c59b27]">
-                  National Honor Society Chapter
+                <div className="text-xs text-[#E7C979] font-mono mt-0.5">
+                  National Honor Society Chapter · Casablanca, Morocco
                 </div>
               </div>
             </div>
@@ -483,17 +622,17 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
               >
                 Privacy Policy
               </button>
-              <span className="text-slate-400">Casablanca, Morocco</span>
+              <span className="text-slate-400 font-mono text-[11px]">Kingdom of Morocco</span>
             </div>
           </div>
 
-          <div className="py-4 text-[11px] text-slate-400 leading-relaxed border-b border-white/5">
-            <strong className="text-slate-300">Institutional Usage Notice:</strong> By using this portal, you automatically accept our Terms of Use and Privacy Policy. Whichever account performs actions on the platform, the account holder or representative is held strictly accountable. Passcodes must remain secure and any compromise must be reported immediately to Chapter Leadership.
+          <div className="py-4 text-[11px] text-slate-400 leading-relaxed border-b border-white/5 font-sans">
+            <strong className="text-slate-300 font-semibold">Institutional Governance Notice:</strong> Access to this portal is restricted to authorized Casablanca American School students, faculty advisors, and administrators. Authentication credentials must remain strictly confidential. Account holders are held legally and administratively accountable for all actions conducted under their credentials.
           </div>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-            <span>© Casablanca American School National Honor Society</span>
-            <span>Academic Year 2026–2027</span>
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 font-mono text-[11px]">
+            <span>© Casablanca American School National Honor Society Chapter</span>
+            <span>Academic Cycle 2026–2027</span>
           </div>
         </div>
       </footer>
