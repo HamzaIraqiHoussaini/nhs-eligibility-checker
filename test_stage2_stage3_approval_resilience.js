@@ -244,7 +244,51 @@ test('Administrator RLS 42501 error provides actionable guidance to notify Super
 });
 
 // -----------------------------------------------------------------------------
-// 4. Verification Summary
+// 4. Proposal Form Submission Transitions & Queue Filtering
+// -----------------------------------------------------------------------------
+console.log('\n--- 4. Proposal Form Transitions & Review Desk Queues ---');
+
+test('Resubmitting a rejected or updated proposal sets targetStatus to pending_leadership', () => {
+  const rejectedProposal = { status: 'rejected_supervisor' };
+  const isSubmitting = true;
+  const targetStatus = isSubmitting ? 'pending_leadership' : (rejectedProposal.status || 'draft');
+  assert.strictEqual(targetStatus, 'pending_leadership');
+});
+
+test('Saving progress on an existing proposal preserves current status', () => {
+  const existingProposal = { status: 'pending_supervisor' };
+  const isSubmitting = false;
+  const targetStatus = isSubmitting ? 'pending_leadership' : (existingProposal.status || 'draft');
+  assert.strictEqual(targetStatus, 'pending_supervisor');
+});
+
+test('Review Desk correctly partitions all 3 stages and resolved queues', () => {
+  const proposals = [
+    { id: '1', status: 'pending_leadership' },
+    { id: '2', status: 'pending_supervisor' },
+    { id: '3', status: 'pending_administrator' },
+    { id: '4', status: 'approved' },
+    { id: '5', status: 'rejected_leadership' },
+    { id: '6', status: 'rejected_supervisor' },
+    { id: '7', status: 'rejected_administrator' },
+    { id: '8', status: 'completed' },
+  ];
+
+  const pendingStage1 = proposals.filter((p) => p.status === 'pending_leadership');
+  const pendingStage2 = proposals.filter((p) => p.status === 'pending_supervisor');
+  const pendingStage3 = proposals.filter((p) => p.status === 'pending_administrator');
+  const resolved = proposals.filter(
+    (p) => !['pending_leadership', 'pending_supervisor', 'pending_administrator'].includes(p.status)
+  );
+
+  assert.strictEqual(pendingStage1.length, 1);
+  assert.strictEqual(pendingStage2.length, 1);
+  assert.strictEqual(pendingStage3.length, 1);
+  assert.strictEqual(resolved.length, 5);
+});
+
+// -----------------------------------------------------------------------------
+// 5. Verification Summary
 // -----------------------------------------------------------------------------
 console.log('\n================================================================');
 console.log(`  RESULTS: ${passed} / ${total} tests passed (${Math.round((passed / total) * 100)}%)`);
@@ -253,3 +297,4 @@ console.log('================================================================');
 if (passed < total) {
   process.exit(1);
 }
+

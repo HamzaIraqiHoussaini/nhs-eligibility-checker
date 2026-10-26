@@ -9,7 +9,7 @@ import {
   subscribeToUserNotifications,
 } from '../../lib/notificationService';
 import { formatRelativeTime } from '../../lib/authTracking';
-import { Bell, CheckCircle2, AlertTriangle, FileText, CheckCheck, ExternalLink } from 'lucide-react';
+import { Bell, CheckCircle2, AlertTriangle, FileText, CheckCheck, ExternalLink, MessageSquare } from 'lucide-react';
 
 interface NotificationBellProps {
   onNavigate: (tab: string) => void;
@@ -109,9 +109,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onNavigate }
     switch (type) {
       case 'stage1_approved':
       case 'stage2_approved':
+      case 'stage3_approved':
         return <CheckCircle2 size={16} color="#059669" />;
       case 'project_rejected':
         return <AlertTriangle size={16} color="#DC2626" />;
+      case 'project_comment':
+        return <MessageSquare size={16} color="#0284C7" />;
       case 'project_submitted':
       default:
         return <FileText size={16} color="var(--color-oxford)" />;
