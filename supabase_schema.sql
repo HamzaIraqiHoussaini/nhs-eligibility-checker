@@ -310,14 +310,14 @@ create policy "Semesters manage leadership" on public.semesters for all using (
 );
 
 -- Project Proposals:
--- Members see approved projects and their own proposals; Leadership & Supervisors see all
+-- Members see approved projects and their own proposals; Leadership, Supervisors & Administrators see all
 create policy "Proposals select" on public.project_proposals for select using (
   status in ('approved', 'completed')
   or creator_id = auth.uid()
   or auth.jwt()->>'email' = any(co_leader_emails)
   or exists (
     select 1 from public.profiles
-    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor')
+    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor', 'administrator')
   )
 );
 
@@ -329,12 +329,12 @@ create policy "Proposals insert active members" on public.project_proposals for 
   )
 );
 
--- Creator can update before approval or mark completed; Leadership & Supervisor can update review fields
+-- Creator can update before approval or mark completed; Leadership, Supervisor & Administrator can update review fields
 create policy "Proposals update" on public.project_proposals for update using (
   creator_id = auth.uid()
   or exists (
     select 1 from public.profiles
-    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor')
+    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor', 'administrator')
   )
 );
 
