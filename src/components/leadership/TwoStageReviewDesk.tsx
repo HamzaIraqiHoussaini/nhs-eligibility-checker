@@ -5,6 +5,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
 import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision, notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
 import { resolveStageReviewer, getDisplayComments } from '../../lib/projectVolunteerHelper';
+import { FormattedProposalSections } from '../common/FormattedProposalSections';
 import {
   CheckCircle2,
   XCircle,
@@ -878,36 +879,9 @@ export const TwoStageReviewDesk: React.FC = () => {
               </div>
             </div>
 
-            {/* Background */}
+            {/* Structured Proposal Sections */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <div className="drawer-section-title">Background & Context</div>
-              <p style={{ fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
-                {selectedProposal.background}
-              </p>
-            </div>
-
-            {/* Objectives */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div className="drawer-section-title">Objectives</div>
-              <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                {selectedProposal.objectives?.map((obj, i) => (
-                  <li key={i}>{obj}</li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Costs */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <div className="drawer-section-title">Project Costs & Budget</div>
-              {selectedProposal.costs && selectedProposal.costs.length > 0 ? (
-                <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                  {selectedProposal.costs.map((c, i) => (
-                    <li key={i}>{c}</li>
-                  ))}
-                </ul>
-              ) : (
-                <div style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>No monetary costs requested.</div>
-              )}
+              <FormattedProposalSections project={selectedProposal} showInternalLogistics={true} />
             </div>
 
             {/* PROOF OF PURCHASE AUDIT SECTION */}

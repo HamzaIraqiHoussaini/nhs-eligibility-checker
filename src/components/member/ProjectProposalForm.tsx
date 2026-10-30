@@ -7,6 +7,24 @@ import { X, Plus, Trash2, Send, AlertCircle, Star, Search, Users, Save, Clock } 
 import { useDebounce } from '../../hooks/useDebounce';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { notifyProjectSubmitted } from '../../lib/projectNotificationOrchestrator';
+import {
+  formatProposalContent,
+  upsertProposalRubricInComments,
+  type RubricCriterion,
+} from '../../utils/proposalFormatter';
+
+function createDefaultRubricRow(): RubricCriterion {
+  return {
+    category: '',
+    points: '5pts',
+    tiers: [
+      { score: '5', description: '' },
+      { score: '3–4', description: '' },
+      { score: '1–2', description: '' },
+      { score: '0', description: '' },
+    ],
+  };
+}
 
 interface CoLeaderMember {
   id: string;
@@ -56,23 +74,49 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
   const [costs, setCosts] = useState<string[]>(initialData?.costs?.length ? initialData.costs : ['No costs expected']);
   const [needsFromSchool, setNeedsFromSchool] = useState<string[]>(initialData?.needs_from_school?.length ? initialData.needs_from_school : ['Classroom space and projector']);
   const [volunteersNeeded, setVolunteersNeeded] = useState(initialData?.volunteers_needed || 0);
+  const [hasRubric, setHasRubric] = useState<boolean>(false);
+  const [rubricTotalPoints, setRubricTotalPoints] = useState<string>('');
+  const [rubricNote, setRubricNote] = useState<string>('');
+  const [rubricCriteria, setRubricCriteria] = useState<RubricCriterion[]>([createDefaultRubricRow()]);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
+      const formatted = formatProposalContent(initialData);
       setProjectTitle(initialData.project_title || '');
       setAdvisorName(initialData.advisor_name || '');
       setEventDate(initialData.event_date || '');
       setLocation(initialData.location || '');
       setAwards(initialData.awards || '');
-      setBackground(initialData.background || '');
-      setObjectives(initialData.objectives?.length ? initialData.objectives : ['']);
-      setEventDetails(initialData.event_details?.length ? initialData.event_details : ['']);
+      setBackground(formatted.overview || initialData.background || '');
+      setObjectives(formatted.objectives.length ? formatted.objectives : initialData.objectives?.length ? initialData.objectives : ['']);
+      setEventDetails(formatted.eventDetails.length ? formatted.eventDetails : initialData.event_details?.length ? initialData.event_details : ['']);
       setCosts(initialData.costs?.length ? initialData.costs : ['No costs expected']);
       setNeedsFromSchool(initialData.needs_from_school?.length ? initialData.needs_from_school : ['Classroom space and projector']);
       setVolunteersNeeded(initialData.volunteers_needed || 0);
+
+      if (formatted.rubric && formatted.rubric.criteria.length > 0) {
+        setHasRubric(true);
+        setRubricTotalPoints(formatted.rubric.totalPoints || '');
+        setRubricNote(formatted.rubric.note || '');
+        setRubricCriteria(
+          formatted.rubric.criteria.map((row) => ({
+            category: row.category || '',
+            points: row.points || '',
+            tiers: [0, 1, 2, 3].map((idx) => ({
+              score: row.tiers[idx]?.score || '',
+              description: row.tiers[idx]?.description || '',
+            })),
+          }))
+        );
+      } else {
+        setHasRubric(false);
+        setRubricTotalPoints('');
+        setRubricNote('');
+        setRubricCriteria([createDefaultRubricRow()]);
+      }
 
       // Load existing co-leaders from database
       if (initialData.co_leader_emails && initialData.co_leader_emails.length > 0) {
@@ -111,6 +155,10 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       setCosts(['No costs expected']);
       setNeedsFromSchool(['Classroom space and projector']);
       setVolunteersNeeded(0);
+      setHasRubric(false);
+      setRubricTotalPoints('');
+      setRubricNote('');
+      setRubricCriteria([createDefaultRubricRow()]);
     }
   }, [initialData, isOpen]);
 
@@ -352,6 +400,30 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
       targetStatus = initialData?.status || 'draft';
     }
 
+    const validRubricCriteria = hasRubric
+      ? rubricCriteria
+          .map((row) => ({
+            category: row.category.trim(),
+            points: row.points.trim(),
+            tiers: [0, 1, 2, 3].map((idx) => ({
+              score: (row.tiers[idx]?.score || '').trim(),
+              description: (row.tiers[idx]?.description || '').trim(),
+            })),
+          }))
+          .filter((row) => row.category || row.tiers.some((t) => t.description))
+      : [];
+
+    const rubricPayload =
+      hasRubric && validRubricCriteria.length > 0
+        ? {
+            totalPoints: rubricTotalPoints.trim() || undefined,
+            note: rubricNote.trim() || undefined,
+            criteria: validRubricCriteria,
+          }
+        : null;
+
+    const updatedComments = upsertProposalRubricInComments(initialData?.comments, rubricPayload);
+
     try {
       if (isEditing && initialData) {
         const { error } = await supabase
@@ -370,6 +442,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
             costs: costs.map(c => c.trim()).filter(Boolean),
             needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
             volunteers_needed: Number(volunteersNeeded) || 0,
+            comments: updatedComments,
             status: targetStatus,
           })
           .eq('id', initialData.id);
@@ -467,6 +540,7 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
           costs: costs.map(c => c.trim()).filter(Boolean),
           needs_from_school: needsFromSchool.map(n => n.trim()).filter(Boolean),
           volunteers_needed: Number(volunteersNeeded) || 0,
+          comments: updatedComments,
           status: targetStatus,
         }).select('id').single();
 
@@ -1003,6 +1077,219 @@ export const ProjectProposalForm: React.FC<ProjectProposalFormProps> = ({
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Optional Judging / Evaluation Rubric Matrix */}
+          <div style={{ border: '1px solid var(--color-border)', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Judging &amp; Evaluation Rubric / Matrix (Optional)
+                </div>
+                <div style={{ fontSize: '0.76rem', color: 'var(--color-text-secondary)', marginTop: '0.15rem' }}>
+                  If your competition or project uses a scoring rubric, add a structured matrix below.
+                </div>
+              </div>
+              {!hasRubric ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLimitReached}
+                  style={{ fontSize: '0.76rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => {
+                    setHasRubric(true);
+                    if (rubricCriteria.length === 0) {
+                      setRubricCriteria([createDefaultRubricRow()]);
+                    }
+                  }}
+                >
+                  <Plus size={13} /> Add Rubric Matrix
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={isLimitReached}
+                  style={{ fontSize: '0.74rem', padding: '0.3rem 0.65rem', color: 'var(--color-terracotta)', borderColor: 'var(--color-terracotta)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => setHasRubric(false)}
+                >
+                  <Trash2 size={12} /> Remove Rubric
+                </button>
+              )}
+            </div>
+
+            {hasRubric && (
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                      Total Points (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      disabled={isLimitReached}
+                      placeholder="e.g. 25pts total"
+                      value={rubricTotalPoints}
+                      onChange={(e) => setRubricTotalPoints(e.target.value)}
+                      style={{ width: '100%', padding: '0.4rem 0.55rem', border: '1px solid var(--color-border)', fontSize: '0.8rem', backgroundColor: '#FFFFFF' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                      Scoring Note (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      disabled={isLimitReached}
+                      placeholder="e.g. Each judge scores teams across all criteria"
+                      value={rubricNote}
+                      onChange={(e) => setRubricNote(e.target.value)}
+                      style={{ width: '100%', padding: '0.4rem 0.55rem', border: '1px solid var(--color-border)', fontSize: '0.8rem', backgroundColor: '#FFFFFF' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', minWidth: '680px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--color-border)' }}>
+                        <th style={{ textAlign: 'left', padding: '0.55rem 0.65rem', color: 'var(--color-navy)', fontWeight: 700, width: '19%' }}>
+                          Criteria
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.55rem 0.65rem', color: '#166534', fontWeight: 700, width: '19.5%' }}>
+                          Excellent
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.55rem 0.65rem', color: '#1E40AF', fontWeight: 700, width: '19.5%' }}>
+                          Good
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.55rem 0.65rem', color: '#92400E', fontWeight: 700, width: '19.5%' }}>
+                          Satisfactory
+                        </th>
+                        <th style={{ textAlign: 'left', padding: '0.55rem 0.65rem', color: '#991B1B', fontWeight: 700, width: '19.5%' }}>
+                          Needs Improvement
+                        </th>
+                        <th style={{ width: '3%' }} />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rubricCriteria.map((row, rowIdx) => (
+                        <tr key={rowIdx} style={{ borderBottom: '1px solid #E2E8F0', verticalAlign: 'top' }}>
+                          <td style={{ padding: '0.55rem 0.6rem' }}>
+                            <input
+                              type="text"
+                              disabled={isLimitReached}
+                              placeholder="e.g. Strength of Arguments"
+                              value={row.category}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setRubricCriteria((prev) =>
+                                  prev.map((r, i) => (i === rowIdx ? { ...r, category: val } : r))
+                                );
+                              }}
+                              style={{ width: '100%', padding: '0.35rem 0.45rem', border: '1px solid var(--color-border)', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.35rem' }}
+                            />
+                            <input
+                              type="text"
+                              disabled={isLimitReached}
+                              placeholder="Max pts (e.g. 7pts)"
+                              value={row.points}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setRubricCriteria((prev) =>
+                                  prev.map((r, i) => (i === rowIdx ? { ...r, points: val } : r))
+                                );
+                              }}
+                              style={{ width: '100%', padding: '0.28rem 0.45rem', border: '1px solid var(--color-border)', fontSize: '0.72rem', color: 'var(--color-text-secondary)' }}
+                            />
+                          </td>
+
+                          {[0, 1, 2, 3].map((tierIdx) => {
+                            const tier = row.tiers[tierIdx] || { score: '', description: '' };
+                            const scorePlaceholders = ['6–7', '4–5', '2–3', '0–1'];
+                            const descPlaceholders = [
+                              'Clear, convincing...',
+                              'Logical arguments...',
+                              'Basic arguments...',
+                              'Weak or unclear...',
+                            ];
+                            return (
+                              <td key={tierIdx} style={{ padding: '0.55rem 0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.3rem' }}>
+                                  <input
+                                    type="text"
+                                    disabled={isLimitReached}
+                                    placeholder={scorePlaceholders[tierIdx]}
+                                    value={tier.score}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setRubricCriteria((prev) =>
+                                        prev.map((r, i) => {
+                                          if (i !== rowIdx) return r;
+                                          const nextTiers = [...r.tiers];
+                                          nextTiers[tierIdx] = { ...tier, score: val };
+                                          return { ...r, tiers: nextTiers };
+                                        })
+                                      );
+                                    }}
+                                    style={{ width: '64px', padding: '0.22rem 0.35rem', border: '1px solid var(--color-border)', fontSize: '0.72rem', fontWeight: 700 }}
+                                  />
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>pts</span>
+                                </div>
+                                <textarea
+                                  rows={3}
+                                  disabled={isLimitReached}
+                                  placeholder={descPlaceholders[tierIdx]}
+                                  value={tier.description}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setRubricCriteria((prev) =>
+                                      prev.map((r, i) => {
+                                        if (i !== rowIdx) return r;
+                                        const nextTiers = [...r.tiers];
+                                        nextTiers[tierIdx] = { ...tier, description: val };
+                                        return { ...r, tiers: nextTiers };
+                                      })
+                                    );
+                                  }}
+                                  style={{ width: '100%', padding: '0.32rem 0.4rem', border: '1px solid var(--color-border)', fontSize: '0.74rem', resize: 'vertical', fontFamily: 'var(--font-sans)' }}
+                                />
+                              </td>
+                            );
+                          })}
+
+                          <td style={{ padding: '0.55rem 0.35rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                            {rubricCriteria.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRubricCriteria((prev) => prev.filter((_, i) => i !== rowIdx))
+                                }
+                                style={{ background: 'transparent', border: 'none', color: 'var(--color-terracotta)', cursor: 'pointer', padding: '2px' }}
+                                title="Remove Criterion Row"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={isLimitReached}
+                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => setRubricCriteria((prev) => [...prev, createDefaultRubricRow()])}
+                  >
+                    <Plus size={12} /> Add Criterion Row
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Costs & Needs from School */}

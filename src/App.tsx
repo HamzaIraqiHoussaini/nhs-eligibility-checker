@@ -118,9 +118,10 @@ function PortalContent() {
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => getTabFromPath(window.location.pathname));
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-  const [activeAcademicYear, setActiveAcademicYear] = useState<string>('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navigateTo = (tab: ActiveTab) => {
+    setIsMobileSidebarOpen(false);
     // If account is administrator, strictly lock down to review only (and legal terms if clicked)
     if (isAdministrator && tab !== 'review' && tab !== 'legal') {
       setActiveTab('review');
@@ -218,11 +219,10 @@ function PortalContent() {
       try {
         const { data } = await supabase
           .from('semesters')
-          .select('name, academic_year, semester_number, is_active')
+          .select('name, semester_number, is_active')
           .eq('is_active', true)
           .maybeSingle();
         if (data) {
-          if (data.academic_year) setActiveAcademicYear(data.academic_year);
           setIsSemester2(data.semester_number === 2 || (data.name && data.name.toLowerCase().includes('semester 2')));
         }
       } catch (err) {
@@ -235,78 +235,52 @@ function PortalContent() {
   // Standalone Public Screener Page (No login required, no dashboard sidebar)
   if (activeTab === 'screener') {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', backgroundColor: 'var(--color-bg-base)' }}>
-        {/* Clean Header */}
-        <header
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 100,
-            backgroundColor: 'rgba(255, 255, 255, 0.96)',
-            backdropFilter: 'blur(10px)',
-            borderBottom: '1px solid #E2E8F0',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: '1280px',
-              margin: '0 auto',
-              padding: '0.85rem 1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '1.5rem',
-            }}
-          >
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer' }}
+      <div className="min-h-screen w-full bg-surface text-on-surface antialiased font-body-md">
+        {/* Stitch Shared Editorial Header */}
+        <header className="bg-surface border-b border-surface-container-highest sticky top-0 z-50">
+          <div className="flex justify-between items-center w-full px-6 md:px-14 py-4 max-w-7xl mx-auto">
+            <button
+              type="button"
               onClick={() => navigateTo('home')}
+              className="flex items-center space-x-3.5 text-left group cursor-pointer"
             >
-              <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
-                <img
-                  src="/cas-logo.png"
-                  alt="Casablanca American School"
-                  style={{ width: '32px', height: '32px', objectFit: 'contain' }}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748B', lineHeight: 1, marginBottom: '3px' }}>
+              <img
+                src="/cas-logo.png"
+                alt="Casablanca American School"
+                className="w-8 h-8 object-contain"
+              />
+              <div className="flex flex-col">
+                <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
                   Casablanca American School
-                </div>
-                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
-                  National Honor Society
-                </div>
+                </span>
+                <span className="font-display text-headline-sm text-primary tracking-tight font-normal">
+                  CAS NHS
+                </span>
               </div>
-            </div>
+            </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="flex items-center space-x-4">
               {user ? (
                 <button
                   type="button"
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  className="bg-primary-container text-on-primary font-label-md text-label-md uppercase tracking-wider px-5 py-2.5 hover:bg-secondary transition-colors duration-150 cursor-pointer"
                   onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
                 >
-                  <LayoutDashboard size={14} />
-                  <span>{(isAdministrator || isSupervisor) ? 'Review Desk' : 'Member Portal'}</span>
+                  {(isAdministrator || isSupervisor) ? 'Review Desk' : 'Member Portal'}
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
+                  className="bg-primary-container text-on-primary font-label-md text-label-md uppercase tracking-wider px-5 py-2.5 hover:bg-secondary transition-colors duration-150 cursor-pointer"
                   onClick={() => setIsAuthModalOpen(true)}
                 >
-                  <LogIn size={14} />
-                  <span>Sign In</span>
+                  Sign In
                 </button>
               )}
 
               <button
                 type="button"
-                className="btn-secondary"
-                style={{ fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
+                className="border border-on-surface text-on-surface font-label-md text-label-md uppercase tracking-wider px-4 py-2.5 hover:bg-surface-container transition-colors duration-150 cursor-pointer"
                 onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'home')}
               >
                 {(isAdministrator || isSupervisor) ? 'Back to Portal' : 'Back to Homepage'}
@@ -316,7 +290,7 @@ function PortalContent() {
         </header>
 
         {/* Screener View */}
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1rem' }}>
+        <main className="max-w-7xl mx-auto px-6 md:px-14 py-10">
           <ScreenerView />
         </main>
 
@@ -407,36 +381,31 @@ function PortalContent() {
 
   return (
     <div className="stitch-layout">
-      
-      {/* Stitch Fixed Left Sidebar */}
-      <aside className="stitch-sidebar">
+      {/* Mobile Sidebar Backdrop */}
+      <div
+        className={`stitch-sidebar-backdrop ${isMobileSidebarOpen ? 'open' : ''}`}
+        onClick={() => setIsMobileSidebarOpen(false)}
+      />
+
+      {/* Stitch Fixed Left Editorial Navigation Rail (256px) */}
+      <aside className={`stitch-sidebar ${isMobileSidebarOpen ? 'open' : ''}`}>
         
-        {/* Brand Header */}
+        {/* Editorial Seal & Mark */}
         <div
-          className="stitch-sidebar-header"
-          style={{ cursor: 'pointer' }}
+          className="stitch-sidebar-header cursor-pointer"
           onClick={() => navigateTo((isAdministrator || isSupervisor) ? 'review' : 'dashboard')}
           title="Return to Portal"
         >
-          <div style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '8px', padding: '2px', flexShrink: 0 }}>
-            <img
-              src="/cas-logo.png"
-              alt="CAS NHS Crest"
-              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
-            />
+          <div className="font-headline-sm text-headline-sm text-primary font-normal leading-tight">
+            Casablanca American School
           </div>
-          <div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-navy)', lineHeight: 1.1 }}>
-              CAS NHS Portal
-            </div>
-            <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-sans)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginTop: '3px' }}>
-              Casablanca American School
-            </div>
-          </div>
+          <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+            National Honor Society
+          </p>
         </div>
 
         {/* Navigation Items */}
-        <nav className="stitch-sidebar-nav">
+        <nav className="stitch-sidebar-nav" aria-label="Portal Sections">
           
           {isAdministrator ? (
             <>
@@ -447,8 +416,10 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
                 onClick={() => navigateTo('review')}
               >
-                <ClipboardCheck size={16} />
-                <span>Final Project Reviews</span>
+                <span className="flex items-center gap-2.5">
+                  <ClipboardCheck size={15} />
+                  <span>Final Project Reviews</span>
+                </span>
               </button>
             </>
           ) : isSupervisor ? (
@@ -460,8 +431,10 @@ function PortalContent() {
                 className="stitch-nav-item"
                 onClick={() => navigateTo('screener')}
               >
-                <CheckCircle2 size={16} />
-                <span>Academic Eligibility</span>
+                <span className="flex items-center gap-2.5">
+                  <CheckCircle2 size={15} />
+                  <span>Academic Eligibility</span>
+                </span>
               </button>
 
               <button
@@ -469,8 +442,10 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
                 onClick={() => navigateTo('review')}
               >
-                <ClipboardCheck size={16} />
-                <span>Project Reviews</span>
+                <span className="flex items-center gap-2.5">
+                  <ClipboardCheck size={15} />
+                  <span>Project Reviews</span>
+                </span>
               </button>
 
               <button
@@ -478,8 +453,10 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
                 onClick={() => navigateTo('roster')}
               >
-                <Users size={16} />
-                <span>Chapter Members</span>
+                <span className="flex items-center gap-2.5">
+                  <Users size={15} />
+                  <span>Chapter Members</span>
+                </span>
               </button>
             </>
           ) : isRestricted ? (
@@ -491,21 +468,25 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
                 onClick={() => navigateTo('dashboard')}
               >
-                <LayoutDashboard size={16} />
-                <span>Dashboard</span>
+                <span className="flex items-center gap-2.5">
+                  <LayoutDashboard size={15} />
+                  <span>Member Dashboard</span>
+                </span>
               </button>
             </>
           ) : (
             <>
-              <div className="stitch-nav-section-label">General Workspace</div>
+              <div className="stitch-nav-section-label">Member Portal</div>
 
               <button
                 type="button"
                 className={`stitch-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
                 onClick={() => navigateTo('dashboard')}
               >
-                <LayoutDashboard size={16} />
-                <span>Dashboard</span>
+                <span className="flex items-center gap-2.5">
+                  <LayoutDashboard size={15} />
+                  <span>Member Dashboard</span>
+                </span>
               </button>
 
               <button
@@ -513,8 +494,10 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'projects' ? 'active' : ''}`}
                 onClick={() => navigateTo('projects')}
               >
-                <FileText size={16} />
-                <span>Project Hub</span>
+                <span className="flex items-center gap-2.5">
+                  <FileText size={15} />
+                  <span>Opportunities &amp; Projects</span>
+                </span>
               </button>
 
               <button
@@ -522,8 +505,10 @@ function PortalContent() {
                 className="stitch-nav-item"
                 onClick={() => navigateTo('screener')}
               >
-                <CheckCircle2 size={16} />
-                <span>{isLeadership ? 'Academic Eligibility' : 'Check My Eligibility'}</span>
+                <span className="flex items-center gap-2.5">
+                  <CheckCircle2 size={15} />
+                  <span>{isLeadership ? 'Academic Eligibility' : 'Eligibility Screener'}</span>
+                </span>
               </button>
 
               <button
@@ -531,22 +516,26 @@ function PortalContent() {
                 className={`stitch-nav-item ${activeTab === 'rules' ? 'active' : ''}`}
                 onClick={() => navigateTo('rules')}
               >
-                <BookOpen size={16} />
-                <span>Rules</span>
+                <span className="flex items-center gap-2.5">
+                  <BookOpen size={15} />
+                  <span>Chapter Rules</span>
+                </span>
               </button>
 
               {/* Governance & Councils (Leadership Only) */}
               {isLeadership && (
                 <>
-                  <div className="stitch-nav-section-label" style={{ marginTop: '0.75rem' }}>Governance Desk</div>
+                  <div className="stitch-nav-section-label" style={{ marginTop: '0.75rem' }}>Council Governance</div>
 
                   <button
                     type="button"
                     className={`stitch-nav-item ${activeTab === 'review' ? 'active' : ''}`}
                     onClick={() => navigateTo('review')}
                   >
-                    <ClipboardCheck size={16} />
-                    <span>Project Reviews</span>
+                    <span className="flex items-center gap-2.5">
+                      <ClipboardCheck size={15} />
+                      <span>Project Reviews</span>
+                    </span>
                   </button>
 
                   {isSemester2 && (
@@ -555,8 +544,10 @@ function PortalContent() {
                       className={`stitch-nav-item ${activeTab === 'annual_projects_desk' ? 'active' : ''}`}
                       onClick={() => navigateTo('annual_projects_desk')}
                     >
-                      <Star size={16} />
-                      <span>Annual Projects Desk</span>
+                      <span className="flex items-center gap-2.5">
+                        <Star size={15} />
+                        <span>Annual Projects Desk</span>
+                      </span>
                     </button>
                   )}
 
@@ -565,8 +556,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
                     onClick={() => navigateTo('attendance')}
                   >
-                    <CalendarCheck size={16} />
-                    <span>Attendance Calendar</span>
+                    <span className="flex items-center gap-2.5">
+                      <CalendarCheck size={15} />
+                      <span>Attendance Calendar</span>
+                    </span>
                   </button>
 
                   <button
@@ -574,8 +567,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'treasury' ? 'active' : ''}`}
                     onClick={() => navigateTo('treasury')}
                   >
-                    <Coins size={16} />
-                    <span>Chapter Treasury</span>
+                    <span className="flex items-center gap-2.5">
+                      <Coins size={15} />
+                      <span>Chapter Treasury</span>
+                    </span>
                   </button>
 
                   <button
@@ -583,8 +578,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'semesters' ? 'active' : ''}`}
                     onClick={() => navigateTo('semesters')}
                   >
-                    <Calendar size={16} />
-                    <span>Semester Manager</span>
+                    <span className="flex items-center gap-2.5">
+                      <Calendar size={15} />
+                      <span>Semester Manager</span>
+                    </span>
                   </button>
 
                   <button
@@ -592,8 +589,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'rules_management' ? 'active' : ''}`}
                     onClick={() => navigateTo('rules_management')}
                   >
-                    <Scale size={16} />
-                    <span>Rules & Policies</span>
+                    <span className="flex items-center gap-2.5">
+                      <Scale size={15} />
+                      <span>Rules &amp; Policies</span>
+                    </span>
                   </button>
 
                   <button
@@ -601,8 +600,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'roster' ? 'active' : ''}`}
                     onClick={() => navigateTo('roster')}
                   >
-                    <Users size={16} />
-                    <span>Chapter Members</span>
+                    <span className="flex items-center gap-2.5">
+                      <Users size={15} />
+                      <span>Chapter Members</span>
+                    </span>
                   </button>
 
                   <button
@@ -610,8 +611,10 @@ function PortalContent() {
                     className={`stitch-nav-item ${activeTab === 'allowlist' ? 'active' : ''}`}
                     onClick={() => navigateTo('allowlist')}
                   >
-                    <ShieldCheck size={16} />
-                    <span>Access Control</span>
+                    <span className="flex items-center gap-2.5">
+                      <ShieldCheck size={15} />
+                      <span>Access Control</span>
+                    </span>
                   </button>
                 </>
               )}
@@ -619,34 +622,47 @@ function PortalContent() {
           )}
         </nav>
 
-        {/* Sidebar Footer User Info */}
-        <div style={{ borderTop: '1px solid var(--color-border)', padding: '1rem 1.25rem', backgroundColor: '#F8FAFC' }}>
+        {/* Member Profile Lockup (Bottom Anchor matching Stitch HTML) */}
+        <div className="p-5 border-t border-surface-container-highest bg-surface">
           {user ? (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)' }}>
-                  {profile?.full_name || (user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'Hamza Iraqi Houssaini' : user?.email?.split('@')[0] || 'Member')}
-                </span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', color: isAdministrator ? '#4338CA' : isLeadership ? 'var(--color-gold-text)' : isSupervisor ? 'var(--color-oxford)' : 'var(--color-text-muted)' }}>
-                  {role || (user?.user_metadata?.role as string) || 'Member'}
-                </span>
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 bg-primary-container text-white flex items-center justify-center font-label-md text-label-md font-semibold tracking-wider flex-shrink-0">
+                  {(profile?.full_name || user.email || 'M')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-label-md text-label-md font-semibold text-primary truncate">
+                    {profile?.full_name || (user?.email?.toLowerCase() === 'hiraqihoussaini@cas.ac.ma' ? 'Hamza Iraqi Houssaini' : user?.email?.split('@')[0] || 'Member')}
+                  </div>
+                  <div className="font-body-sm text-[12px] text-on-surface-variant truncate">
+                    {role || (user?.user_metadata?.role as string) || 'Member'}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.email}
-              </div>
-              <div style={{ marginTop: '0.65rem', borderTop: '1px dashed var(--color-border)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+              <div className="mt-3 flex items-center justify-between text-xs font-label-sm uppercase tracking-wider pt-2.5 border-t border-surface-container-highest">
                 <button
                   type="button"
                   onClick={() => navigateTo('legal')}
-                  style={{ background: 'transparent', border: 'none', padding: 0, color: 'var(--color-oxford)', cursor: 'pointer', textDecoration: 'underline', fontSize: 'inherit' }}
+                  className="text-on-surface-variant hover:text-primary transition-colors underline underline-offset-2 cursor-pointer"
                 >
-                  Terms & Privacy
+                  Terms &amp; Privacy
                 </button>
-                <span style={{ color: '#94A3B8' }}>Account Holder Liable</span>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="text-secondary hover:text-primary transition-colors underline underline-offset-2 cursor-pointer"
+                >
+                  Sign Out
+                </button>
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+            <div className="font-label-sm text-label-sm uppercase text-on-surface-variant">
               Guest Session
             </div>
           )}
@@ -654,21 +670,27 @@ function PortalContent() {
 
       </aside>
 
-      {/* Stitch Fixed Top Header */}
+      {/* Stitch Fixed Top Utility Header */}
       <header className="stitch-top-header">
         
-        {/* Left: Academic Year Indicator with Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--color-border)' }} />
-          <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-            Academic Year {activeAcademicYear ? activeAcademicYear.replace('-', ' — ') : '2026 — 2027'}
-          </span>
+        {/* Left: Mobile Drawer Toggle & Academic Session Indicator */}
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+            className="stitch-mobile-toggle"
+            aria-label="Toggle portal navigation"
+          >
+            <span className="material-symbols-outlined text-lg">
+              {isMobileSidebarOpen ? 'close' : 'menu'}
+            </span>
+          </button>
         </div>
 
         {/* Right: Actions & Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="flex items-center space-x-4">
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="flex items-center space-x-3">
               
               {/* Standing Badge - only show when on probation, restricted, or graduated */}
               {isGraduated ? (
@@ -691,7 +713,7 @@ function PortalContent() {
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                style={{ fontSize: '11px', padding: '0.4rem 0.75rem' }}
                 onClick={() => setIsChangePasswordOpen(true)}
                 title="Change your personal passcode"
               >
@@ -701,7 +723,7 @@ function PortalContent() {
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                style={{ fontSize: '11px', padding: '0.4rem 0.75rem' }}
                 onClick={signOut}
               >
                 <LogOut size={13} /> Sign Out
@@ -711,7 +733,6 @@ function PortalContent() {
             <button
               type="button"
               className="btn-primary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 1rem' }}
               onClick={() => setIsAuthModalOpen(true)}
             >
               <LogIn size={14} /> Sign In

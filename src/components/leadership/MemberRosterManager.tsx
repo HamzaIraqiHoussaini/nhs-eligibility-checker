@@ -518,108 +518,85 @@ export const MemberRosterManager: React.FC = () => {
         </p>
       </div>
 
-      {/* Chapter Telemetry Snapshot Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', marginBottom: '1.75rem' }}>
+      {/* Chapter Telemetry Snapshot Strip (Stitch Editorial Hairline Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border border-surface-container-highest divide-y sm:divide-y-0 sm:divide-x divide-surface-container-highest bg-surface-container-lowest mb-7">
         <div
           onClick={() => setStatusFilter('all')}
-          style={{
-            padding: '1rem 1.15rem',
-            backgroundColor: statusFilter === 'all' ? '#EFF6FF' : '#FFFFFF',
-            border: `1px solid ${statusFilter === 'all' ? '#BFDBFE' : 'var(--color-border)'}`,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`p-5 cursor-pointer transition-colors ${
+            statusFilter === 'all' ? 'bg-surface' : 'hover:bg-surface/60'
+          }`}
           title="Filter all active inducted members"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)' }}>
+          <div className="flex justify-between items-center mb-1">
+            <span className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold">
               Active Roster
             </span>
-            <Users size={16} color="var(--color-oxford)" />
+            <Users size={15} className="text-primary" />
           </div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-navy)', marginTop: '0.25rem' }}>
+          <div className="font-display text-3xl text-primary font-normal">
             {activeMembersCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+          <div className="text-xs text-on-surface-variant mt-1">
             Inducted chapter members
           </div>
         </div>
 
         <div
           onClick={() => setStatusFilter('active_week')}
-          style={{
-            padding: '1rem 1.15rem',
-            backgroundColor: statusFilter === 'active_week' ? '#ECFDF5' : '#FFFFFF',
-            border: `1px solid ${statusFilter === 'active_week' ? '#A7F3D0' : 'var(--color-border)'}`,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`p-5 cursor-pointer transition-colors ${
+            statusFilter === 'active_week' ? 'bg-surface' : 'hover:bg-surface/60'
+          }`}
           title="Filter members who signed in over the past 7 days"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#065F46' }}>
+          <div className="mb-1">
+            <span className="font-label-sm text-[11px] uppercase tracking-wider text-[#1E5631] font-semibold">
               Active This Week
             </span>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
           </div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#065F46', marginTop: '0.25rem' }}>
+          <div className="font-display text-3xl text-[#1E5631] font-normal">
             {activeWeekCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#047857', marginTop: '0.15rem' }}>
+          <div className="text-xs text-on-surface-variant mt-1">
             Logged in &le; 7 days ago
           </div>
         </div>
 
         <div
           onClick={() => setStatusFilter('inactive_telemetry')}
-          style={{
-            padding: '1rem 1.15rem',
-            backgroundColor: statusFilter === 'inactive_telemetry' ? '#FFFBEB' : '#FFFFFF',
-            border: `1px solid ${statusFilter === 'inactive_telemetry' ? '#FDE68A' : 'var(--color-border)'}`,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`p-5 cursor-pointer transition-colors ${
+            statusFilter === 'inactive_telemetry' ? 'bg-surface' : 'hover:bg-surface/60'
+          }`}
           title="Filter members with no logins in the past 14 days"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#92400E' }}>
+          <div className="mb-1">
+            <span className="font-label-sm text-[11px] uppercase tracking-wider text-secondary font-semibold">
               Dormant / Inactive
             </span>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
           </div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#92400E', marginTop: '0.25rem' }}>
+          <div className="font-display text-3xl text-secondary font-normal">
             {inactiveTelemetryCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#B45309', marginTop: '0.15rem' }}>
+          <div className="text-xs text-on-surface-variant mt-1">
             No login &gt; 14 days
           </div>
         </div>
 
         <div
           onClick={() => setStatusFilter('never_logged_in')}
-          style={{
-            padding: '1rem 1.15rem',
-            backgroundColor: statusFilter === 'never_logged_in' ? '#FEF2F2' : '#FFFFFF',
-            border: `1px solid ${statusFilter === 'never_logged_in' ? '#FECACA' : 'var(--color-border)'}`,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
+          className={`p-5 cursor-pointer transition-colors ${
+            statusFilter === 'never_logged_in' ? 'bg-surface' : 'hover:bg-surface/60'
+          }`}
           title="Filter members who have never signed in"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#991B1B' }}>
+          <div className="mb-1">
+            <span className="font-label-sm text-[11px] uppercase tracking-wider text-error font-semibold">
               Never Logged In
             </span>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#EF4444' }} />
           </div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', fontWeight: 700, color: '#991B1B', marginTop: '0.25rem' }}>
+          <div className="font-display text-3xl text-error font-normal">
             {neverLoggedInCount}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#B91C1C', marginTop: '0.15rem' }}>
+          <div className="text-xs text-on-surface-variant mt-1">
             Awaiting portal onboarding
           </div>
         </div>

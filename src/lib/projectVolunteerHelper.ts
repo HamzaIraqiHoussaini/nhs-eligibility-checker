@@ -113,7 +113,7 @@ export function createCommentsWithVolunteeringUpdate(
 }
 
 /**
- * Filters out internal system comments (like __volunteering_config__) for display in comment feeds
+ * Filters out internal system comments (like __volunteering_config__ and __proposal_rubric__) for display in comment feeds
  */
 export function getDisplayComments(comments?: ProjectComment[] | string | null): ProjectComment[] {
   if (!comments) return [];
@@ -128,7 +128,7 @@ export function getDisplayComments(comments?: ProjectComment[] | string | null):
       return [];
     }
   }
-  return list.filter((c) => c && c.id !== '__volunteering_config__');
+  return list.filter((c) => c && c.id !== '__volunteering_config__' && c.id !== '__proposal_rubric__');
 }
 
 /**

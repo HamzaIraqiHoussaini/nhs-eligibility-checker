@@ -14,6 +14,7 @@ import {
 import { ProjectProposalForm } from './ProjectProposalForm';
 import { ProjectDetailsDrawer } from './ProjectDetailsDrawer';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { formatProposalContent } from '../../utils/proposalFormatter';
 import {
   Plus,
   CheckCircle2,
@@ -1125,6 +1126,7 @@ export const MyProjectsView: React.FC = () => {
               const canModify = project.status !== 'approved' && project.status !== 'completed' && isProjectLeader;
               const canDelete = project.status !== 'approved' && project.status !== 'completed' && isCreator && !project.is_yearly;
               const commentCount = project.comments?.length || 0;
+              const formatted = formatProposalContent(project);
 
               return (
                 <div
@@ -1214,6 +1216,11 @@ export const MyProjectsView: React.FC = () => {
                             </button>
                           )}
                         </div>
+                        {formatted.overview && (
+                          <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', margin: '0.4rem 0 0.65rem', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {formatted.overview}
+                          </p>
+                        )}
                         <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
                           <span><strong>Leaders:</strong> {project.leaders}</span>
                           <span><strong>Advisor:</strong> {project.advisor_name}</span>
@@ -1440,6 +1447,7 @@ export const MyProjectsView: React.FC = () => {
               const fillPct = targetNeeded > 0 ? Math.min(100, Math.round((acceptedCount / targetNeeded) * 100)) : 0;
               const isFull = targetNeeded > 0 && acceptedCount >= targetNeeded;
               const spotsRemaining = Math.max(0, targetNeeded - acceptedCount);
+              const formatted = formatProposalContent(project);
 
               return (
                 <div
@@ -1500,8 +1508,8 @@ export const MyProjectsView: React.FC = () => {
                         )}
                       </div>
 
-                      <div style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem', lineHeight: '1.5' }}>
-                        {project.background}
+                      <div style={{ fontSize: '0.86rem', color: 'var(--color-text-secondary)', marginBottom: '0.65rem', lineHeight: '1.55', whiteSpace: 'pre-wrap' }}>
+                        {formatted.overview}
                       </div>
 
                       {/* Visual Volunteer Capacity Bar */}
@@ -1561,35 +1569,18 @@ export const MyProjectsView: React.FC = () => {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {!isLeading && !myVolRecord && (
-                        isRecruiting ? (
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedProject(project);
-                            }}
-                          >
-                            <UserPlus size={13} /> Request to Volunteer
-                          </button>
-                        ) : (
-                          <span
-                            style={{
-                              fontSize: '0.74rem',
-                              color: '#64748B',
-                              backgroundColor: '#F1F5F9',
-                              padding: '0.35rem 0.65rem',
-                              borderRadius: '2px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <Lock size={12} /> Requests Closed
-                          </span>
-                        )
+                      {!isLeading && !myVolRecord && isRecruiting && (
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProject(project);
+                          }}
+                        >
+                          <UserPlus size={13} /> Request to Volunteer
+                        </button>
                       )}
 
                       <button
@@ -1601,7 +1592,7 @@ export const MyProjectsView: React.FC = () => {
                           setSelectedProject(project);
                         }}
                       >
-                        <Eye size={13} /> View Details & Roster
+                        <Eye size={13} /> View Details
                       </button>
                     </div>
                   </div>
@@ -1650,6 +1641,7 @@ export const MyProjectsView: React.FC = () => {
               const proposalDate = project.created_at ? new Date(project.created_at).toLocaleDateString() : '—';
               const eventDate = project.event_date || '—';
               const concludedDate = project.completed_at ? new Date(project.completed_at).toLocaleDateString() : '—';
+              const formatted = formatProposalContent(project);
 
               return (
                 <div
@@ -1696,8 +1688,8 @@ export const MyProjectsView: React.FC = () => {
                         )}
                       </div>
 
-                      <div style={{ fontSize: '0.84rem', color: '#475569', marginBottom: '0.5rem', lineHeight: '1.5' }}>
-                        {project.background}
+                      <div style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '0.65rem', lineHeight: '1.55', whiteSpace: 'pre-wrap' }}>
+                        {formatted.overview}
                       </div>
 
                       {project.completed_notes && (
@@ -1743,7 +1735,7 @@ export const MyProjectsView: React.FC = () => {
                           setSelectedProject(project);
                         }}
                       >
-                        <Eye size={13} /> View Historical Record & Roster
+                        <Eye size={13} /> View Details
                       </button>
                     </div>
                   </div>

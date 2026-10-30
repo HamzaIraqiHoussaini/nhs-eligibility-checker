@@ -102,10 +102,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         className="sharp-card"
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '450px',
           margin: 'auto',
           backgroundColor: 'var(--color-surface)',
-          padding: '2rem',
+          borderTop: '3px solid var(--color-gold)',
+          padding: '2.25rem 2rem',
           position: 'relative',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -117,17 +118,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           <X size={20} />
         </button>
 
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <img
-            src="/nhs-logo.png"
-            alt="NHS Crest"
-            style={{ height: '48px', width: 'auto', margin: '0 auto 0.75rem', display: 'block' }}
-          />
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--color-navy)', margin: '0 0 0.25rem' }}>
-            Sign In to Chapter Portal
+        <div style={{ textAlign: 'left', marginBottom: '1.75rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '1.25rem' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-secondary)', marginBottom: '0.35rem' }}>
+            Casablanca American School · CAS NHS
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.85rem', fontWeight: 400, color: 'var(--color-navy)', margin: '0 0 0.25rem', letterSpacing: '-0.01em' }}>
+            Sign In to Member Portal
           </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-            Casablanca American School • National Honor Society
+          <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', margin: 0 }}>
+            Enter your CAS email and chapter access code to continue.
           </p>
         </div>
 

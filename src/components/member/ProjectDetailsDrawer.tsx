@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment, ProjectVolunteer, VolunteerApplicationStatus } from '../../types/nhs';
 import { notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
+import { FormattedProposalSections } from '../common/FormattedProposalSections';
 import {
   X,
   Calendar,
@@ -957,10 +958,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
               {getStatusBadge()}
-              <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                ID: {project.id ? String(project.id).slice(0, 8) : ''}
-              </span>
-              {displayComments.length > 0 && (
+              {isLeadership && (
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                  ID: {project.id ? String(project.id).slice(0, 8) : ''}
+                </span>
+              )}
+              {(isLeadership || ((isOwner || isCoLeader) && !isApprovedOrCompleted)) && displayComments.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1010,8 +1013,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
         {/* Scrollable Content Body */}
         <div style={{ padding: '2rem', overflowY: 'auto', flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
           
-          {/* Official Three-Tier Chapter Governance Stepper */}
-          {(() => {
+          {/* Proposal Approval Status (Leadership Only) */}
+          {isLeadership && (() => {
             const s1 = resolveStageReviewer(1, project, profilesMap);
             const s1Approved = s1.decision === 'approved' || project.status === 'pending_supervisor' || project.status === 'pending_administrator' || project.status === 'approved' || project.status === 'completed';
             const s1Rejected = s1.decision === 'rejected' || project.status === 'rejected_leadership';
@@ -1035,26 +1038,25 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                     <ShieldCheck size={18} color="var(--color-oxford)" />
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        Three-Tier Chapter Governance Stepper
+                        Proposal Approval Status
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--color-text-secondary)', marginTop: '0.1rem' }}>
-                        Sequential Sign-Off: Student Leadership &rarr; Faculty Supervisor &rarr; NHS Chapter Administrator
+                        Student Leadership &rarr; Faculty Supervisor &rarr; NHS Administration
                       </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: '12px', backgroundColor: s3Approved ? '#DCFCE7' : '#FEF3C7', color: s3Approved ? '#15803D' : '#92400E', border: '1px solid', borderColor: s3Approved ? '#86EFAC' : '#FDE68A' }}>
-                    {s3Approved ? 'Fully Ratified Protocol' : s1Rejected || s2Rejected || s3Rejected ? 'Revision / Action Required' : 'Governance In Progress'}
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.6rem', backgroundColor: s3Approved ? '#DCFCE7' : '#FEF3C7', color: s3Approved ? '#15803D' : '#92400E', border: '1px solid', borderColor: s3Approved ? '#86EFAC' : '#FDE68A' }}>
+                    {s3Approved ? 'Approved' : s1Rejected || s2Rejected || s3Rejected ? 'Revision Needed' : 'Under Review'}
                   </span>
                 </div>
 
                 {/* Visual Step Progress Tracker */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', padding: '0.75rem 1rem', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '4px', gap: '0.5rem', overflowX: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', padding: '0.75rem 1rem', backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', gap: '0.5rem', overflowX: 'auto' }}>
                   {/* Step 1 Node */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
                     <div style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1066,9 +1068,9 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       {s1Approved ? <Check size={14} /> : s1Rejected ? <X size={14} /> : '1'}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 1: Leadership</div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Stage 1: Leadership</div>
                       <div style={{ fontSize: '0.68rem', color: s1Approved ? '#16A34A' : s1Rejected ? '#DC2626' : '#B45309', fontWeight: 600 }}>
-                        {s1Approved ? 'Screened & Approved' : s1Rejected ? 'Declined' : 'In Screening'}
+                        {s1Approved ? 'Approved' : s1Rejected ? 'Declined' : 'In Review'}
                       </div>
                     </div>
                   </div>
@@ -1078,9 +1080,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   {/* Step 2 Node */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
                     <div style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1092,9 +1093,9 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       {s2Approved ? <Check size={14} /> : s2Rejected ? <X size={14} /> : '2'}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 2: Faculty Supervisor</div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Stage 2: Faculty Advisor</div>
                       <div style={{ fontSize: '0.68rem', color: s2Approved ? '#16A34A' : s2Rejected ? '#DC2626' : s2Pending ? '#1D4ED8' : '#64748B', fontWeight: 600 }}>
-                        {s2Approved ? 'Sponsorship Confirmed' : s2Rejected ? 'Declined' : s2Pending ? 'Awaiting Signature' : 'Awaiting Tier 1'}
+                        {s2Approved ? 'Approved' : s2Rejected ? 'Declined' : s2Pending ? 'In Review' : 'Awaiting Stage 1'}
                       </div>
                     </div>
                   </div>
@@ -1104,9 +1105,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   {/* Step 3 Node */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
                     <div style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '50%',
+                      width: '24px',
+                      height: '24px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1118,9 +1118,9 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       {s3Approved ? <Check size={14} /> : s3Rejected ? <X size={14} /> : '3'}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Tier 3: NHS Administrator</div>
+                      <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>Stage 3: Administration</div>
                       <div style={{ fontSize: '0.68rem', color: s3Approved ? '#16A34A' : s3Rejected ? '#DC2626' : s3Pending ? '#4338CA' : '#64748B', fontWeight: 600 }}>
-                        {s3Approved ? 'Ratified & Active' : s3Rejected ? 'Declined' : s3Pending ? 'Final Review' : 'Awaiting Tier 2'}
+                        {s3Approved ? 'Approved & Active' : s3Rejected ? 'Declined' : s3Pending ? 'Final Review' : 'Awaiting Stage 2'}
                       </div>
                     </div>
                   </div>
@@ -1302,8 +1302,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             );
           })()}
 
-          {/* Active vs Concluded / Archived Banner & Schedule Modification */}
-          {(project.status === 'approved' || project.status === 'completed') && (
+          {/* Active vs Concluded / Archived Banner & Schedule Modification (Leadership Only) */}
+          {isLeadership && (project.status === 'approved' || project.status === 'completed') && (
             <div style={{
               backgroundColor: project.status === 'completed' || project.is_completed ? '#F5F3FF' : '#F0FDF4',
               border: '1px solid',
@@ -1573,97 +1573,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             )}
           </div>
 
-          {/* Background */}
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
-              Background & Need
-            </span>
-            <p style={{ margin: '0', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
-              {project.background || 'No background description provided.'}
-            </p>
-          </div>
+          {/* Structured Proposal Sections (Overview, Objectives, Event Details, Roles, Rubric, Costs, Needs, Awards) */}
+          <FormattedProposalSections project={project} showInternalLogistics={Boolean(isLeadership)} />
 
-          {/* Objectives */}
-          {Array.isArray(project.objectives) && project.objectives.length > 0 && (
-            <div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
-                Measurable Objectives
-              </span>
-              <ul style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
-                {project.objectives.map((obj, i) => (
-                  <li key={i}>{typeof obj === 'string' ? obj : String(obj)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Event Details */}
-          {Array.isArray(project.event_details) && project.event_details.length > 0 && (
-            <div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
-                Execution Plan & Activities
-              </span>
-              <ol style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--color-text-primary)' }}>
-                {project.event_details.map((det, i) => (
-                  <li key={i}>{typeof det === 'string' ? det : String(det)}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* Financials / Budget */}
-          <div>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
-              Financial Breakdown & Anticipated Costs
-            </span>
-            <div style={{ backgroundColor: 'var(--color-canvas)', border: '1px solid var(--color-border)', padding: '0.85rem 1.15rem' }}>
-              {Array.isArray(project.costs) && project.costs.length > 0 ? (
-                <ul style={{ margin: '0', paddingLeft: '1.15rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                  {project.costs.map((c, i) => {
-                    const cStr = typeof c === 'string' ? c : String(c);
-                    return (
-                      <li key={i} style={{ fontFamily: /\d+/.test(cStr) ? 'monospace' : 'inherit' }}>
-                        {cStr}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                  No monetary costs expected.
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Institutional Needs */}
-          {Array.isArray(project.needs_from_school) && project.needs_from_school.length > 0 && (
-            <div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>
-                School Facilities & Support Needed
-              </span>
-              <ul style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-                {project.needs_from_school.map((need, i) => (
-                  <li key={i}>{typeof need === 'string' ? need : String(need)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Awards */}
-          {project.awards && (
-            <div>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.35rem' }}>
-                <Award size={13} /> Recognition & Awards Plan
-              </span>
-              <div style={{ fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
-                {project.awards}
-              </div>
-            </div>
-          )}
-
-          {/* Proof of Purchase (Receipt) Details if uploaded */}
-          {project.receipt_url && (
+          {/* Proof of Purchase (Receipt) Details if uploaded (Leadership Only) */}
+          {isLeadership && project.receipt_url && (
             <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', padding: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -2343,6 +2257,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           )}
 
           {/* Reviewer Comments & Revision Feedback Thread */}
+          {(isLeadership || ((isOwner || isCoLeader) && !isApprovedOrCompleted)) && (
           <div ref={commentsRef} id="comments-section" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
               <MessageSquare size={16} color="var(--color-oxford)" />
@@ -2472,6 +2387,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               </div>
             </form>
           </div>
+          )}
 
         </div>
 
@@ -2489,12 +2405,12 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
           }}
         >
           <div>
-            {isApprovedOrCompleted && (
+            {isLeadership && isApprovedOrCompleted && (
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
                 Approved by Administrator: Proposal is finalized and locked.
               </span>
             )}
-            {!isApprovedOrCompleted && (
+            {isLeadership && !isApprovedOrCompleted && (
               <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                 Modifiable until approved by chapter administrator.
               </span>

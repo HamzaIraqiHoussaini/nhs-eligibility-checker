@@ -616,38 +616,46 @@ export const AllowlistManager: React.FC = () => {
         </div>
       )}
 
-      {/* Stitch System Status Metric Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
-          <div className="kpi-label">Active Inducted Members</div>
-          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-navy)' }}>
+      {/* Stitch System Status Metric Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border border-surface-container-highest divide-y sm:divide-y-0 sm:divide-x divide-surface-container-highest bg-surface-container-lowest mb-8">
+        <div className="p-5">
+          <div className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-1">
+            Active Inducted Members
+          </div>
+          <div className="font-display text-3xl text-primary font-normal">
             {activeEntries.filter((e) => e.role === 'member').length}
           </div>
-          <div className="kpi-subtext">Good chapter standing</div>
+          <div className="text-xs text-on-surface-variant mt-1">Good chapter standing</div>
         </div>
 
-        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
-          <div className="kpi-label">Leadership Core</div>
-          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-oxford)' }}>
+        <div className="p-5">
+          <div className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-1">
+            Leadership Core
+          </div>
+          <div className="font-display text-3xl text-primary font-normal">
             {activeEntries.filter((e) => e.role === 'leadership').length}
           </div>
-          <div className="kpi-subtext">Active leadership</div>
+          <div className="text-xs text-on-surface-variant mt-1">Active executive council</div>
         </div>
 
-        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
-          <div className="kpi-label">Faculty & Administrators</div>
-          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-gold-text)' }}>
+        <div className="p-5">
+          <div className="font-label-sm text-[11px] uppercase tracking-wider text-secondary font-semibold mb-1">
+            Faculty &amp; Administrators
+          </div>
+          <div className="font-display text-3xl text-secondary font-normal">
             {activeEntries.filter((e) => e.role === 'supervisor' || e.role === 'administrator').length}
           </div>
-          <div className="kpi-subtext">Advisors & Executive reviewers</div>
+          <div className="text-xs text-on-surface-variant mt-1">Advisors &amp; Executive reviewers</div>
         </div>
 
-        <div className="kpi-card" style={{ padding: '1rem 1.25rem' }}>
-          <div className="kpi-label">Archived Accounts</div>
-          <div className="kpi-value" style={{ fontSize: '1.8rem', color: 'var(--color-text-muted)' }}>
+        <div className="p-5">
+          <div className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-1">
+            Archived Accounts
+          </div>
+          <div className="font-display text-3xl text-on-surface-variant font-normal">
             {archivedEntries.length}
           </div>
-          <div className="kpi-subtext">Alumni, past leaders & exits</div>
+          <div className="text-xs text-on-surface-variant mt-1">Alumni, past leaders &amp; exits</div>
         </div>
       </div>
 

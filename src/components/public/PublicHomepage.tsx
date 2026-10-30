@@ -1,16 +1,4 @@
-import React, { useState } from 'react';
-import {
-  ArrowRight,
-  CheckCircle2,
-  Compass,
-  Shield,
-  Users,
-  GraduationCap,
-  ChevronRight,
-  LogIn,
-  LayoutDashboard,
-  Lock,
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { TermsAndPrivacyModal } from '../legal/TermsAndPrivacyModal';
 import { useChapterRules } from '../../hooks/useChapterRules';
 
@@ -24,452 +12,583 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
   const { rules } = useChapterRules();
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('about');
+
+  useEffect(() => {
+    const sectionIds = ['about', 'pillars', 'requirements', 'rules'];
+    const handleScroll = () => {
+      const scrollPos = window.scrollY + 180;
+      for (let i = sectionIds.length - 1; i >= 0; i--) {
+        const el = document.getElementById(sectionIds[i]);
+        if (el && el.offsetTop <= scrollPos) {
+          setActiveSection(sectionIds[i]);
+          break;
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const scrollToSection = (id: string) => {
+    setMobileMenuOpen(false);
+    setActiveSection(id);
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleAction = (tab: string) => {
+  const handlePortalAction = () => {
+    setMobileMenuOpen(false);
     if (user) {
-      onNavigate(tab);
-    } else {
-      if (onOpenAuth) onOpenAuth();
+      onNavigate('dashboard');
+    } else if (onOpenAuth) {
+      onOpenAuth();
     }
   };
 
+  const chapterRulesList = [
+    {
+      num: '01',
+      title: 'Academic Standing',
+      description:
+        rules.academic_rules_summary ||
+        'Maintain at least a 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Level courses), with no course grade of 3 or lower and no AE or BE marks.',
+    },
+    {
+      num: '02',
+      title: 'Project Leadership',
+      description:
+        rules.participation_rules_summary ||
+        (rules.no_projects_led_required
+          ? 'Project leadership requirements are waived for the current semester.'
+          : `Lead at least ${rules.required_projects_led} approved project${
+              rules.required_projects_led === 1 ? '' : 's'
+            } per semester, with a maximum cap of ${rules.max_projects_per_semester} projects per semester.`),
+    },
+    {
+      num: '03',
+      title: 'Volunteering',
+      description: rules.no_volunteering_required
+        ? 'Peer volunteering requirements are waived for the current semester.'
+        : `Volunteer in at least ${rules.required_volunteering} other members' project${
+            rules.required_volunteering === 1 ? '' : 's'
+          } each semester.`,
+    },
+    {
+      num: '04',
+      title: 'Meeting Attendance',
+      description: `Attend all general chapter meetings. Accumulating ${
+        rules.absences_for_probation || 2
+      } unexcused absences (${
+        rules.tardies_per_absence || 3
+      } tardies = 1 absence) in a semester results in chapter probation.`,
+    },
+    {
+      num: '05',
+      title: 'Probation Policy',
+      description:
+        rules.probation_rules_summary ||
+        'Failing to meet academic, project, or attendance requirements results in probation for one semester.',
+    },
+    {
+      num: '06',
+      title: 'Dismissal Policy',
+      description:
+        rules.dismissal_rules_summary ||
+        'Receiving a second probation or violating the CAS Academic Honesty Policy results in dismissal from the chapter after Faculty Council review.',
+    },
+    {
+      num: '07',
+      title: 'Senior Graduation',
+      description:
+        'Grade 12 members who meet chapter requirements through their Semester 1 report card audit graduate in good standing with NHS honors.',
+    },
+    ...(rules.custom_sections || []).map((sec, idx) => ({
+      num: String(idx + 8).padStart(2, '0'),
+      title: sec.title,
+      description: sec.content,
+    })),
+  ];
+
   return (
-    <div className="min-h-screen bg-[#fbfbfa] text-[#0a1e3f] font-sans selection:bg-[#c59b27]/20 selection:text-[#0a1e3f]">
-      
-      {/* Fixed Public Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_rgba(10,30,63,0.03)] transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-3 flex items-center justify-between gap-4">
-          
-          {/* Logo & Brand */}
-          <div
-            className="flex items-center gap-3.5 cursor-pointer group"
+    <div className="bg-surface text-on-surface antialiased font-body-md selection:bg-primary-container selection:text-surface min-h-screen">
+      {/* =========================================================================
+          1. Header / Navigation Bar
+         ========================================================================= */}
+      <header className="bg-surface/95 backdrop-blur-xs border-b border-surface-container-highest sticky top-0 z-50">
+        <div className="flex justify-between items-center w-full px-6 md:px-14 py-4 max-w-7xl mx-auto">
+          {/* Brand Logo & School Title */}
+          <button
+            type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center gap-3.5 text-left group cursor-pointer"
           >
-            <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center p-1 rounded-lg border border-slate-200 bg-white shadow-2xs group-hover:border-[#c59b27] transition-colors">
+            <div className="w-10 h-10 border border-surface-container-highest bg-surface-container-lowest flex items-center justify-center p-1.5 flex-shrink-0">
               <img
                 src="/cas-logo.png"
                 alt="Casablanca American School"
-                className="w-7 h-7 object-contain"
-                style={{ width: '28px', height: '28px' }}
+                className="w-full h-full object-contain"
               />
             </div>
-            <div>
-              <div className="text-[11px] font-sans font-semibold uppercase tracking-[0.08em] text-slate-500 leading-tight mb-0.5">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant">
                 Casablanca American School
-              </div>
-              <div className="font-serif text-lg sm:text-xl font-bold text-[#0a1e3f] tracking-tight leading-tight group-hover:text-[#16325c] transition-colors">
+              </span>
+              <span className="font-display text-xl sm:text-[22px] text-primary tracking-tight font-normal leading-tight">
                 National Honor Society
-              </div>
+              </span>
             </div>
-          </div>
+          </button>
 
-          {/* Center Navigation */}
-          <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-slate-600">
-            <button
-              onClick={() => scrollToSection('about')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
-            >
-              About
-            </button>
-            <button
-              onClick={() => scrollToSection('pillars')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
-            >
-              The 4 Pillars
-            </button>
-            <button
-              onClick={() => scrollToSection('requirements')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
-            >
-              Academic Requirements
-            </button>
-            <button
-              onClick={() => scrollToSection('rules')}
-              className="hover:text-[#0a1e3f] transition-colors cursor-pointer py-1"
-            >
-              Rules
-            </button>
+          {/* Center Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-8">
+            {[
+              { id: 'about', label: 'About' },
+              { id: 'pillars', label: 'The Four Pillars' },
+              { id: 'requirements', label: 'Academic Requirements' },
+              { id: 'rules', label: 'Rules' },
+            ].map((item) => {
+              const isActive = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => scrollToSection(item.id)}
+                  className={`font-label-md text-xs uppercase tracking-wider pb-1 border-b-2 transition-colors duration-150 cursor-pointer ${
+                    isActive
+                      ? 'border-secondary text-primary font-semibold'
+                      : 'border-transparent text-on-surface-variant hover:text-primary'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
               onClick={() => onNavigate('screener')}
+              className="hidden sm:inline-flex items-center px-4 py-2.5 border border-primary text-primary hover:bg-surface-container-high transition-colors duration-150 font-label-md text-xs uppercase tracking-wider cursor-pointer"
             >
-              <CheckCircle2 size={14} className="text-[#c59b27]" />
-              <span className="hidden sm:inline">Check Academic Eligibility</span>
-              <span className="sm:hidden">Eligibility</span>
+              Check Eligibility
             </button>
-
-            {user ? (
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
-                onClick={() => onNavigate('dashboard')}
-              >
-                <LayoutDashboard size={14} />
-                <span>Member Portal</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="inline-flex items-center justify-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-2xs hover:shadow-sm transition-all cursor-pointer whitespace-nowrap"
-                onClick={onOpenAuth}
-              >
-                <LogIn size={14} />
-                <span>Sign In</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handlePortalAction}
+              className="inline-flex items-center px-5 py-2.5 bg-primary-container text-on-primary hover:bg-secondary transition-colors duration-150 font-label-md text-xs uppercase tracking-wider cursor-pointer"
+            >
+              {user ? 'Member Portal' : 'Sign In'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden border border-surface-container-highest p-2 text-primary hover:bg-surface-container-low cursor-pointer"
+              aria-label="Toggle navigation menu"
+            >
+              <span className="material-symbols-outlined text-xl block">
+                {mobileMenuOpen ? 'close' : 'menu'}
+              </span>
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden bg-surface-container-lowest border-t border-surface-container-highest px-6 py-4 space-y-2">
+            {[
+              { id: 'about', label: 'About' },
+              { id: 'pillars', label: 'The Four Pillars' },
+              { id: 'requirements', label: 'Academic Requirements' },
+              { id: 'rules', label: 'Rules' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollToSection(item.id)}
+                className="w-full text-left py-2.5 border-b border-surface-container-highest font-label-md text-xs uppercase tracking-wider text-primary hover:text-secondary flex justify-between items-center cursor-pointer"
+              >
+                <span>{item.label}</span>
+                <span>→</span>
+              </button>
+            ))}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onNavigate('screener');
+                }}
+                className="w-full border border-primary text-primary font-label-md text-xs uppercase tracking-wider py-2.5 text-center cursor-pointer"
+              >
+                Check Academic Eligibility
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Hero Section */}
-      <section
-        id="about"
-        className="relative pt-14 pb-18 md:pt-22 md:pb-26 bg-gradient-to-b from-white via-[#fcfbf9] to-[#fbfbfa] border-b border-slate-200/80"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            
-            {/* Left Content */}
-            <div className="lg:col-span-7">
-              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-[#0a1e3f] leading-[1.08] tracking-tight mb-5">
-                Scholarship. Leadership.<br />
+      {/* =========================================================================
+          2. Hero / Intro Section (#about)
+         ========================================================================= */}
+      <section className="border-b border-surface-container-highest bg-surface" id="about">
+        <div className="max-w-7xl mx-auto px-6 md:px-14 py-16 md:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+            {/* Left Column (7 cols): Title, Intro & Actions */}
+            <div className="lg:col-span-7 flex flex-col justify-center">
+              <div className="mb-4">
+                <span className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant">
+                  Casablanca American School · National Honor Society
+                </span>
+              </div>
+
+              <h1 className="font-display text-4xl sm:text-5xl lg:text-[60px] text-primary font-normal leading-[1.08] tracking-tight mb-6">
+                Scholarship. Leadership.
+                <br />
                 Service. Character.
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl mb-9">
-                The Casablanca American School chapter of the National Honor Society recognizes students
-                who demonstrate distinction in academic achievement, leadership, community service, and character.
+              <p className="font-body-lg text-base sm:text-lg text-on-surface-variant max-w-xl mb-9 leading-relaxed">
+                The Casablanca American School chapter of the National Honor Society recognizes students in Grades 10–12 who demonstrate distinction in academic achievement, student leadership, community service, and personal character.
               </p>
 
-              {/* Action Buttons with Generous, Balanced Spacing */}
-              <div className="flex flex-wrap items-center gap-3.5">
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-4 mb-12">
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold text-white bg-[#0a1e3f] hover:bg-[#16325c] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-                  onClick={() => handleAction('dashboard')}
+                  onClick={handlePortalAction}
+                  className="px-6 py-3.5 bg-primary-container text-on-primary font-label-md text-xs uppercase tracking-wider hover:bg-secondary transition-colors duration-150 cursor-pointer"
                 >
-                  {!user && <Lock size={15} className="text-white/80" />}
-                  <span>Enter Member Portal</span>
-                  <ArrowRight size={16} />
+                  {user ? 'Open Member Portal' : 'Enter Member Portal'}
                 </button>
 
                 <button
                   type="button"
-                  className="inline-flex items-center justify-center gap-2.5 px-6 py-3.5 text-sm font-semibold text-[#0a1e3f] bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 rounded-lg shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
                   onClick={() => onNavigate('screener')}
+                  className="px-6 py-3.5 border border-primary text-primary bg-surface-container-lowest font-label-md text-xs uppercase tracking-wider hover:bg-surface-container-high transition-colors duration-150 inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <CheckCircle2 size={16} className="text-[#c59b27]" />
                   <span>Check Academic Eligibility</span>
+                  <span>→</span>
                 </button>
 
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 px-4 py-3.5 text-sm font-semibold text-slate-700 hover:text-[#0a1e3f] transition-colors cursor-pointer"
                   onClick={() => scrollToSection('rules')}
+                  className="px-3 py-3.5 font-label-md text-xs uppercase tracking-wider text-on-surface-variant hover:text-primary underline underline-offset-4 transition-colors cursor-pointer"
                 >
-                  <span>Rules</span>
-                  <ChevronRight size={15} />
+                  Chapter Rules
                 </button>
+              </div>
+
+              {/* 3-Stat Summary Strip */}
+              <div className="pt-8 border-t border-surface-container-highest grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div>
+                  <p className="font-display text-2xl sm:text-3xl text-primary font-normal mb-0.5">
+                    5.80 / 7.00
+                  </p>
+                  <p className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant">
+                    Standard IB GPA
+                  </p>
+                </div>
+                <div className="sm:border-l sm:border-surface-container-highest sm:pl-6">
+                  <p className="font-display text-2xl sm:text-3xl text-primary font-normal mb-0.5">
+                    5.60 / 7.00
+                  </p>
+                  <p className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant">
+                    With 4 IB HL Courses
+                  </p>
+                </div>
+                <div className="sm:border-l sm:border-surface-container-highest sm:pl-6">
+                  <p className="font-display text-2xl sm:text-3xl text-primary font-normal mb-0.5">
+                    Grades 10–12
+                  </p>
+                  <p className="font-label-sm text-[11px] uppercase tracking-wider text-on-surface-variant">
+                    Upper School Chapter
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Right: NHS Official Keystone Emblem */}
+            {/* Right Column (5 cols): Official NHS Keystone Emblem (/nhs-logo-bw.png) */}
             <div className="lg:col-span-5 flex justify-center lg:justify-end">
-              <div className="relative p-6 sm:p-8 bg-white/80 rounded-2xl border border-slate-200/90 shadow-[0_8px_24px_rgba(10,30,63,0.06)] flex items-center justify-center">
+              <div className="w-full max-w-sm bg-surface-container-lowest border border-surface-container-highest p-8 sm:p-10 flex items-center justify-center">
                 <img
                   src="/nhs-logo-bw.png"
                   alt="National Honor Society Keystone Emblem"
-                  className="w-auto max-h-[290px] sm:max-h-[330px] object-contain drop-shadow-sm"
-                  style={{ maxHeight: '310px', width: 'auto', objectFit: 'contain' }}
+                  className="w-auto max-h-[280px] sm:max-h-[320px] object-contain"
                 />
               </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* The Four Pillars */}
-      <section id="pillars" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-10 sm:mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-            The Four Pillars of NHS
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-            The four foundational standards required for induction and continuous active membership.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-          {/* Pillar 1 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
-              <GraduationCap size={22} className="text-[#c59b27]" />
-            </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Scholarship
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Commitment to learning, intellectual curiosity, and maintaining a minimum 5.80 cumulative GPA standard.
+      {/* =========================================================================
+          3. The Four Pillars of NHS (#pillars)
+         ========================================================================= */}
+      <section
+        className="border-b border-surface-container-highest bg-surface-container-lowest"
+        id="pillars"
+      >
+        <div className="max-w-7xl mx-auto px-6 md:px-14 py-20">
+          <div className="max-w-2xl mb-12">
+            <span className="font-label-sm text-xs uppercase tracking-wider text-secondary font-semibold block mb-2">
+              The Four Pillars
+            </span>
+            <h2 className="font-display text-3xl sm:text-4xl text-primary tracking-tight font-normal">
+              The Four Pillars of NHS
+            </h2>
+            <p className="font-body-md text-sm sm:text-base text-on-surface-variant mt-2 leading-relaxed">
+              The four foundational standards required for induction and active membership at Casablanca American School.
             </p>
           </div>
 
-          {/* Pillar 2 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#0a1e3f]/5 rounded-lg flex items-center justify-center mb-4 border border-slate-200">
-              <Compass size={22} className="text-[#0a1e3f]" />
+          {/* 4-Column Hairline Grid (No rounded SaaS icon cards) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y md:divide-y-0 lg:divide-x divide-surface-container-highest border-t border-b border-surface-container-highest">
+            <div className="py-8 lg:py-10 lg:pr-8">
+              <span className="font-display text-3xl text-secondary block mb-3">01</span>
+              <h3 className="font-display text-2xl text-primary font-normal mb-2.5">
+                Scholarship
+              </h3>
+              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                Commitment to learning and maintaining strong academic performance across all courses, with a minimum 5.80 GPA (or 5.60 when taking 4 IB Higher Level courses).
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Leadership
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Taking proactive initiative, guiding peers ethically, and spearheading impactful student-led chapter initiatives.
-            </p>
-          </div>
 
-          {/* Pillar 3 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#ecfdf5] rounded-lg flex items-center justify-center mb-4 border border-[#a7f3d0]">
-              <Users size={22} className="text-[#059669]" />
+            <div className="py-8 lg:py-10 lg:px-8">
+              <span className="font-display text-3xl text-secondary block mb-3">02</span>
+              <h3 className="font-display text-2xl text-primary font-normal mb-2.5">
+                Leadership
+              </h3>
+              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                Taking initiative in school and community life, guiding peers responsibly, and organizing meaningful student-led chapter projects each semester.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Service
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Voluntary contributions to school and community welfare without seeking monetary compensation or recognition.
-            </p>
-          </div>
 
-          {/* Pillar 4 */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover hover:border-[#c59b27]/40 transition-all">
-            <div className="w-11 h-11 bg-[#fcf8ed] rounded-lg flex items-center justify-center mb-4 border border-[#ead59b]">
-              <Shield size={22} className="text-[#c59b27]" />
+            <div className="py-8 lg:py-10 lg:px-8">
+              <span className="font-display text-3xl text-secondary block mb-3">03</span>
+              <h3 className="font-display text-2xl text-primary font-normal mb-2.5">
+                Service
+              </h3>
+              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                Volunteering time and effort to help our school and the wider Casablanca community without expecting personal reward or academic credit.
+              </p>
             </div>
-            <h3 className="font-serif text-xl font-bold text-[#0a1e3f] mb-2">
-              Character
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Upholding strict academic honesty, demonstrating reliability, integrity, and fostering a culture of mutual respect.
-            </p>
+
+            <div className="py-8 lg:py-10 lg:pl-8">
+              <span className="font-display text-3xl text-secondary block mb-3">04</span>
+              <h3 className="font-display text-2xl text-primary font-normal mb-2.5">
+                Character
+              </h3>
+              <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                Practicing academic honesty, reliability, and mutual respect every day, with a clean conduct record and no AE or BE effort marks.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Academic Requirements */}
-      <section id="requirements" className="py-16 md:py-24 bg-white border-y border-slate-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 sm:mb-12">
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
+      {/* =========================================================================
+          4. Academic Requirements & Screener Callout (#requirements)
+         ========================================================================= */}
+      <section className="border-b border-surface-container-highest bg-surface" id="requirements">
+        <div className="max-w-7xl mx-auto px-6 md:px-14 py-20">
+          <div className="mb-12">
+            <span className="font-label-sm text-xs uppercase tracking-wider text-secondary font-semibold block mb-2">
+              Academic Standards
+            </span>
+            <h2 className="font-display text-3xl sm:text-4xl text-primary tracking-tight font-normal">
               Academic Requirements
             </h2>
-            <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-              Official grade requirements from the Casablanca American School chapter bylaws.
+            <p className="font-body-md text-sm sm:text-base text-on-surface-variant mt-2 max-w-xl leading-relaxed">
+              Official grade and conduct requirements from the Casablanca American School chapter bylaws, verified at the end of each semester.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            
-            {/* Standards Table */}
-            <div className="lg:col-span-7 bg-[#fbfbfa] p-6 sm:p-8 rounded-xl border border-slate-200/90 shadow-card flex flex-col justify-between">
-              <div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        <th className="py-3 px-3">Grade Level</th>
-                        <th className="py-3 px-3">GPA Requirement</th>
-                        <th className="py-3 px-3">Rules</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/70 text-slate-700">
-                      <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grade 10</td>
-                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          Core academic courses only (PE & Design excluded). No AE or BE marks.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Grades 11 & 12 (IB)</td>
-                        <td className="py-3.5 px-3 font-bold text-[#0a1e3f]">5.80 / 7.00</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          Calculated across 6 IB courses. Reduced to <strong className="text-slate-900 font-semibold">5.60</strong> if taking 4 IB Higher Level courses.
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 px-3 font-semibold text-[#0a1e3f]">Conduct</td>
-                        <td className="py-3.5 px-3 font-bold text-[#059669]">Good Standing</td>
-                        <td className="py-3.5 px-3 text-xs text-slate-600">
-                          No school disciplinary actions or academic dishonesty.
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
+            {/* Left Column (7 cols): Clear Requirements Table */}
+            <div className="lg:col-span-7 bg-surface-container-lowest border border-surface-container-highest p-6 sm:p-8 flex flex-col justify-between">
+              <div className="divide-y divide-surface-container-highest">
+                {/* Grade 10 */}
+                <div className="py-5 first:pt-0">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-2">
+                    <span className="font-display text-xl text-primary font-normal">
+                      Grade 10
+                    </span>
+                    <span className="font-label-md text-xs uppercase tracking-wider text-secondary font-semibold">
+                      5.80 / 7.00 GPA
+                    </span>
+                  </div>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    Calculated across core academic courses only (Physical Education and Design Technology are excluded). No course grade of 3 or lower, and no AE or BE conduct/effort marks.
+                  </p>
+                </div>
+
+                {/* Grades 11 & 12 (IB) */}
+                <div className="py-5">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-2">
+                    <span className="font-display text-xl text-primary font-normal">
+                      Grades 11 &amp; 12 (IB)
+                    </span>
+                    <span className="font-label-md text-xs uppercase tracking-wider text-secondary font-semibold">
+                      5.80 Standard · 5.60 with 4 HL
+                    </span>
+                  </div>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    5.80 / 7.00 average across assessed IB courses, reduced to{' '}
+                    <strong className="text-primary font-semibold">5.60 / 7.00</strong> for students taking 4 IB Higher Level (HL) courses. No course grade of 3 or lower.
+                  </p>
+                </div>
+
+                {/* Conduct */}
+                <div className="py-5 last:pb-0">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 mb-2">
+                    <span className="font-display text-xl text-primary font-normal">
+                      Conduct &amp; Effort
+                    </span>
+                    <span className="font-label-md text-xs uppercase tracking-wider text-[#1E5631] font-semibold">
+                      Good Standing
+                    </span>
+                  </div>
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    Zero Approaching Expectations (AE) or Beginning Expectations (BE) marks on semester report cards, and no school disciplinary or academic honesty violations.
+                  </p>
                 </div>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-slate-200 text-xs text-slate-500">
-                Academic standing is verified at each semester report card period.
+              <div className="mt-6 pt-5 border-t border-surface-container-highest text-xs text-on-surface-variant">
+                Academic standing is checked at the end of Semester 1 and Semester 2.
               </div>
             </div>
 
-            {/* Screener Prompt Card */}
-            <div className="lg:col-span-5 bg-[#0a1e3f] text-white p-6 sm:p-8 rounded-xl shadow-lg border border-[#c59b27]/30 flex flex-col justify-between">
+            {/* Right Column (5 cols): Clean Oxford Navy Screener Callout */}
+            <div className="lg:col-span-5 bg-primary-container text-surface p-8 sm:p-10 border border-primary flex flex-col justify-between">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[#c59b27] text-xs font-semibold tracking-wide mb-5">
-                  <CheckCircle2 size={14} className="text-[#c59b27]" />
-                  <span>Academic Eligibility Screener</span>
+                <div className="mb-3">
+                  <span className="font-label-sm text-xs uppercase tracking-wider text-secondary-container">
+                    Academic Eligibility Screener
+                  </span>
                 </div>
-                
-                <h3 className="font-serif text-2xl font-bold text-white mb-3">
+
+                <h3 className="font-display text-3xl text-white font-normal mb-3">
                   Check Your Eligibility
                 </h3>
-                
-                <p className="text-sm text-slate-200 leading-relaxed mb-6">
-                  Upload your report card PDF or enter your marks into our screener tool to immediately check your GPA against chapter rules.
+
+                <p className="font-body-md text-sm text-white/85 leading-relaxed mb-6">
+                  Upload your CAS report card PDF or enter your course grades manually to verify whether you meet the GPA and conduct requirements for Grade 10 or IB Grades 11–12.
                 </p>
-                
-                <ul className="space-y-2.5 text-xs text-slate-200 mb-8">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Calculates Grade 10 vs. IB Grade 11/12 scale</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Applies 4 IB Higher Level adjustment (5.60 threshold)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 size={15} className="text-[#c59b27] mt-0.5 flex-shrink-0" />
-                    <span>Filters excluded courses (PE and Design)</span>
-                  </li>
-                </ul>
               </div>
 
-              <button
-                type="button"
-                className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-6 font-bold text-sm bg-[#c59b27] hover:bg-[#b58b1e] text-[#0a1e3f] rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
-                onClick={() => onNavigate('screener')}
-              >
-                <span>Check Academic Eligibility</span>
-                <ArrowRight size={16} />
-              </button>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('screener')}
+                  className="w-full py-3.5 px-6 bg-secondary-container text-on-secondary-fixed font-label-md text-xs uppercase tracking-wider font-semibold hover:bg-white hover:text-primary transition-colors duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Check Academic Eligibility</span>
+                  <span>→</span>
+                </button>
+                <p className="text-[11px] text-white/60 mt-4 leading-normal">
+                  Report cards are checked locally in your browser and are never saved or uploaded to a server.
+                </p>
+              </div>
             </div>
-
           </div>
         </div>
       </section>
 
-      {/* Rules Section */}
-      <section id="rules" className="py-16 md:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-10 sm:mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#0a1e3f] tracking-tight">
-            Rules to Maintain Membership
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-xl">
-            The official rules required to remain in good standing in the chapter.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Academic Standing
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Maintain a minimum 5.80 GPA on every semester report card (5.60 for students taking 4 IB Higher Levels).
+      {/* =========================================================================
+          5. Rules to Maintain Membership (#rules)
+         ========================================================================= */}
+      <section
+        className="border-b border-surface-container-highest bg-surface-container-lowest"
+        id="rules"
+      >
+        <div className="max-w-7xl mx-auto px-6 md:px-14 py-20">
+          <div className="max-w-2xl mb-12">
+            <span className="font-label-sm text-xs uppercase tracking-wider text-secondary font-semibold block mb-2">
+              Member Expectations
+            </span>
+            <h2 className="font-display text-3xl sm:text-4xl text-primary tracking-tight font-normal">
+              Rules to Maintain Membership
+            </h2>
+            <p className="font-body-md text-sm sm:text-base text-on-surface-variant mt-2 leading-relaxed">
+              The official chapter rules required to stay in good standing after induction.
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Project Leadership
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Lead at least 1 approved project per semester, with a maximum cap of 2 projects per semester (4 per year).
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Volunteering
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Volunteer in at least 2 other members' projects each semester.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Meeting Attendance
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Attend all general chapter meetings. Accumulating {rules.absences_for_probation || 2} unexcused absences ({rules.tardies_per_absence || 3} tardies = 1 absence) in a semester results in chapter probation.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Probation & Dismissal
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Failing to meet academic or project requirements results in probation. Incurring 2 probations results in chapter dismissal.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200/90 shadow-card hover:border-[#c59b27]/30 hover:shadow-card-hover transition-all">
-            <strong className="text-[#0a1e3f] font-serif text-base block mb-2">
-              Senior Graduation
-            </strong>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Grade 12 members who meet requirements through Semester 1 graduate in good standing as NHS Graduates.
-            </p>
+          {/* 6-Item Editorial Hairline List */}
+          <div className="border-t border-b border-surface-container-highest divide-y divide-surface-container-highest">
+            {chapterRulesList.map((rule) => (
+              <div
+                key={rule.num}
+                className="py-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-baseline"
+              >
+                <div className="md:col-span-1">
+                  <span className="font-label-md text-xs font-semibold text-secondary">
+                    {rule.num}
+                  </span>
+                </div>
+                <div className="md:col-span-4">
+                  <h3 className="font-display text-xl text-primary font-normal">
+                    {rule.title}
+                  </h3>
+                </div>
+                <div className="md:col-span-7">
+                  <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                    {rule.description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Institutional Footer */}
-      <footer className="bg-[#0a1e3f] text-slate-300 pt-12 pb-8 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* =========================================================================
+          6. Institutional Footer
+         ========================================================================= */}
+      <footer className="bg-primary-container text-surface pt-12 pb-10 border-t border-primary">
+        <div className="max-w-7xl mx-auto px-6 md:px-14">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-8 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 p-1 bg-white rounded-lg flex items-center justify-center">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 p-1.5 bg-white flex items-center justify-center flex-shrink-0">
                 <img
                   src="/cas-logo.png"
                   alt="CAS"
-                  className="w-7 h-7 object-contain"
-                  style={{ width: '28px', height: '28px' }}
+                  className="w-full h-full object-contain"
                 />
               </div>
               <div>
-                <div className="text-white font-serif font-bold text-base">
+                <div className="text-white font-display text-lg font-normal leading-tight">
                   Casablanca American School
                 </div>
-                <div className="text-xs text-[#c59b27]">
+                <div className="font-label-sm text-[11px] uppercase tracking-wider text-secondary-container mt-0.5">
                   National Honor Society Chapter
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-6 text-xs text-slate-300">
+            <div className="flex flex-wrap items-center gap-6 font-label-sm text-xs uppercase tracking-wider text-white/80">
+              <button
+                type="button"
+                onClick={() => onNavigate('screener')}
+                className="hover:text-white underline underline-offset-4 cursor-pointer"
+              >
+                Eligibility Screener
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setLegalTab('terms');
                   setIsLegalOpen(true);
                 }}
-                className="hover:text-white underline cursor-pointer"
+                className="hover:text-white underline underline-offset-4 cursor-pointer"
               >
                 Terms of Use
               </button>
@@ -479,26 +598,25 @@ export const PublicHomepage: React.FC<PublicHomepageProps> = ({ onNavigate, onOp
                   setLegalTab('privacy');
                   setIsLegalOpen(true);
                 }}
-                className="hover:text-white underline cursor-pointer"
+                className="hover:text-white underline underline-offset-4 cursor-pointer"
               >
                 Privacy Policy
               </button>
-              <span className="text-slate-400">Casablanca, Morocco</span>
+              <span className="text-white/60">Casablanca, Morocco</span>
             </div>
           </div>
 
-          <div className="py-4 text-[11px] text-slate-400 leading-relaxed border-b border-white/5">
-            <strong className="text-slate-300">Institutional Usage Notice:</strong> By using this portal, you automatically accept our Terms of Use and Privacy Policy. Whichever account performs actions on the platform, the account holder or representative is held strictly accountable. Passcodes must remain secure and any compromise must be reported immediately to Chapter Leadership.
+          <div className="py-5 text-xs text-white/60 leading-relaxed border-b border-white/10">
+            <strong className="text-white/80">Portal Usage Notice:</strong> By using this portal, you agree to the Terms of Use and Privacy Policy. Each member is responsible for activity performed under their account. Keep your access code private and notify Chapter Leadership immediately if you suspect unauthorized access.
           </div>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/60">
             <span>© Casablanca American School National Honor Society</span>
-            <span>Academic Year 2026–2027</span>
+            <span>Casablanca, Morocco</span>
           </div>
         </div>
       </footer>
 
-      {/* Terms & Privacy Compliance Modal */}
       <TermsAndPrivacyModal
         isOpen={isLegalOpen}
         onClose={() => setIsLegalOpen(false)}
