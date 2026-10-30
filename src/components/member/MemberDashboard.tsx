@@ -4,6 +4,10 @@ import { supabase } from '../../lib/supabase';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { Award, AlertTriangle, ShieldAlert, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
 import { getRestorationEligibility } from '../../lib/probation';
+import {
+  fetchManualParticipationLedger,
+  computeMemberParticipationCounts,
+} from '../../lib/manualParticipationHelper';
 
 interface MemberDashboardProps {
   onNavigate: (tab: string) => void;
@@ -32,64 +36,54 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({ onNavigate }) 
     if (!user) return;
 
     const loadStats = async () => {
-      // Fetch active semester
-      const { data: activeSem } = await supabase
-        .from('semesters')
-        .select('*')
-        .eq('is_active', true)
-        .maybeSingle();
+      // Fetch active semester, proposals, volunteers, and manual participation ledger
+      const [
+        { data: activeSem },
+        { data: allProposalsData },
+        { data: allVols },
+        ledgerData,
+      ] = await Promise.all([
+        supabase.from('semesters').select('*').eq('is_active', true).maybeSingle(),
+        supabase.from('project_proposals').select('id, creator_id, creator_email, co_leader_emails, semester_id, event_date, status'),
+        supabase.from('project_volunteers').select('id, user_id, student_email, project_id, attended, status').eq('user_id', user.id),
+        fetchManualParticipationLedger(),
+      ]);
 
       if (activeSem?.name) {
         setActiveSemesterName(activeSem.name);
       }
 
-      // 1. Project count (overall proposed and active semester led)
-      const { data: userProposals } = await supabase
-        .from('project_proposals')
-        .select('id, semester_id, event_date, status')
-        .or(`creator_id.eq.${user.id},co_leader_emails.cs.{${user.email}}`);
-      
-      const allProposals = userProposals || [];
-      setProjectCount(allProposals.length);
+      const userEmailLower = (user.email || '').toLowerCase().trim();
+      const allChapterProposals = allProposalsData || [];
 
-      const approvedProjects = allProposals.filter((p: any) =>
-        p.status === 'approved' || p.status === 'completed'
+      const userProposals = allChapterProposals.filter((p: any) => {
+        const isCreator = p.creator_id === user.id || (p.creator_email || '').toLowerCase().trim() === userEmailLower;
+        const isCoLeader = Array.isArray(p.co_leader_emails) && p.co_leader_emails.some((e: string) => (e || '').toLowerCase().trim() === userEmailLower);
+        return isCreator || isCoLeader;
+      });
+
+      const semApprovedProposals = allChapterProposals.filter((p: any) =>
+        (p.status === 'approved' || p.status === 'completed') &&
+        (!activeSem ||
+          !p.semester_id ||
+          p.semester_id === activeSem.id ||
+          (p.event_date && p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date))
       );
+      const semProposalIdSet = new Set<string>(semApprovedProposals.map((p: any) => p.id));
 
-      if (activeSem) {
-        const semLed = approvedProjects.filter((p: any) =>
-          p.semester_id === activeSem.id ||
-          (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
-        );
-        setSemesterProjectsLed(semLed.length);
-      } else {
-        setSemesterProjectsLed(approvedProjects.length);
-      }
+      const counts = computeMemberParticipationCounts({
+        member: { id: user.id, email: user.email || '' },
+        proposals: allChapterProposals,
+        volunteers: allVols || [],
+        semesterProposalIds: semProposalIdSet,
+        activeSemester: activeSem,
+        ledger: ledgerData,
+      });
 
-      // 2. Volunteer count (overall and active semester) - only confirmed attendance
-      const { data: allVols } = await supabase
-        .from('project_volunteers')
-        .select('id, project_id, attended, status')
-        .eq('user_id', user.id);
-      
-      const confirmedVols = (allVols || []).filter((v: any) => v.attended === true || v.status === 'confirmed');
-      setVolunteerCount(confirmedVols.length);
-
-      if (activeSem && confirmedVols.length > 0) {
-        const volProjIds = confirmedVols.map((v: any) => v.project_id);
-        const { data: semProjs } = await supabase
-          .from('project_proposals')
-          .select('id, semester_id, event_date')
-          .in('id', volProjIds);
-
-        const semVolCount = (semProjs || []).filter((p: any) =>
-          p.semester_id === activeSem.id ||
-          (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
-        ).length;
-        setSemesterVolunteered(semVolCount);
-      } else {
-        setSemesterVolunteered(activeSem ? 0 : confirmedVols.length);
-      }
+      setProjectCount(Math.max(userProposals.length, counts.lifetimeLedCount));
+      setSemesterProjectsLed(counts.semesterLedCount);
+      setVolunteerCount(counts.lifetimeVolCount);
+      setSemesterVolunteered(counts.semesterVolCount);
 
       let attQuery = supabase
         .from('meeting_attendance')

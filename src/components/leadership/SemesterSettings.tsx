@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Semester, ProjectProposal } from '../../types/nhs';
 import { Plus, Check, Calendar, BarChart3, X, FolderArchive, ArrowRight, Award, AlertTriangle, ShieldAlert, ShieldCheck, CheckCircle2, RotateCw, Trash2 } from 'lucide-react';
+import { fetchManualParticipationLedger } from '../../lib/manualParticipationHelper';
 
 interface SemesterStats {
   projectsCompleted: number;
@@ -139,12 +140,67 @@ export const SemesterSettings: React.FC = () => {
     setTransitionPreviewLoading(true);
     setTransitionPreviewData(null);
     try {
-      const { data, error } = await supabase.rpc('preview_semester_rollover', {
-        p_concluded_semester_id: concludedSem.id,
-        p_target_semester_id: targetSem.id,
-      });
+      const [{ data, error }, ledgerData, { data: rulesData }] = await Promise.all([
+        supabase.rpc('preview_semester_rollover', {
+          p_concluded_semester_id: concludedSem.id,
+          p_target_semester_id: targetSem.id,
+        }),
+        fetchManualParticipationLedger(),
+        supabase.from('chapter_rules').select('*').eq('id', 'current').maybeSingle(),
+      ]);
       if (error) throw error;
-      setTransitionPreviewData(data);
+
+      const reqLed = Number(rulesData?.required_projects_led ?? 1);
+      const noLedReq = Boolean(rulesData?.no_projects_led_required);
+      const reqVol = Number(rulesData?.required_volunteering ?? 2);
+      const noVolReq = Boolean(rulesData?.no_volunteering_required);
+
+      if (data && Array.isArray(data.members)) {
+        const enrichedMembers = data.members.map((m: any) => {
+          const emailLower = (m.email || '').toLowerCase().trim();
+          const manualLedCount = ledgerData.entries.filter(
+            (e) =>
+              e.type === 'led' &&
+              ((e.user_id && e.user_id === m.id) || (e.user_email && e.user_email.toLowerCase().trim() === emailLower)) &&
+              (!e.semester_id || e.semester_id === concludedSem.id)
+          ).length;
+          const manualVolCount = ledgerData.entries.filter(
+            (e) =>
+              e.type === 'volunteered' &&
+              ((e.user_id && e.user_id === m.id) || (e.user_email && e.user_email.toLowerCase().trim() === emailLower)) &&
+              (!e.semester_id || e.semester_id === concludedSem.id)
+          ).length;
+          const adj = ledgerData.adjustments.find(
+            (a) =>
+              ((a.user_id && a.user_id === m.id) || (a.user_email && a.user_email.toLowerCase().trim() === emailLower)) &&
+              (!a.semester_id || a.semester_id === concludedSem.id)
+          );
+
+          const effectiveLed = Math.max(0, Number(m.led_count || 0) + manualLedCount + Number(adj?.led_adjustment || 0));
+          const effectiveVol = Math.max(0, Number(m.vol_count || 0) + manualVolCount + Number(adj?.vol_adjustment || 0));
+          const meetsQuota = (noLedReq || effectiveLed >= reqLed) && (noVolReq || effectiveVol >= reqVol);
+
+          let nextActionType = m.action_type;
+          if (meetsQuota && (m.action_type === 'probation' || m.action_type === 'dismissal')) {
+            nextActionType = 'pass';
+          } else if (meetsQuota && m.action_type === 'graduate_with_probation') {
+            nextActionType = 'graduate';
+          }
+
+          return {
+            ...m,
+            led_count: effectiveLed,
+            vol_count: effectiveVol,
+            action_type: nextActionType,
+          };
+        });
+        setTransitionPreviewData({
+          ...data,
+          members: enrichedMembers,
+        });
+      } else {
+        setTransitionPreviewData(data);
+      }
     } catch (err: any) {
       console.error('Failed to preview rollover:', err);
       await alert({

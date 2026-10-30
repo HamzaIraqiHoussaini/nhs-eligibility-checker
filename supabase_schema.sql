@@ -338,9 +338,20 @@ create policy "Proposals update" on public.project_proposals for update using (
   )
 );
 
--- Volunteers: readable by all, insertable by any active member
+-- Volunteers: readable by all, insertable by any active member or leadership/supervisor
 create policy "Volunteers read all" on public.project_volunteers for select using (true);
-create policy "Volunteers insert" on public.project_volunteers for insert with check (user_id = auth.uid());
+create policy "Volunteers insert" on public.project_volunteers for insert with check (
+  user_id = auth.uid() or exists (
+    select 1 from public.profiles
+    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor')
+  )
+);
+create policy "Volunteers update" on public.project_volunteers for update using (
+  user_id = auth.uid() or exists (
+    select 1 from public.profiles
+    where profiles.id = auth.uid() and profiles.role in ('leadership', 'supervisor')
+  )
+);
 create policy "Volunteers delete" on public.project_volunteers for delete using (
   user_id = auth.uid() or exists (
     select 1 from public.profiles

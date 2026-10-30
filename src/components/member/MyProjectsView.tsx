@@ -44,6 +44,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { parseVolunteeringConfig } from '../../lib/projectVolunteerHelper';
+import { fetchManualParticipationLedger } from '../../lib/manualParticipationHelper';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
   if (!project.costs || project.costs.length === 0) return false;
@@ -128,6 +129,22 @@ export const MyProjectsView: React.FC = () => {
         }
       }
 
+      const ledgerData = await fetchManualParticipationLedger();
+
+      // 3. Fetch all approved chapter projects (filtering out future annual projects)
+      const { data: approvedData } = await supabase
+        .from('project_proposals')
+        .select('*')
+        .in('status', ['approved', 'completed'])
+        .order('event_date', { ascending: true });
+      const filteredApproved = approvedData
+        ? (approvedData as ProjectProposal[]).filter((p) => {
+            const isFutureAnnual = (p.is_yearly || p.annual_project_id) && p.semester_id && futureSemesterIds.has(p.semester_id);
+            return !isFutureAnnual;
+          })
+        : [];
+      setAllApprovedProjects(filteredApproved);
+
       if (user) {
         // 2. Fetch my proposals — two safe parameterized queries merged client-side
         // to avoid PostgREST filter injection via string-interpolated user.email
@@ -153,22 +170,53 @@ export const MyProjectsView: React.FC = () => {
             merged.push(row as ProjectProposal);
           }
         }
+
+        // Also include any manual 'led' entries for this user
+        const userEmailLower = (user.email || '').toLowerCase().trim();
+        const myManualLedEntries = ledgerData.entries.filter(
+          (e) =>
+            e.type === 'led' &&
+            ((e.user_id && e.user_id === user.id) ||
+              (e.user_email && e.user_email.toLowerCase().trim() === userEmailLower))
+        );
+        for (const entry of myManualLedEntries) {
+          if (entry.project_id) {
+            if (seen.has(entry.project_id)) continue;
+            const linkedProj = filteredApproved.find((p) => p.id === entry.project_id);
+            if (linkedProj) {
+              seen.add(linkedProj.id);
+              merged.push(linkedProj);
+              continue;
+            }
+          }
+          if (!seen.has(entry.id)) {
+            seen.add(entry.id);
+            merged.push({
+              id: entry.id,
+              semester_id: entry.semester_id || (semData ? semData.id : null),
+              creator_id: user.id,
+              creator_name: entry.user_name || user.email || 'NHS Member',
+              creator_email: user.email || entry.user_email,
+              project_title: entry.project_title,
+              leaders: entry.user_name || user.email || 'NHS Member',
+              co_leader_emails: [],
+              event_date: entry.event_date || entry.created_at.split('T')[0],
+              location: entry.location || 'CAS Campus',
+              background: entry.role_description || 'Manual project leadership credit added by NHS Leadership.',
+              objectives: ['Manually credited project leadership by NHS Leadership'],
+              event_details: [entry.role_description || 'Verified by NHS Leadership'],
+              costs: [],
+              needs_from_school: [],
+              volunteers_needed: 0,
+              status: 'completed',
+              is_completed: true,
+              created_at: entry.created_at,
+            });
+          }
+        }
+
         merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setProposals(merged);
-      }
-
-      // 3. Fetch all approved chapter projects (filtering out future annual projects)
-      const { data: approvedData } = await supabase
-        .from('project_proposals')
-        .select('*')
-        .in('status', ['approved', 'completed'])
-        .order('event_date', { ascending: true });
-      if (approvedData) {
-        const filteredApproved = (approvedData as ProjectProposal[]).filter((p) => {
-          const isFutureAnnual = (p.is_yearly || p.annual_project_id) && p.semester_id && futureSemesterIds.has(p.semester_id);
-          return !isFutureAnnual;
-        });
-        setAllApprovedProjects(filteredApproved);
       }
 
       // 4. Fetch volunteers for chapter projects
@@ -176,10 +224,32 @@ export const MyProjectsView: React.FC = () => {
         .from('project_volunteers')
         .select('*');
       if (vData) {
-        const vols = vData as ProjectVolunteer[];
+        const dbVols = vData as ProjectVolunteer[];
+        const manualVols: ProjectVolunteer[] = ledgerData.entries
+          .filter((e) => e.type === 'volunteered')
+          .map((e) => ({
+            id: e.id,
+            project_id: e.project_id || e.id,
+            user_id: e.user_id || '',
+            student_name: e.user_name,
+            student_email: e.user_email,
+            role_description: e.role_description ? `${e.project_title} — ${e.role_description}` : e.project_title,
+            status: 'confirmed',
+            attended: true,
+            confirmed_at: e.created_at,
+            created_at: e.created_at,
+          }));
+
+        const vols = [...dbVols, ...manualVols];
         setAllVolunteers(vols);
         if (user) {
-          setMyVolunteers(vols.filter((v) => v.user_id === user.id || (user.email && v.student_email?.toLowerCase() === user.email.toLowerCase())));
+          setMyVolunteers(
+            vols.filter(
+              (v) =>
+                v.user_id === user.id ||
+                (user.email && v.student_email?.toLowerCase().trim() === user.email.toLowerCase().trim())
+            )
+          );
         }
       }
 

@@ -221,13 +221,21 @@ export interface DetailedAccountMetrics {
   healthBgColor: string;
 }
 
+export interface ManualMetricsOverride {
+  semesterProjectsLed?: number;
+  totalProjectsApproved?: number;
+  semesterVolunteeredConfirmed?: number;
+  totalVolunteeredConfirmed?: number;
+}
+
 export function calculateAccountMetrics(
   member: Profile,
   proposals: ProjectProposal[],
   volunteers: ProjectVolunteer[],
   attendance: MeetingAttendance[],
   rules: ChapterRules,
-  activeSemester: Semester | null
+  activeSemester: Semester | null,
+  manualCounts?: ManualMetricsOverride
 ): DetailedAccountMetrics {
   // Login metrics
   const recency = getLoginRecency(member.last_login_at);
@@ -250,20 +258,22 @@ export function calculateAccountMetrics(
 
   // Projects metrics
   const totalProjectsProposed = proposals.length;
-  const totalProjectsApproved = proposals.filter(p => p.status === 'approved' || p.status === 'completed').length;
+  const computedProjectsApproved = proposals.filter(p => p.status === 'approved' || p.status === 'completed').length;
   const semProjects = activeSemester
-    ? proposals.filter(p => (p.status === 'approved' || p.status === 'completed') && (p.semester_id === activeSemester.id || (Boolean(p.event_date) && p.event_date! >= activeSemester.start_date && p.event_date! <= activeSemester.end_date)))
+    ? proposals.filter(p => (p.status === 'approved' || p.status === 'completed') && (!p.semester_id || p.semester_id === activeSemester.id || (Boolean(p.event_date) && p.event_date! >= activeSemester.start_date && p.event_date! <= activeSemester.end_date)))
     : proposals.filter(p => p.status === 'approved' || p.status === 'completed');
-  const semesterProjectsLed = semProjects.length;
+  const semesterProjectsLed = manualCounts?.semesterProjectsLed ?? semProjects.length;
+  const totalProjectsApproved = manualCounts?.totalProjectsApproved ?? Math.max(computedProjectsApproved, semesterProjectsLed);
   const meetsProjectsQuota = Boolean(rules.no_projects_led_required) || semesterProjectsLed >= rules.required_projects_led;
 
   // Volunteering metrics
   const totalVolunteeredSignedUp = volunteers.length;
-  const totalVolunteeredConfirmed = volunteers.filter(v => v.attended || v.status === 'confirmed').length;
+  const computedVolunteeredConfirmed = volunteers.filter(v => v.attended || v.status === 'confirmed').length;
   const semVolunteers = activeSemester
-    ? volunteers.filter(v => (v.attended || v.status === 'confirmed') && (v.created_at >= activeSemester.start_date && v.created_at <= activeSemester.end_date))
+    ? volunteers.filter(v => (v.attended || v.status === 'confirmed') && (!activeSemester.start_date || v.created_at >= activeSemester.start_date))
     : volunteers.filter(v => v.attended || v.status === 'confirmed');
-  const semesterVolunteeredConfirmed = semVolunteers.length;
+  const semesterVolunteeredConfirmed = manualCounts?.semesterVolunteeredConfirmed ?? semVolunteers.length;
+  const totalVolunteeredConfirmed = manualCounts?.totalVolunteeredConfirmed ?? Math.max(computedVolunteeredConfirmed, semesterVolunteeredConfirmed);
   const meetsVolunteeringQuota = Boolean(rules.no_volunteering_required) || semesterVolunteeredConfirmed >= rules.required_volunteering;
 
   const meetsOverallQuota = meetsProjectsQuota && meetsVolunteeringQuota;

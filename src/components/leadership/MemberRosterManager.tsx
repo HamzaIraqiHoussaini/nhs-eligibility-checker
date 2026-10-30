@@ -4,16 +4,23 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { Profile, ProbationReason, Semester } from '../../types/nhs';
 import { MemberProfileDrawer } from './MemberProfileDrawer';
-import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck, RotateCcw, Users } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, ShieldAlert, UserCheck, UserX, Eye, Trash2, Award, X, ShieldCheck, RotateCcw, Users, Plus, Minus } from 'lucide-react';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useChapterRules } from '../../hooks/useChapterRules';
 import { getRestorationEligibility, getRestoredProfilePayload } from '../../lib/probation';
 import { formatRelativeTime, getLoginRecency } from '../../lib/authTracking';
+import {
+  fetchManualParticipationLedger,
+  computeMemberParticipationCounts,
+  saveMemberTargetCounts,
+  createEmptyParticipationLedger,
+  type ManualParticipationLedger,
+} from '../../lib/manualParticipationHelper';
 
 const SUPERADMIN_EMAIL = 'hiraqihoussaini@cas.ac.ma';
 
 export const MemberRosterManager: React.FC = () => {
-  const { user, isLeadership } = useAuth();
+  const { user, profile: currentUserProfile, isLeadership } = useAuth();
   const { confirm, alert } = useConfirm();
   const { rules } = useChapterRules();
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
@@ -36,7 +43,22 @@ export const MemberRosterManager: React.FC = () => {
   const [probationReason, setProbationReason] = useState<ProbationReason>('grades');
   const [probationNotes, setProbationNotes] = useState('');
   const [loading, setLoading] = useState(true);
-  const [participationMap, setParticipationMap] = useState<Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }>>({});
+  const [participationMap, setParticipationMap] = useState<
+    Record<
+      string,
+      {
+        ledCount: number;
+        volCount: number;
+        baseLedCount: number;
+        baseVolCount: number;
+        ledAdjustment: number;
+        volAdjustment: number;
+        meetsQuota: boolean;
+      }
+    >
+  >({});
+  const [manualLedger, setManualLedger] = useState<ManualParticipationLedger>(createEmptyParticipationLedger());
+  const [adjustingMemberId, setAdjustingMemberId] = useState<string | null>(null);
   const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
 
   const loadMembers = async () => {
@@ -50,20 +72,27 @@ export const MemberRosterManager: React.FC = () => {
       const mems = (data as Profile[]) || [];
       setMembers(mems);
 
-      // Fetch active semester & project participation
-      const { data: activeSem } = await supabase
-        .from('semesters')
-        .select('*')
-        .eq('is_active', true)
-        .maybeSingle();
-      setActiveSemester(activeSem as Semester);
+      // Fetch active semester, proposals, volunteers, rules, and manual participation ledger
+      const [
+        { data: activeSem },
+        { data: allProposals },
+        { data: rulesData },
+        ledgerData,
+      ] = await Promise.all([
+        supabase.from('semesters').select('*').eq('is_active', true).maybeSingle(),
+        supabase.from('project_proposals').select('id, creator_id, creator_email, co_leader_emails, semester_id, event_date, status'),
+        supabase.from('chapter_rules').select('*').eq('id', 'current').maybeSingle(),
+        fetchManualParticipationLedger(),
+      ]);
 
-      const { data: allProposals } = await supabase
-        .from('project_proposals')
-        .select('id, creator_id, co_leader_emails, semester_id, event_date, status');
-      
+      setActiveSemester(activeSem as Semester);
+      setManualLedger(ledgerData);
+
       const semProposals = (allProposals || []).filter((p: any) =>
-        !activeSem || p.semester_id === activeSem.id || (p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
+        !activeSem ||
+        !p.semester_id ||
+        p.semester_id === activeSem.id ||
+        (p.event_date && p.event_date >= activeSem.start_date && p.event_date <= activeSem.end_date)
       );
 
       // Only approved or completed proposals count towards 'Led' quota
@@ -71,40 +100,57 @@ export const MemberRosterManager: React.FC = () => {
         p.status === 'approved' || p.status === 'completed'
       );
       const semProposalIds = semProposals.map((p: any) => p.id);
+      const semProposalIdSet = new Set<string>(semProposalIds);
 
       let semVolunteers: any[] = [];
       if (semProposalIds.length > 0) {
         const { data: vData } = await supabase
           .from('project_volunteers')
-          .select('id, user_id, project_id, attended, status')
+          .select('id, user_id, student_email, project_id, attended, status')
           .in('project_id', semProposalIds);
         semVolunteers = (vData || []).filter((v: any) => v.attended === true || v.status === 'confirmed');
       }
-
-      // Fetch active chapter rules & quotas
-      const { data: rulesData } = await supabase
-        .from('chapter_rules')
-        .select('*')
-        .eq('id', 'current')
-        .maybeSingle();
 
       const reqProjectsLed = Number(rulesData?.required_projects_led ?? 1);
       const noProjectsLedReq = Boolean(rulesData?.no_projects_led_required);
       const reqVolunteering = Number(rulesData?.required_volunteering ?? 2);
       const noVolunteeringReq = Boolean(rulesData?.no_volunteering_required);
 
-      const map: Record<string, { ledCount: number; volCount: number; meetsQuota: boolean }> = {};
+      const map: Record<
+        string,
+        {
+          ledCount: number;
+          volCount: number;
+          baseLedCount: number;
+          baseVolCount: number;
+          ledAdjustment: number;
+          volAdjustment: number;
+          meetsQuota: boolean;
+        }
+      > = {};
+
       for (const m of mems) {
-        const ledCount = semApprovedLedProposals.filter((p: any) =>
-          p.creator_id === m.id || (Array.isArray(p.co_leader_emails) && p.co_leader_emails.includes(m.email))
-        ).length;
-        const volCount = semVolunteers.filter((v: any) => v.user_id === m.id).length;
+        const counts = computeMemberParticipationCounts({
+          member: m,
+          proposals: semApprovedLedProposals,
+          volunteers: semVolunteers,
+          semesterProposalIds: semProposalIdSet,
+          activeSemester: activeSem as Semester | null,
+          ledger: ledgerData,
+        });
+
+        const ledCount = counts.semesterLedCount;
+        const volCount = counts.semesterVolCount;
         const meetsProjects = noProjectsLedReq || ledCount >= reqProjectsLed;
         const meetsVolunteering = noVolunteeringReq || volCount >= reqVolunteering;
 
         map[m.id] = {
           ledCount,
           volCount,
+          baseLedCount: counts.baseSemesterLedCount,
+          baseVolCount: counts.baseSemesterVolCount,
+          ledAdjustment: counts.ledAdjustment,
+          volAdjustment: counts.volAdjustment,
           meetsQuota: meetsProjects && meetsVolunteering,
         };
       }
@@ -113,6 +159,66 @@ export const MemberRosterManager: React.FC = () => {
       console.error('Failed to load member roster:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickAdjustCount = async (
+    member: Profile,
+    nextLedCount: number,
+    nextVolCount: number
+  ) => {
+    if (!isLeadership || adjustingMemberId === member.id) return;
+    const currentPart = participationMap[member.id] || {
+      ledCount: 0,
+      volCount: 0,
+      baseLedCount: 0,
+      baseVolCount: 0,
+      ledAdjustment: 0,
+      volAdjustment: 0,
+      meetsQuota: false,
+    };
+
+    const clampedLed = Math.max(0, nextLedCount);
+    const clampedVol = Math.max(0, nextVolCount);
+
+    setAdjustingMemberId(member.id);
+    try {
+      const res = await saveMemberTargetCounts({
+        member: { id: member.id, email: member.email },
+        semesterId: activeSemester?.id || null,
+        baseLedCount: currentPart.baseLedCount,
+        baseVolCount: currentPart.baseVolCount,
+        targetLedCount: clampedLed,
+        targetVolCount: clampedVol,
+        updatedByUserId: user?.id || null,
+        updatedByName: currentUserProfile?.full_name || user?.email || 'Leadership',
+        currentLedger: manualLedger,
+      });
+
+      if (res.success) {
+        setManualLedger(res.ledger);
+        const meetsProjects = Boolean(rules.no_projects_led_required) || clampedLed >= rules.required_projects_led;
+        const meetsVolunteering = Boolean(rules.no_volunteering_required) || clampedVol >= rules.required_volunteering;
+        setParticipationMap((prev) => ({
+          ...prev,
+          [member.id]: {
+            ...currentPart,
+            ledCount: clampedLed,
+            volCount: clampedVol,
+            ledAdjustment: clampedLed - currentPart.baseLedCount,
+            volAdjustment: clampedVol - currentPart.baseVolCount,
+            meetsQuota: meetsProjects && meetsVolunteering,
+          },
+        }));
+      } else {
+        await alert({
+          title: 'Failed to Update Count',
+          message: res.error || 'Could not save manual participation adjustment.',
+          variant: 'danger',
+        });
+      }
+    } finally {
+      setAdjustingMemberId(null);
     }
   };
 
@@ -707,7 +813,15 @@ export const MemberRosterManager: React.FC = () => {
                 </tr>
               ) : (
                 filteredMembers.map(member => {
-                  const part = participationMap[member.id] || { ledCount: 0, volCount: 0, meetsQuota: false };
+                  const part = participationMap[member.id] || {
+                    ledCount: 0,
+                    volCount: 0,
+                    baseLedCount: 0,
+                    baseVolCount: 0,
+                    ledAdjustment: 0,
+                    volAdjustment: 0,
+                    meetsQuota: false,
+                  };
 
                   return (
                 <tr
@@ -844,7 +958,7 @@ export const MemberRosterManager: React.FC = () => {
                       );
                     })()}
                   </td>
-                  <td>
+                  <td onClick={(e) => { if (isLeadership && member.role === 'member') e.stopPropagation(); }}>
                     {member.role === 'supervisor' || member.role === 'past_supervisor' ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Faculty Advisor (Exempt)</span>
                     ) : isGraduatedMember(member) ? (
@@ -853,18 +967,70 @@ export const MemberRosterManager: React.FC = () => {
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-oxford)', fontWeight: 600 }}>Exempt (Leadership)</span>
                     ) : isRestrictedMember(member) ? (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>—</span>
-                    ) : (rules.no_projects_led_required && rules.no_volunteering_required) ? (
-                      <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
-                        <CheckCircle2 size={11} /> Waived (Quota Exempt)
-                      </span>
-                    ) : part.meetsQuota ? (
-                      <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
-                        <CheckCircle2 size={11} /> Met ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}V`})
-                      </span>
                     ) : (
-                      <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} title={`Must lead >= ${rules.required_projects_led} project(s) and volunteer in >= ${rules.required_volunteering} initiative(s) per semester`}>
-                        <AlertTriangle size={11} /> Deficit ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}/${rules.required_projects_led}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}/${rules.required_volunteering}V`})
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
+                        {(rules.no_projects_led_required && rules.no_volunteering_required) ? (
+                          <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                            <CheckCircle2 size={11} /> Waived (Quota Exempt)
+                          </span>
+                        ) : part.meetsQuota ? (
+                          <span className="status-pill eligible" style={{ fontSize: '0.68rem', padding: '0.2rem 0.55rem' }}>
+                            <CheckCircle2 size={11} /> Met ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}V`})
+                          </span>
+                        ) : (
+                          <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.68rem', padding: '0.2rem 0.55rem' }} title={`Must lead >= ${rules.required_projects_led} project(s) and volunteer in >= ${rules.required_volunteering} initiative(s) per semester`}>
+                            <AlertTriangle size={11} /> Deficit ({rules.no_projects_led_required ? 'Waived' : `${part.ledCount}/${rules.required_projects_led}L`} • {rules.no_volunteering_required ? 'Waived' : `${part.volCount}/${rules.required_volunteering}V`})
+                          </span>
+                        )}
+
+                        {isLeadership && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.68rem', color: 'var(--color-navy)' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.18rem' }} title="Arrange Projects Led count">
+                              <span style={{ fontWeight: 700, color: 'var(--color-text-muted)' }}>Led:</span>
+                              <button
+                                type="button"
+                                disabled={adjustingMemberId === member.id || part.ledCount <= 0}
+                                onClick={() => handleQuickAdjustCount(member, part.ledCount - 1, part.volCount)}
+                                style={{ width: '17px', height: '17px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: 'var(--color-navy)', borderRadius: '2px', cursor: part.ledCount <= 0 ? 'not-allowed' : 'pointer', opacity: part.ledCount <= 0 ? 0.45 : 1, padding: 0 }}
+                              >
+                                <Minus size={10} />
+                              </button>
+                              <strong style={{ minWidth: '12px', textAlign: 'center' }}>{part.ledCount}</strong>
+                              <button
+                                type="button"
+                                disabled={adjustingMemberId === member.id}
+                                onClick={() => handleQuickAdjustCount(member, part.ledCount + 1, part.volCount)}
+                                style={{ width: '17px', height: '17px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: 'var(--color-navy)', borderRadius: '2px', cursor: 'pointer', padding: 0 }}
+                              >
+                                <Plus size={10} />
+                              </button>
+                            </span>
+
+                            <span style={{ color: 'var(--color-border)' }}>|</span>
+
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.18rem' }} title="Arrange Times Volunteered count">
+                              <span style={{ fontWeight: 700, color: 'var(--color-text-muted)' }}>Vol:</span>
+                              <button
+                                type="button"
+                                disabled={adjustingMemberId === member.id || part.volCount <= 0}
+                                onClick={() => handleQuickAdjustCount(member, part.ledCount, part.volCount - 1)}
+                                style={{ width: '17px', height: '17px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: 'var(--color-navy)', borderRadius: '2px', cursor: part.volCount <= 0 ? 'not-allowed' : 'pointer', opacity: part.volCount <= 0 ? 0.45 : 1, padding: 0 }}
+                              >
+                                <Minus size={10} />
+                              </button>
+                              <strong style={{ minWidth: '12px', textAlign: 'center' }}>{part.volCount}</strong>
+                              <button
+                                type="button"
+                                disabled={adjustingMemberId === member.id}
+                                onClick={() => handleQuickAdjustCount(member, part.ledCount, part.volCount + 1)}
+                                style={{ width: '17px', height: '17px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF', color: 'var(--color-navy)', borderRadius: '2px', cursor: 'pointer', padding: 0 }}
+                              >
+                                <Plus size={10} />
+                              </button>
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap', paddingRight: '1.25rem' }} onClick={e => e.stopPropagation()}>

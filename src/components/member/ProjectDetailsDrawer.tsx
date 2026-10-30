@@ -35,6 +35,7 @@ import {
   FileSpreadsheet,
   Search,
   ArrowRight,
+  Plus,
 } from 'lucide-react';
 import {
   parseVolunteeringConfig,
@@ -42,6 +43,11 @@ import {
   getDisplayComments,
   resolveStageReviewer,
 } from '../../lib/projectVolunteerHelper';
+import {
+  fetchManualParticipationLedger,
+  addManualParticipationEntry,
+  type ManualParticipationType,
+} from '../../lib/manualParticipationHelper';
 
 interface ProjectDetailsDrawerProps {
   project: ProjectProposal | null;
@@ -118,23 +124,114 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
     setVolInstructions(volunteeringConfig.instructions || '');
   }, [project?.comments]);
 
-  // Load volunteers for this project
+  // Leadership manual credit addition on project
+  const [showManualAddBar, setShowManualAddBar] = useState(false);
+  const [manualMemberId, setManualMemberId] = useState('');
+  const [manualCreditRole, setManualCreditRole] = useState<ManualParticipationType>('volunteered');
+  const [manualCreditNote, setManualCreditNote] = useState('');
+  const [addingManualMember, setAddingManualMember] = useState(false);
+
+  // Load volunteers for this project (merging manual ledger volunteer credits for this project)
   const loadVolunteers = async () => {
     if (!project?.id) return;
     setLoadingVolunteers(true);
     try {
-      const { data, error } = await supabase
-        .from('project_volunteers')
-        .select('*')
-        .eq('project_id', project.id)
-        .order('created_at', { ascending: true });
-      if (!error && data) {
-        setVolunteers(data as ProjectVolunteer[]);
-      }
+      const [{ data, error }, ledgerData] = await Promise.all([
+        supabase
+          .from('project_volunteers')
+          .select('*')
+          .eq('project_id', project.id)
+          .order('created_at', { ascending: true }),
+        fetchManualParticipationLedger(),
+      ]);
+
+      const dbVols: ProjectVolunteer[] = (!error && data ? (data as ProjectVolunteer[]) : []);
+      const existingEmails = new Set(
+        dbVols.map((v) => (v.student_email || '').toLowerCase().trim()).filter(Boolean)
+      );
+      const existingUserIds = new Set(
+        dbVols.map((v) => v.user_id).filter(Boolean)
+      );
+
+      const manualProjectVols: ProjectVolunteer[] = ledgerData.entries
+        .filter((e) => e.type === 'volunteered' && e.project_id === project.id)
+        .filter((e) => {
+          const emailLower = (e.user_email || '').toLowerCase().trim();
+          if (e.user_id && existingUserIds.has(e.user_id)) return false;
+          if (emailLower && existingEmails.has(emailLower)) return false;
+          return true;
+        })
+        .map((e) => ({
+          id: e.id,
+          project_id: project.id,
+          user_id: e.user_id || '',
+          student_name: e.user_name,
+          student_email: e.user_email,
+          role_description: e.role_description || 'Manual Leadership Credit',
+          status: 'confirmed' as VolunteerApplicationStatus,
+          attended: true,
+          confirmed_at: e.created_at,
+          created_at: e.created_at,
+        }));
+
+      setVolunteers([...dbVols, ...manualProjectVols]);
     } catch (err) {
       console.error('Failed to load volunteers:', err);
     } finally {
       setLoadingVolunteers(false);
+    }
+  };
+
+  const handleManualAddMemberToProject = async () => {
+    if (!isLeadership || !project || !manualMemberId || addingManualMember) return;
+    const targetProfile = profilesMap[manualMemberId];
+    if (!targetProfile || !targetProfile.email) {
+      await alert({
+        title: 'Select a Member',
+        message: 'Please select a chapter member to credit on this project.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setAddingManualMember(true);
+    try {
+      const res = await addManualParticipationEntry({
+        member: {
+          id: manualMemberId,
+          email: targetProfile.email,
+          full_name: targetProfile.full_name,
+        },
+        type: manualCreditRole,
+        projectId: project.id,
+        projectTitle: project.project_title,
+        semesterId: project.semester_id || null,
+        eventDate: project.event_date || new Date().toISOString().split('T')[0],
+        location: project.location || 'CAS Campus',
+        roleDescription:
+          manualCreditNote.trim() ||
+          (manualCreditRole === 'led'
+            ? 'Manually credited Co-Leader by NHS Leadership'
+            : 'Manually credited Volunteer by NHS Leadership'),
+        addedByUserId: user?.id || null,
+        addedByName: profile?.full_name || user?.email || 'Leadership',
+      });
+
+      if (res.success) {
+        setManualMemberId('');
+        setManualCreditNote('');
+        setShowManualAddBar(false);
+        await loadVolunteers();
+        onUpdated();
+      } else {
+        await alert({
+          title: 'Failed to Add Credit',
+          message: res.error || 'Could not save manual project credit.',
+          variant: 'danger',
+        });
+      }
+    } finally {
+      setAddingManualMember(false);
     }
   };
 
@@ -1923,10 +2020,83 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                           </span>
                         )}
                       </span>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
-                        Target Capacity: {project.volunteers_needed || 0} students
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                          Target Capacity: {project.volunteers_needed || 0} students
+                        </span>
+                        {isLeadership && (
+                          <button
+                            type="button"
+                            onClick={() => setShowManualAddBar(!showManualAddBar)}
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '0.22rem 0.6rem',
+                              backgroundColor: showManualAddBar ? 'var(--color-navy)' : 'var(--color-oxford)',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                            }}
+                          >
+                            <Plus size={12} />
+                            <span>{showManualAddBar ? 'Close Manual Add' : 'Manually Credit Member'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {isLeadership && showManualAddBar && (
+                      <div style={{ padding: '0.85rem 1rem', backgroundColor: '#EFF6FF', borderBottom: '1px solid #BFDBFE', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                        <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--color-navy)' }}>
+                          Manually Add Confirmed Volunteer or Co-Leader to "{project.project_title}"
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <select
+                            value={manualMemberId}
+                            onChange={(e) => setManualMemberId(e.target.value)}
+                            style={{ flex: '1', minWidth: '190px', padding: '0.38rem 0.5rem', fontSize: '0.78rem', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}
+                          >
+                            <option value="">— Select Chapter Member —</option>
+                            {Object.entries(profilesMap)
+                              .filter(([, p]) => p.role === 'member' || p.role === 'leadership')
+                              .sort((a, b) => a[1].full_name.localeCompare(b[1].full_name))
+                              .map(([id, p]) => (
+                                <option key={id} value={id}>
+                                  {p.full_name} ({p.email})
+                                </option>
+                              ))}
+                          </select>
+                          <select
+                            value={manualCreditRole}
+                            onChange={(e) => setManualCreditRole(e.target.value as ManualParticipationType)}
+                            style={{ padding: '0.38rem 0.5rem', fontSize: '0.78rem', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}
+                          >
+                            <option value="volunteered">Confirmed Volunteer (+1 Volunteering)</option>
+                            <option value="led">Co-Leader (+1 Projects Led)</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={manualCreditNote}
+                            onChange={(e) => setManualCreditNote(e.target.value)}
+                            placeholder="Optional role / verification note..."
+                            style={{ flex: '1', minWidth: '160px', padding: '0.38rem 0.5rem', fontSize: '0.78rem', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            disabled={!manualMemberId || addingManualMember}
+                            onClick={handleManualAddMemberToProject}
+                            style={{ fontSize: '0.75rem', padding: '0.38rem 0.75rem' }}
+                          >
+                            {addingManualMember ? 'Adding...' : 'Add Credit'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Filter & Search Bar */}
                     <div style={{ padding: '0.65rem 1rem', backgroundColor: '#FAFAFA', borderBottom: '1px solid var(--color-border)', display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
