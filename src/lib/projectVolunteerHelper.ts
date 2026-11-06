@@ -107,28 +107,202 @@ export function createCommentsWithVolunteeringUpdate(
     author_role: authorRole,
     content: auditContent,
     created_at: new Date().toISOString(),
+    is_approval_message: true,
   };
 
   return [...otherComments, configComment, auditComment];
 }
 
 /**
- * Filters out internal system comments (like __volunteering_config__ and __proposal_rubric__) for display in comment feeds
+ * Safely normalizes comments from JSON or array into a ProjectComment[]
  */
-export function getDisplayComments(comments?: ProjectComment[] | string | null): ProjectComment[] {
+export function normalizeCommentList(comments?: ProjectComment[] | string | null): ProjectComment[] {
   if (!comments) return [];
-  let list: ProjectComment[] = [];
   if (Array.isArray(comments)) {
-    list = comments;
-  } else if (typeof comments === 'string') {
+    return comments.filter(Boolean);
+  }
+  if (typeof comments === 'string') {
     try {
       const parsed = JSON.parse(comments);
-      if (Array.isArray(parsed)) list = parsed;
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
     } catch {
       return [];
     }
   }
-  return list.filter((c) => c && c.id !== '__volunteering_config__' && c.id !== '__proposal_rubric__');
+  return [];
+}
+
+/**
+ * Returns true if the comment is an internal serialized config entry (volunteering config or proposal rubric)
+ */
+export function isInternalConfigComment(comment?: ProjectComment | null): boolean {
+  if (!comment) return true;
+  return comment.id === '__volunteering_config__' || comment.id === '__proposal_rubric__';
+}
+
+/**
+ * Returns true if the comment is an automated stage approval/rejection message or system audit message
+ * that belongs in the dedicated Approval Messages section rather than the user comments thread.
+ */
+export function isApprovalOrAuditMessage(comment?: ProjectComment | null): boolean {
+  if (!comment || isInternalConfigComment(comment)) return false;
+  if (comment.is_approval_message === true) return true;
+  if (comment.author_role === 'system') return true;
+
+  const text = (comment.content || '').trim();
+  if (!text) return false;
+
+  // Stage 1 / 2 / 3 approval or rejection determination messages
+  if (/^Stage\s+[123]\b.*:\s*(APPROVED|REJECTED)\b/i.test(text)) return true;
+  if (/^Stage\s+[123]\s+(Leadership|Faculty|Supervisor|Administrator|Determination|Sign-Off|Final)/i.test(text)) return true;
+  // Volunteer recruitment or project lifecycle system audit logs
+  if (/^(Opened|Closed)\s+volunteer\s+recruitment\b/i.test(text)) return true;
+  if (/^Project\s+(concluded|reopened|archived)\b/i.test(text)) return true;
+
+  return false;
+}
+
+/**
+ * Extracts only the approval / decision / audit messages for display in their own dedicated section
+ */
+export function getApprovalMessages(comments?: ProjectComment[] | string | null): ProjectComment[] {
+  const list = normalizeCommentList(comments);
+  return list.filter((c) => !isInternalConfigComment(c) && isApprovalOrAuditMessage(c));
+}
+
+/**
+ * Resolves the timestamp (in ms) when the proposal passed Stage 3 (final approval).
+ * Returns null if the proposal has not yet passed final approval.
+ */
+export function getStage3ApprovedTimestamp(proposal?: ProjectProposal | null): number | null {
+  if (!proposal) return null;
+  const isApprovedOrCompleted = proposal.status === 'approved' || proposal.status === 'completed';
+  if (!isApprovedOrCompleted) return null;
+
+  if (proposal.administrator_reviewed_at) {
+    const ts = Date.parse(proposal.administrator_reviewed_at);
+    if (!isNaN(ts)) return ts;
+  }
+
+  const list = normalizeCommentList(proposal.comments);
+  // Look for Stage 3 approval message timestamp
+  for (let i = list.length - 1; i >= 0; i--) {
+    const c = list[i];
+    const contentLower = (c.content || '').toLowerCase();
+    if (contentLower.includes('stage 3') && contentLower.includes('approved') && c.created_at) {
+      const ts = Date.parse(c.created_at);
+      if (!isNaN(ts)) return ts;
+    }
+  }
+
+  // Fallback for 2-stage direct ratification
+  if (proposal.supervisor_reviewed_at) {
+    const ts = Date.parse(proposal.supervisor_reviewed_at);
+    if (!isNaN(ts)) return ts;
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    const c = list[i];
+    const contentLower = (c.content || '').toLowerCase();
+    if (contentLower.includes('stage 2') && contentLower.includes('approved') && c.created_at) {
+      const ts = Date.parse(c.created_at);
+      if (!isNaN(ts)) return ts;
+    }
+  }
+
+  if (proposal.leadership_reviewed_at) {
+    const ts = Date.parse(proposal.leadership_reviewed_at);
+    if (!isNaN(ts)) return ts;
+  }
+
+  return null;
+}
+
+/**
+ * Determines whether a comment was posted before 3rd-stage approval.
+ */
+export function isPreStage3Comment(comment: ProjectComment, proposal?: ProjectProposal | null): boolean {
+  if (comment.pre_approval === true) return true;
+  if (comment.pre_approval === false) return false;
+  if (!proposal) return false;
+
+  const isApprovedOrCompleted = proposal.status === 'approved' || proposal.status === 'completed';
+  if (!isApprovedOrCompleted) {
+    // Project has not reached 3rd-stage approval yet, so all comments on it are pre-3rd-stage
+    return true;
+  }
+
+  const stage3Ts = getStage3ApprovedTimestamp(proposal);
+  if (stage3Ts !== null && comment.created_at) {
+    const commentTs = Date.parse(comment.created_at);
+    if (!isNaN(commentTs)) {
+      return commentTs <= stage3Ts + 1000;
+    }
+  }
+
+  return false;
+}
+
+export interface DisplayCommentsOptions {
+  proposal?: ProjectProposal | null;
+  isRegularMember?: boolean;
+}
+
+/**
+ * Filters out internal system configs AND approval/audit messages so only genuine comments appear in comment feeds.
+ * When `options.isRegularMember` is true, also hides administrator comments and comments written before 3rd-stage approval.
+ */
+export function getDisplayComments(
+  comments?: ProjectComment[] | string | null,
+  options?: DisplayCommentsOptions
+): ProjectComment[] {
+  const list = normalizeCommentList(comments);
+  const humanComments = list.filter((c) => !isInternalConfigComment(c) && !isApprovalOrAuditMessage(c));
+
+  if (options?.isRegularMember) {
+    return humanComments.filter((c) => {
+      if (c.author_role === 'administrator') return false;
+      if (isPreStage3Comment(c, options.proposal)) return false;
+      return true;
+    });
+  }
+
+  return humanComments;
+}
+
+/**
+ * A user can ONLY modify/edit their own comment.
+ * Moderators / Leadership CANNOT modify someone else's comment.
+ */
+export function canEditComment(
+  comment?: ProjectComment | null,
+  user?: { id?: string | null; email?: string | null } | null
+): boolean {
+  if (!comment || !user) return false;
+  if (isInternalConfigComment(comment) || isApprovalOrAuditMessage(comment)) return false;
+
+  const byId = Boolean(user.id && comment.author_id && user.id === comment.author_id);
+  const byEmail = Boolean(
+    user.email &&
+      comment.author_email &&
+      user.email.toLowerCase().trim() === comment.author_email.toLowerCase().trim()
+  );
+
+  return byId || byEmail;
+}
+
+/**
+ * A user can delete their own comment, AND Leadership (`isLeadership`) acts as a moderator
+ * who can delete any comment.
+ */
+export function canDeleteComment(
+  comment?: ProjectComment | null,
+  user?: { id?: string | null; email?: string | null } | null,
+  isLeadership?: boolean
+): boolean {
+  if (!comment || !user) return false;
+  if (isInternalConfigComment(comment) || isApprovalOrAuditMessage(comment)) return false;
+
+  return canEditComment(comment, user) || Boolean(isLeadership);
 }
 
 /**

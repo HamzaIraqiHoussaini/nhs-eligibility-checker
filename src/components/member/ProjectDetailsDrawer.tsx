@@ -42,6 +42,11 @@ import {
   parseVolunteeringConfig,
   createCommentsWithVolunteeringUpdate,
   getDisplayComments,
+  getApprovalMessages,
+  isPreStage3Comment,
+  canEditComment,
+  canDeleteComment,
+  normalizeCommentList,
   resolveStageReviewer,
 } from '../../lib/projectVolunteerHelper';
 import {
@@ -71,6 +76,10 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   const { confirm, alert } = useConfirm();
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [savingCommentEdit, setSavingCommentEdit] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -271,21 +280,17 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
   // Rule: Proposals can only be deleted if they haven't been approved (pending or rejected), and is_yearly cannot be deleted
   const canDelete = !isApprovedOrCompleted && !project.is_yearly && (isOwner || isSuperadmin || isLeadership);
 
-  // Safe comment normalization
-  const comments: ProjectComment[] = Array.isArray(project.comments)
-    ? project.comments
-    : typeof project.comments === 'string'
-    ? (() => {
-        try {
-          const parsed = JSON.parse(project.comments);
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return [];
-        }
-      })()
-    : [];
+  const isStaffOrLeadership = Boolean(isLeadership || isSupervisor || isAdministrator);
+  const isRegularMember = !isStaffOrLeadership;
 
-  const displayComments = getDisplayComments(comments);
+  // Safe comment normalization & separation of approval messages vs user comments
+  const comments: ProjectComment[] = normalizeCommentList(project.comments);
+  const approvalMessages = getApprovalMessages(comments);
+  const displayComments = getDisplayComments(comments, {
+    proposal: project,
+    isRegularMember,
+  });
+  const canViewCommentsSection = isStaffOrLeadership || isApprovedOrCompleted;
 
   const myVolunteerRecord = volunteers.find(
     (v) => Boolean(
@@ -786,6 +791,8 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       author_role: authorRole as any,
       content: commentText.trim(),
       created_at: new Date().toISOString(),
+      pre_approval: !isApprovedOrCompleted,
+      is_approval_message: false,
     };
 
     const updatedComments = [...comments, newComment];
@@ -814,6 +821,97 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       });
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleSaveEditComment = async (targetComment: ProjectComment) => {
+    if (!user || !editingCommentText.trim() || savingCommentEdit) return;
+    // Strict rule: ONLY the comment author can modify their own comment (moderators/leadership CANNOT modify others' comments)
+    if (!canEditComment(targetComment, user)) {
+      await alert({
+        title: 'Action Not Permitted',
+        message: 'You can only modify your own comments. Moderators can delete comments, but cannot edit another user\'s comment.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setSavingCommentEdit(true);
+    try {
+      const updatedComments = comments.map((c) =>
+        c.id === targetComment.id
+          ? {
+              ...c,
+              content: editingCommentText.trim(),
+              updated_at: new Date().toISOString(),
+            }
+          : c
+      );
+
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', project.id);
+
+      if (error) throw error;
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      onUpdated();
+    } catch (err: any) {
+      await alert({
+        title: 'Failed to Update Comment',
+        message: err.message || 'Could not save comment changes.',
+        variant: 'danger',
+      });
+    } finally {
+      setSavingCommentEdit(false);
+    }
+  };
+
+  const handleDeleteComment = async (targetComment: ProjectComment) => {
+    if (!user || deletingCommentId) return;
+    const isOwnComment = canEditComment(targetComment, user);
+    if (!canDeleteComment(targetComment, user, isLeadership)) {
+      await alert({
+        title: 'Action Not Permitted',
+        message: 'You do not have permission to remove this comment.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: isOwnComment ? 'Delete Your Comment' : 'Moderator Action: Remove Comment',
+      message: isOwnComment
+        ? 'Are you sure you want to permanently remove your comment?'
+        : `As a chapter moderator, are you sure you want to remove this comment by ${targetComment.author_name || 'this user'}?`,
+      confirmText: isOwnComment ? 'Delete Comment' : 'Remove Comment',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    setDeletingCommentId(targetComment.id);
+    try {
+      const updatedComments = comments.filter((c) => c.id !== targetComment.id);
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', project.id);
+
+      if (error) throw error;
+      if (editingCommentId === targetComment.id) {
+        setEditingCommentId(null);
+        setEditingCommentText('');
+      }
+      onUpdated();
+    } catch (err: any) {
+      await alert({
+        title: 'Failed to Remove Comment',
+        message: err.message || 'Could not remove comment.',
+        variant: 'danger',
+      });
+    } finally {
+      setDeletingCommentId(null);
     }
   };
 
@@ -881,7 +979,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       case 'approved':
         return (
           <span className="status-pill eligible" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <CheckCircle2 size={13} /> Approved by Administrator
+            <CheckCircle2 size={13} /> {isStaffOrLeadership ? 'Approved by Administrator' : 'Active Project'}
           </span>
         );
       case 'completed':
@@ -901,26 +999,26 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
       case 'rejected_administrator':
         return (
           <span className="status-pill ineligible" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <XCircle size={13} /> Rejected ({project.status === 'rejected_leadership' ? 'Leadership' : project.status === 'rejected_supervisor' ? 'Supervisor' : 'Administrator'})
+            <XCircle size={13} /> {isStaffOrLeadership ? `Rejected (${project.status === 'rejected_leadership' ? 'Leadership' : project.status === 'rejected_supervisor' ? 'Supervisor' : 'Administrator'})` : 'Revision Needed'}
           </span>
         );
       case 'pending_administrator':
         return (
           <span className="status-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}>
-            <Clock size={13} /> Stage 3: Pending Administrator Review
+            <Clock size={13} /> {isStaffOrLeadership ? 'Stage 3: Pending Administrator Review' : 'Under Review'}
           </span>
         );
       case 'pending_supervisor':
         return (
           <span className="status-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#DBEAFE', color: '#1E40AF' }}>
-            <Clock size={13} /> Stage 2: Pending Supervisor Review
+            <Clock size={13} /> {isStaffOrLeadership ? 'Stage 2: Pending Supervisor Review' : 'Under Review'}
           </span>
         );
       case 'pending_leadership':
       default:
         return (
           <span className="status-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#FEF3C7', color: '#92400E' }}>
-            <Clock size={13} /> Stage 1: Pending Leadership Review
+            <Clock size={13} /> {isStaffOrLeadership ? 'Stage 1: Pending Leadership Review' : 'Under Review'}
           </span>
         );
     }
@@ -963,7 +1061,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   ID: {project.id ? String(project.id).slice(0, 8) : ''}
                 </span>
               )}
-              {(isLeadership || ((isOwner || isCoLeader) && !isApprovedOrCompleted)) && displayComments.length > 0 && (
+              {canViewCommentsSection && displayComments.length > 0 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -982,7 +1080,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
-                  title="Jump to revision feedback comments"
+                  title="Jump to comments"
                 >
                   <MessageSquare size={12} /> {displayComments.length} Comment{displayComments.length > 1 ? 's' : ''}
                 </button>
@@ -1298,6 +1396,49 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Dedicated Approval & Decision Audit Messages Section (Separated from User Comments) */}
+                {approvalMessages.length > 0 && (
+                  <div style={{ marginTop: '1rem', paddingTop: '0.9rem', borderTop: '1px solid #E2E8F0' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <FileCheck size={13} color="var(--color-oxford)" />
+                      Official Approval & Decision Log ({approvalMessages.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      {approvalMessages.map((msg, idx) => {
+                        const msgDate = msg.created_at ? new Date(msg.created_at) : null;
+                        const formattedMsgDate = msgDate && !isNaN(msgDate.getTime())
+                          ? `${msgDate.toLocaleDateString()} at ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : '';
+                        return (
+                          <div
+                            key={msg.id || `approval-msg-${idx}`}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #E2E8F0',
+                              borderLeft: '3px solid var(--color-oxford)',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '0.5rem',
+                              fontSize: '0.78rem',
+                            }}
+                          >
+                            <span style={{ color: 'var(--color-navy)', fontWeight: 500 }}>{msg.content}</span>
+                            {formattedMsgDate && (
+                              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                                {formattedMsgDate}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -1480,7 +1621,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   <strong>Supervisor Feedback:</strong> {project.supervisor_notes}
                 </div>
               )}
-              {project.administrator_notes && (
+              {isStaffOrLeadership && project.administrator_notes && (
                 <div style={{ fontSize: '0.82rem', color: '#991B1B', marginTop: '0.35rem' }}>
                   <strong>Administrator Feedback:</strong> {project.administrator_notes}
                 </div>
@@ -2256,21 +2397,30 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
             </div>
           )}
 
-          {/* Reviewer Comments & Revision Feedback Thread */}
-          {(isLeadership || ((isOwner || isCoLeader) && !isApprovedOrCompleted)) && (
+          {/* Project Comments & Feedback Thread (Approval messages separated into their own section; pre-Stage-3 & admin comments hidden for regular members) */}
+          {canViewCommentsSection && (
           <div ref={commentsRef} id="comments-section" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-              <MessageSquare size={16} color="var(--color-oxford)" />
-              <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
-                Revision Feedback & Comments ({displayComments.length})
-              </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MessageSquare size={16} color="var(--color-oxford)" />
+                <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
+                  {isRegularMember ? `Project Comments (${displayComments.length})` : `Comments & Discussion (${displayComments.length})`}
+                </h3>
+              </div>
+              {isLeadership && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                  Moderator Mode: You may remove any comment, and edit your own comments.
+                </span>
+              )}
             </div>
 
             {/* Comments List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.25rem' }}>
               {displayComments.length === 0 ? (
                 <div style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--color-canvas)', border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
-                  No comments or revision feedback posted yet. Leadership and supervisors can leave instructions here.
+                  {isRegularMember
+                    ? 'No comments posted on this project yet.'
+                    : 'No comments posted yet. Leave a comment or feedback note below.'}
                 </div>
               ) : (
                 displayComments.map((comment, index) => {
@@ -2280,6 +2430,11 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                   const formattedDate = isValidDate
                     ? `${commentDate.toLocaleDateString()} at ${commentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                     : '';
+                  const isOwn = canEditComment(comment, user);
+                  const canRemove = canDeleteComment(comment, user, isLeadership);
+                  const isEditingThis = editingCommentId === comment.id;
+                  const isDeletingThis = deletingCommentId === comment.id;
+                  const isPreApproval = isPreStage3Comment(comment, project);
 
                   return (
                     <div
@@ -2299,9 +2454,9 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <strong style={{ fontSize: '0.85rem', color: 'var(--color-navy)' }}>
-                            {comment.author_name || 'Anonymous Reviewer'}
+                            {comment.author_name || 'Member'}
                           </strong>
                           {comment.author_role && (
                             <span
@@ -2343,16 +2498,129 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
                                 : comment.author_role}
                             </span>
                           )}
+                          {isStaffOrLeadership && isPreApproval && (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '0.08rem 0.4rem',
+                                backgroundColor: '#F1F5F9',
+                                color: '#64748B',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '2px',
+                                fontWeight: 600,
+                              }}
+                              title="Posted prior to Stage 3 approval (hidden from regular members)"
+                            >
+                              Pre-Stage 3 Review
+                            </span>
+                          )}
                         </div>
-                        {formattedDate && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                            {formattedDate}
-                          </span>
-                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {formattedDate && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                              {formattedDate}
+                              {comment.updated_at ? ' (edited)' : ''}
+                            </span>
+                          )}
+
+                          {/* Edit Own Comment Button (ONLY the comment author can edit; moderators cannot edit others' comments) */}
+                          {isOwn && !isEditingThis && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCommentId(comment.id);
+                                setEditingCommentText(comment.content);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                padding: '0.15rem 0.45rem',
+                                backgroundColor: '#FFFFFF',
+                                color: 'var(--color-navy)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                              }}
+                              title="Modify your comment"
+                            >
+                              <Edit3 size={11} /> Edit
+                            </button>
+                          )}
+
+                          {/* Delete Comment Button (Author can delete own comment; Leadership can delete any comment as Moderator) */}
+                          {canRemove && !isEditingThis && (
+                            <button
+                              type="button"
+                              disabled={isDeletingThis}
+                              onClick={() => handleDeleteComment(comment)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                padding: '0.15rem 0.45rem',
+                                backgroundColor: '#FFFFFF',
+                                color: 'var(--color-terracotta)',
+                                border: '1px solid #FECACA',
+                                borderRadius: '3px',
+                                cursor: isDeletingThis ? 'not-allowed' : 'pointer',
+                              }}
+                              title={isOwn ? 'Delete your comment' : 'Moderator: Remove this comment'}
+                            >
+                              <Trash2 size={11} /> {isDeletingThis ? 'Removing...' : isOwn ? 'Delete' : 'Remove'}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p style={{ margin: '0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
-                        {comment.content}
-                      </p>
+
+                      {isEditingThis ? (
+                        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <textarea
+                            rows={2}
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.7rem',
+                              border: '1px solid var(--color-oxford)',
+                              fontSize: '0.84rem',
+                              backgroundColor: '#FFFFFF',
+                              resize: 'vertical',
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.45rem' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ fontSize: '0.74rem', padding: '0.28rem 0.65rem' }}
+                              onClick={() => {
+                                setEditingCommentId(null);
+                                setEditingCommentText('');
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              disabled={savingCommentEdit || !editingCommentText.trim()}
+                              style={{ fontSize: '0.74rem', padding: '0.28rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => handleSaveEditComment(comment)}
+                            >
+                              <Save size={12} /> {savingCommentEdit ? 'Saving...' : 'Save Changes'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: '0', fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
+                          {comment.content}
+                        </p>
+                      )}
                     </div>
                   );
                 })
@@ -2364,7 +2632,7 @@ export const ProjectDetailsDrawer: React.FC<ProjectDetailsDrawerProps> = ({
               <textarea
                 rows={2}
                 required
-                placeholder="Write a comment or revision feedback for this proposal..."
+                placeholder={isRegularMember ? 'Write a comment on this project...' : 'Write a comment or feedback note...'}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 style={{

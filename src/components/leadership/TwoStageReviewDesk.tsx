@@ -4,7 +4,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import type { ProjectProposal, ProjectComment } from '../../types/nhs';
 import { notifyStage1Decision, notifyStage2Decision, notifyStage3Decision, notifyProjectComment } from '../../lib/projectNotificationOrchestrator';
-import { resolveStageReviewer, getDisplayComments } from '../../lib/projectVolunteerHelper';
+import {
+  resolveStageReviewer,
+  getDisplayComments,
+  getApprovalMessages,
+  canEditComment,
+  canDeleteComment,
+  normalizeCommentList,
+} from '../../lib/projectVolunteerHelper';
 import { FormattedProposalSections } from '../common/FormattedProposalSections';
 import {
   CheckCircle2,
@@ -17,6 +24,8 @@ import {
   Receipt,
   MessageSquare,
   Send,
+  Edit3,
+  Save,
   Trash2,
   ShieldCheck,
   Copy,
@@ -40,6 +49,10 @@ export const TwoStageReviewDesk: React.FC = () => {
   // Review & revision comment state
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [savingCommentEdit, setSavingCommentEdit] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   // Receipt review notes
   const [receiptFeedback, setReceiptFeedback] = useState('');
@@ -100,6 +113,7 @@ export const TwoStageReviewDesk: React.FC = () => {
         author_role: reviewerRole as any,
         content: `${stageName}: ${decision.toUpperCase()} by ${reviewerFullName}${decisionNotes.trim() ? ` — Notes: "${decisionNotes.trim()}"` : ''}`,
         created_at: new Date().toISOString(),
+        is_approval_message: true,
       };
 
       const updatedComments = [...(selectedProposal.comments || []), auditComment];
@@ -162,6 +176,7 @@ export const TwoStageReviewDesk: React.FC = () => {
             author_role: reviewerRole as any,
             content: `Stage 2 Faculty Supervisor Sign-Off: APPROVED by ${reviewerFullName} (Direct Chapter Ratification - 2-Stage Mode)${decisionNotes.trim() ? ` — Notes: "${decisionNotes.trim()}"` : ''}`,
             created_at: new Date().toISOString(),
+            is_approval_message: true,
           };
           updates.comments = [...(selectedProposal.comments || []), twoStageAuditComment];
 
@@ -320,6 +335,7 @@ export const TwoStageReviewDesk: React.FC = () => {
     const authorRole = profile?.role || (isAdministrator ? 'administrator' : isSupervisor ? 'supervisor' : isLeadership ? 'leadership' : 'member');
     const authorName = profile?.full_name || (isAdministrator ? 'Chapter Administrator' : isSupervisor ? 'Faculty Supervisor' : isLeadership ? 'Leadership Reviewer' : 'Reviewer');
 
+    const isApprovedOrCompleted = selectedProposal.status === 'approved' || selectedProposal.status === 'completed';
     const newComment: ProjectComment = {
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       author_id: user.id,
@@ -328,9 +344,11 @@ export const TwoStageReviewDesk: React.FC = () => {
       author_role: authorRole as any,
       content: commentText.trim(),
       created_at: new Date().toISOString(),
+      pre_approval: !isApprovedOrCompleted,
+      is_approval_message: false,
     };
 
-    const updatedComments = [...(selectedProposal.comments || []), newComment];
+    const updatedComments = [...normalizeCommentList(selectedProposal.comments), newComment];
 
     try {
       const { error } = await supabase
@@ -357,6 +375,100 @@ export const TwoStageReviewDesk: React.FC = () => {
       });
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleSaveEditComment = async (targetComment: ProjectComment) => {
+    if (!user || !selectedProposal || !editingCommentText.trim() || savingCommentEdit) return;
+    if (!canEditComment(targetComment, user)) {
+      await alert({
+        title: 'Action Not Permitted',
+        message: 'You can only modify your own comments. Moderators can delete comments, but cannot edit another user\'s comment.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setSavingCommentEdit(true);
+    try {
+      const currentComments = normalizeCommentList(selectedProposal.comments);
+      const updatedComments = currentComments.map((c) =>
+        c.id === targetComment.id
+          ? {
+              ...c,
+              content: editingCommentText.trim(),
+              updated_at: new Date().toISOString(),
+            }
+          : c
+      );
+
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', selectedProposal.id);
+
+      if (error) throw error;
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      setSelectedProposal({ ...selectedProposal, comments: updatedComments });
+      await loadProposals();
+    } catch (err: any) {
+      await alert({
+        title: 'Failed to Update Comment',
+        message: err.message || 'Could not save comment changes.',
+        variant: 'danger',
+      });
+    } finally {
+      setSavingCommentEdit(false);
+    }
+  };
+
+  const handleDeleteComment = async (targetComment: ProjectComment) => {
+    if (!user || !selectedProposal || deletingCommentId) return;
+    const isOwnComment = canEditComment(targetComment, user);
+    if (!canDeleteComment(targetComment, user, isLeadership)) {
+      await alert({
+        title: 'Action Not Permitted',
+        message: 'You do not have permission to remove this comment.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: isOwnComment ? 'Delete Your Comment' : 'Moderator Action: Remove Comment',
+      message: isOwnComment
+        ? 'Are you sure you want to permanently remove your comment?'
+        : `As a chapter moderator, are you sure you want to remove this comment by ${targetComment.author_name || 'this user'}?`,
+      confirmText: isOwnComment ? 'Delete Comment' : 'Remove Comment',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    setDeletingCommentId(targetComment.id);
+    try {
+      const currentComments = normalizeCommentList(selectedProposal.comments);
+      const updatedComments = currentComments.filter((c) => c.id !== targetComment.id);
+      const { error } = await supabase
+        .from('project_proposals')
+        .update({ comments: updatedComments })
+        .eq('id', selectedProposal.id);
+
+      if (error) throw error;
+      if (editingCommentId === targetComment.id) {
+        setEditingCommentId(null);
+        setEditingCommentText('');
+      }
+      setSelectedProposal({ ...selectedProposal, comments: updatedComments });
+      await loadProposals();
+    } catch (err: any) {
+      await alert({
+        title: 'Failed to Remove Comment',
+        message: err.message || 'Could not remove comment.',
+        variant: 'danger',
+      });
+    } finally {
+      setDeletingCommentId(null);
     }
   };
 
@@ -861,6 +973,53 @@ export const TwoStageReviewDesk: React.FC = () => {
                   );
                 })()}
               </div>
+
+              {/* Dedicated Approval & Decision Messages Section (Separated from User Comments) */}
+              {(() => {
+                const approvalMsgs = getApprovalMessages(selectedProposal.comments);
+                if (approvalMsgs.length === 0) return null;
+                return (
+                  <div style={{ marginTop: '0.9rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-navy)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <FileCheck size={12} color="var(--color-oxford)" />
+                      Official Approval & Decision Log ({approvalMsgs.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {approvalMsgs.map((msg, idx) => {
+                        const msgDate = msg.created_at ? new Date(msg.created_at) : null;
+                        const formattedMsgDate = msgDate && !isNaN(msgDate.getTime())
+                          ? `${msgDate.toLocaleDateString()} ${msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : '';
+                        return (
+                          <div
+                            key={msg.id || `approval-msg-${idx}`}
+                            style={{
+                              padding: '0.45rem 0.65rem',
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #E2E8F0',
+                              borderLeft: '3px solid var(--color-oxford)',
+                              borderRadius: '3px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '0.4rem',
+                              fontSize: '0.75rem',
+                            }}
+                          >
+                            <span style={{ color: 'var(--color-navy)', fontWeight: 500 }}>{msg.content}</span>
+                            {formattedMsgDate && (
+                              <span style={{ fontSize: '0.66rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                                {formattedMsgDate}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Event Specs */}
@@ -990,11 +1149,18 @@ export const TwoStageReviewDesk: React.FC = () => {
                 const displayComments = getDisplayComments(selectedProposal.comments);
                 return (
                   <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                      <MessageSquare size={16} color="var(--color-oxford)" />
-                      <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
-                        Revision Feedback & Comments ({displayComments.length})
-                      </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <MessageSquare size={16} color="var(--color-oxford)" />
+                        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.2rem', color: 'var(--color-navy)', margin: '0' }}>
+                          Revision Feedback & Comments ({displayComments.length})
+                        </h3>
+                      </div>
+                      {isLeadership && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                          Moderator Mode: You may remove any comment, and edit your own comments.
+                        </span>
+                      )}
                     </div>
 
                     {/* Comments list */}
@@ -1009,79 +1175,179 @@ export const TwoStageReviewDesk: React.FC = () => {
                           const cDateFormatted = cDate && !isNaN(cDate.getTime())
                             ? `${cDate.toLocaleDateString()} ${cDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                             : '';
+                          const isOwn = canEditComment(c, user);
+                          const canRemove = canDeleteComment(c, user, isLeadership);
+                          const isEditingThis = editingCommentId === c.id;
+                          const isDeletingThis = deletingCommentId === c.id;
+
                           return (
-                      <div
-                        key={c.id || `comment-${idx}`}
-                        style={{
-                          padding: '0.85rem 1rem',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid var(--color-border)',
-                          borderLeft:
-                            c.author_role === 'administrator'
-                              ? '3px solid #4338CA'
-                              : c.author_role === 'supervisor'
-                              ? '3px solid #0284C7'
-                              : c.author_role === 'leadership'
-                              ? '3px solid var(--color-oxford)'
-                              : '1px solid var(--color-border)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name || 'Reviewer'}</strong>
-                            {c.author_role && (
-                              <span
-                                className="grade-badge"
-                                style={{
-                                  textTransform: 'capitalize',
-                                  fontSize: '0.65rem',
-                                  backgroundColor:
-                                    c.author_role === 'administrator'
-                                      ? '#EEF2FF'
-                                      : c.author_role === 'supervisor'
-                                      ? '#E0F2FE'
-                                      : c.author_role === 'leadership'
-                                      ? '#FEF3C7'
-                                      : undefined,
-                                  color:
-                                    c.author_role === 'administrator'
-                                      ? '#4338CA'
-                                      : c.author_role === 'supervisor'
-                                      ? '#0369A1'
-                                      : c.author_role === 'leadership'
-                                      ? '#92400E'
-                                      : undefined,
-                                  borderColor:
-                                    c.author_role === 'administrator'
-                                      ? '#C7D2FE'
-                                      : c.author_role === 'supervisor'
-                                      ? '#BAE6FD'
-                                      : c.author_role === 'leadership'
-                                      ? '#FDE68A'
-                                      : undefined,
-                                }}
-                              >
-                                {c.author_role === 'administrator' ? 'Administrator' : c.author_role}
-                              </span>
-                            )}
-                          </div>
-                          {cDateFormatted && (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
-                              {cDateFormatted}
-                            </span>
-                          )}
-                        </div>
-                        <p style={{ margin: '0', fontSize: '0.82rem', lineHeight: '1.5', color: 'var(--color-text-primary)' }}>
-                          {c.content}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </>
-          );
-        })()}
+                            <div
+                              key={c.id || `comment-${idx}`}
+                              style={{
+                                padding: '0.85rem 1rem',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid var(--color-border)',
+                                borderLeft:
+                                  c.author_role === 'administrator'
+                                    ? '3px solid #4338CA'
+                                    : c.author_role === 'supervisor'
+                                    ? '3px solid #0284C7'
+                                    : c.author_role === 'leadership'
+                                    ? '3px solid var(--color-oxford)'
+                                    : '1px solid var(--color-border)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <strong style={{ fontSize: '0.82rem', color: 'var(--color-navy)' }}>{c.author_name || 'Reviewer'}</strong>
+                                  {c.author_role && (
+                                    <span
+                                      className="grade-badge"
+                                      style={{
+                                        textTransform: 'capitalize',
+                                        fontSize: '0.65rem',
+                                        backgroundColor:
+                                          c.author_role === 'administrator'
+                                            ? '#EEF2FF'
+                                            : c.author_role === 'supervisor'
+                                            ? '#E0F2FE'
+                                            : c.author_role === 'leadership'
+                                            ? '#FEF3C7'
+                                            : undefined,
+                                        color:
+                                          c.author_role === 'administrator'
+                                            ? '#4338CA'
+                                            : c.author_role === 'supervisor'
+                                            ? '#0369A1'
+                                            : c.author_role === 'leadership'
+                                            ? '#92400E'
+                                            : undefined,
+                                        borderColor:
+                                          c.author_role === 'administrator'
+                                            ? '#C7D2FE'
+                                            : c.author_role === 'supervisor'
+                                            ? '#BAE6FD'
+                                            : c.author_role === 'leadership'
+                                            ? '#FDE68A'
+                                            : undefined,
+                                      }}
+                                    >
+                                      {c.author_role === 'administrator' ? 'Administrator' : c.author_role}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                                  {cDateFormatted && (
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
+                                      {cDateFormatted}
+                                      {c.updated_at ? ' (edited)' : ''}
+                                    </span>
+                                  )}
+
+                                  {isOwn && !isEditingThis && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingCommentId(c.id);
+                                        setEditingCommentText(c.content);
+                                      }}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        padding: '0.12rem 0.4rem',
+                                        backgroundColor: '#FFFFFF',
+                                        color: 'var(--color-navy)',
+                                        border: '1px solid var(--color-border)',
+                                        borderRadius: '3px',
+                                        cursor: 'pointer',
+                                      }}
+                                      title="Modify your comment"
+                                    >
+                                      <Edit3 size={10} /> Edit
+                                    </button>
+                                  )}
+
+                                  {canRemove && !isEditingThis && (
+                                    <button
+                                      type="button"
+                                      disabled={isDeletingThis}
+                                      onClick={() => handleDeleteComment(c)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        padding: '0.12rem 0.4rem',
+                                        backgroundColor: '#FFFFFF',
+                                        color: 'var(--color-terracotta)',
+                                        border: '1px solid #FECACA',
+                                        borderRadius: '3px',
+                                        cursor: isDeletingThis ? 'not-allowed' : 'pointer',
+                                      }}
+                                      title={isOwn ? 'Delete your comment' : 'Moderator: Remove this comment'}
+                                    >
+                                      <Trash2 size={10} /> {isDeletingThis ? 'Removing...' : isOwn ? 'Delete' : 'Remove'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {isEditingThis ? (
+                                <div style={{ marginTop: '0.45rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                  <textarea
+                                    rows={2}
+                                    value={editingCommentText}
+                                    onChange={(e) => setEditingCommentText(e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.45rem 0.65rem',
+                                      border: '1px solid var(--color-oxford)',
+                                      fontSize: '0.82rem',
+                                      backgroundColor: '#FFFFFF',
+                                      resize: 'vertical',
+                                    }}
+                                  />
+                                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                                    <button
+                                      type="button"
+                                      className="btn-secondary"
+                                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.6rem' }}
+                                      onClick={() => {
+                                        setEditingCommentId(null);
+                                        setEditingCommentText('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn-primary"
+                                      disabled={savingCommentEdit || !editingCommentText.trim()}
+                                      style={{ fontSize: '0.72rem', padding: '0.25rem 0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                      onClick={() => handleSaveEditComment(c)}
+                                    >
+                                      <Save size={11} /> {savingCommentEdit ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p style={{ margin: '0', fontSize: '0.82rem', lineHeight: '1.5', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap' }}>
+                                  {c.content}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Add comment input */}
               <form onSubmit={handleAddComment} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

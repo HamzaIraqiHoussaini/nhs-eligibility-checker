@@ -187,6 +187,9 @@ export interface ProjectComment {
   author_role: UserRole | 'system';
   content: string;
   created_at: string;
+  updated_at?: string;
+  pre_approval?: boolean;
+  is_approval_message?: boolean;
 }
 
 export type VolunteerApplicationStatus = 'applied' | 'accepted' | 'declined' | 'confirmed';

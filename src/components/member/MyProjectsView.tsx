@@ -44,7 +44,7 @@ import {
   Search,
   Filter,
 } from 'lucide-react';
-import { parseVolunteeringConfig } from '../../lib/projectVolunteerHelper';
+import { parseVolunteeringConfig, getDisplayComments } from '../../lib/projectVolunteerHelper';
 import { fetchManualParticipationLedger } from '../../lib/manualParticipationHelper';
 
 function projectHasMonetaryCosts(project: ProjectProposal): boolean {
@@ -53,7 +53,8 @@ function projectHasMonetaryCosts(project: ProjectProposal): boolean {
 }
 
 export const MyProjectsView: React.FC = () => {
-  const { user, isRestricted, isGraduated } = useAuth();
+  const { user, isLeadership, isSupervisor, isAdministrator, isRestricted, isGraduated } = useAuth();
+  const isStaffOrLeadership = Boolean(isLeadership || isSupervisor || isAdministrator);
   const { confirm, alert } = useConfirm();
   const [proposals, setProposals] = useState<ProjectProposal[]>([]);
   const [allApprovedProjects, setAllApprovedProjects] = useState<ProjectProposal[]>([]);
@@ -680,25 +681,25 @@ export const MyProjectsView: React.FC = () => {
       case 'pending_leadership':
         return (
           <span className="status-pill" style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>
-            <Clock size={12} /> Stage 1: Pending Leadership Review
+            <Clock size={12} /> {isStaffOrLeadership ? 'Stage 1: Pending Leadership Review' : 'Under Review'}
           </span>
         );
       case 'pending_supervisor':
         return (
           <span className="status-pill" style={{ backgroundColor: '#EFF6FF', color: '#1E3A8A', border: '1px solid #BFDBFE' }}>
-            <Clock size={12} /> Stage 2: Pending Supervisor Review
+            <Clock size={12} /> {isStaffOrLeadership ? 'Stage 2: Pending Supervisor Review' : 'Under Review'}
           </span>
         );
       case 'pending_administrator':
         return (
           <span className="status-pill" style={{ backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}>
-            <Clock size={12} /> Stage 3: Pending Administrator Review
+            <Clock size={12} /> {isStaffOrLeadership ? 'Stage 3: Pending Administrator Review' : 'Under Review'}
           </span>
         );
       case 'approved':
         return (
           <span className="status-pill eligible">
-            <CheckCircle2 size={12} /> Fully Approved
+            <CheckCircle2 size={12} /> {isStaffOrLeadership ? 'Fully Approved' : 'Active Project'}
           </span>
         );
       case 'completed':
@@ -710,19 +711,19 @@ export const MyProjectsView: React.FC = () => {
       case 'rejected_leadership':
         return (
           <span className="status-pill ineligible">
-            <XCircle size={12} /> Rejected by Leadership
+            <XCircle size={12} /> {isStaffOrLeadership ? 'Rejected by Leadership' : 'Revision Needed'}
           </span>
         );
       case 'rejected_supervisor':
         return (
           <span className="status-pill ineligible">
-            <XCircle size={12} /> Rejected by Supervisor
+            <XCircle size={12} /> {isStaffOrLeadership ? 'Rejected by Supervisor' : 'Revision Needed'}
           </span>
         );
       case 'rejected_administrator':
         return (
           <span className="status-pill ineligible">
-            <XCircle size={12} /> Rejected by Administrator
+            <XCircle size={12} /> {isStaffOrLeadership ? 'Rejected by Administrator' : 'Revision Needed'}
           </span>
         );
       default:
@@ -1125,7 +1126,11 @@ export const MyProjectsView: React.FC = () => {
               const isProjectLeader = isCreator || isCoLeader;
               const canModify = project.status !== 'approved' && project.status !== 'completed' && isProjectLeader;
               const canDelete = project.status !== 'approved' && project.status !== 'completed' && isCreator && !project.is_yearly;
-              const commentCount = project.comments?.length || 0;
+              const visibleComments = getDisplayComments(project.comments, {
+                proposal: project,
+                isRegularMember: !isStaffOrLeadership,
+              });
+              const commentCount = visibleComments.length;
               const formatted = formatProposalContent(project);
 
               return (
@@ -1237,8 +1242,8 @@ export const MyProjectsView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Feedback notes from leadership or supervisor */}
-                    {(project.leadership_notes || project.supervisor_notes) && (
+                    {/* Feedback notes from leadership or supervisor (only shown to staff/leadership or when rejected for revision) */}
+                    {(isStaffOrLeadership || project.status.startsWith('rejected_')) && (project.leadership_notes || project.supervisor_notes) && (
                       <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#F8FAFC', border: '1px solid var(--color-border)', fontSize: '0.8rem' }}>
                         {project.leadership_notes && (
                           <div style={{ marginBottom: project.supervisor_notes ? '0.35rem' : 0 }}>
@@ -1338,7 +1343,7 @@ export const MyProjectsView: React.FC = () => {
                         setSelectedProject(project);
                       }}
                     >
-                      <Eye size={13} /> Details & Comments
+                      <Eye size={13} /> View Details
                     </button>
 
                     {canModify && (
@@ -1384,7 +1389,7 @@ export const MyProjectsView: React.FC = () => {
                       </span>
                     ) : null}
 
-                    {project.status === 'approved' && !isCompleted && (
+                    {isLeadership && project.status === 'approved' && !isCompleted && (
                       <button
                         type="button"
                         className="btn-gold"
@@ -1414,7 +1419,9 @@ export const MyProjectsView: React.FC = () => {
                 No Active Projects Currently Ongoing
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', margin: 0 }}>
-                Active projects appear here after receiving final Stage 3 confirmation by the NHS Chapter Administrator.
+                {isStaffOrLeadership
+                  ? 'Active projects appear here after receiving final Stage 3 confirmation by the NHS Chapter Administrator.'
+                  : 'Active chapter service projects currently underway will appear here.'}
               </p>
             </div>
           ) : (
@@ -1467,7 +1474,7 @@ export const MyProjectsView: React.FC = () => {
                         </h3>
 
                         <span className="status-pill eligible" style={{ fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <CheckCircle2 size={11} /> Stage 3 Confirmed / Active
+                          <CheckCircle2 size={11} /> {isStaffOrLeadership ? 'Stage 3 Confirmed / Active' : 'Active Project'}
                         </span>
 
                         {/* Recruitment Status Pill */}
