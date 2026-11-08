@@ -32,11 +32,29 @@ export interface SendProjectEmailParams {
 }
 
 /**
+ * Sanitizes email subject lines to prevent multi-byte emoji / symbol corruption (e.g. )
+ * in Google Apps Script / SMTP MIME headers.
+ */
+export function sanitizeEmailSubject(subject: string): string {
+  return String(subject || '')
+    .replace(/\uFFFD/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '')
+    .replace(/[•·]/g, '-')
+    .replace(/[—–]/g, '-')
+    .replace(/→/g, '->')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\x20-\x7E\u00C0-\u017F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Builds a direct 1-click Gmail Compose link with pre-filled To, Subject, and Body
  */
 export function createGmailComposeUrl(to: string, subject: string, bodyText: string): string {
   const cleanTo = encodeURIComponent(to);
-  const cleanSubject = encodeURIComponent(subject);
+  const cleanSubject = encodeURIComponent(sanitizeEmailSubject(subject));
   const cleanBody = encodeURIComponent(bodyText);
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${cleanTo}&su=${cleanSubject}&body=${cleanBody}`;
 }
@@ -124,11 +142,11 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
         ctaLink = reviewLink;
         ctaText = 'Perform Final Review (Stage 3)';
       } else {
-        subject = `[CAS NHS Update] Supervisor Approved • Advanced to Stage 3: "${params.projectTitle}"`;
+        subject = `[CAS NHS Update] Supervisor Approved - Advanced to Stage 3: "${params.projectTitle}"`;
         headline = 'Faculty Supervisor Has Approved Your Proposal';
         badgeColor = '#0284C7';
         badgeBg = '#E0F2FE';
-        badgeText = 'STAGE 2 APPROVED • PENDING STAGE 3';
+        badgeText = 'STAGE 2 APPROVED - PENDING STAGE 3';
         primaryMessage = `Great news! Chapter Faculty Supervisor <strong>${params.reviewerName || 'Laura Hayes'}</strong> has reviewed and approved <strong>"${params.projectTitle}"</strong>.`;
         nextStepsText = 'The proposal has now reached Stage 3 for final check by the Chapter Administrator. You may continue refining your proposal until final administrator approval is recorded.';
         ctaLink = projectsLink;
@@ -137,7 +155,7 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
       break;
 
     case 'stage3_approved':
-      subject = `🎉 [CAS NHS] Project Officially Approved: "${params.projectTitle}"`;
+      subject = `[CAS NHS] Project Officially Approved: "${params.projectTitle}"`;
       headline = 'Your Project Is Officially Approved!';
       badgeColor = '#065F46';
       badgeBg = '#ECFDF5';
@@ -324,7 +342,7 @@ export function generateProjectEmailTemplate(params: ProjectEmailContentParams &
           <tr>
             <td style="background-color: #F8FAFC; padding: 20px 30px; border-top: 1px solid #E2E8F0; text-align: center;">
               <p style="font-size: 11px; color: #64748B; margin: 0 0 4px 0;">
-                Casablanca American School • Route de la Mecque, Casablanca, Morocco
+                Casablanca American School &bull; Route de la Mecque, Casablanca, Morocco
               </p>
               <p style="font-size: 11px; color: #94A3B8; margin: 0;">
                 This automated chapter notification was dispatched by the CAS NHS Portal Telemetry Engine.
@@ -365,7 +383,7 @@ ${ctaLink}
 Casablanca American School National Honor Society Chapter Portal
   `.trim();
 
-  return { subject, htmlBody, plainText };
+  return { subject: sanitizeEmailSubject(subject), htmlBody, plainText };
 }
 
 /**
@@ -380,9 +398,10 @@ export async function sendProjectEmail(params: SendProjectEmailParams): Promise<
   gmailComposeUrl: string;
   error?: string;
 }> {
+  const cleanSubject = sanitizeEmailSubject(params.subject);
   const gmailUrl = createGmailComposeUrl(
     params.recipient.email,
-    params.subject,
+    cleanSubject,
     params.plainTextBody
   );
 
@@ -399,7 +418,7 @@ export async function sendProjectEmail(params: SendProjectEmailParams): Promise<
       body: JSON.stringify({
         to: params.recipient.email,
         fromName: 'CAS NHS Chapter',
-        subject: params.subject,
+        subject: cleanSubject,
         html: params.htmlBody,
         text: params.plainTextBody,
       }),
@@ -427,7 +446,7 @@ export async function sendProjectEmail(params: SendProjectEmailParams): Promise<
       event_type: params.type,
       project_id: params.projectId || null,
       project_title: params.projectTitle,
-      subject: params.subject,
+      subject: cleanSubject,
       html_body: params.htmlBody,
       status: status,
       error_message: errorMessage,
@@ -498,7 +517,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
     roleBadgeBorder = '#C7D2FE';
     subject = isReset
       ? `[CAS NHS Security] Your Executive Administrator Access Code Has Been Reset`
-      : `CAS NHS Chapter • Executive Administrator Access Credentials`;
+      : `CAS NHS Chapter - Executive Administrator Access Credentials`;
     headline = isReset
       ? `Your Administrator Access Code Has Been Reset`
       : `Executive Chapter Administration Access`;
@@ -515,7 +534,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
       '<strong>School Policy & Safety Alignment:</strong> Ensure chapter initiatives comply with Casablanca American School administration standards and community safety guidelines.',
     ];
     signInDestination = 'You will be routed directly to the <strong>Final Project Reviews</strong> queue.';
-    ctaButtonText = 'Access Chapter Administration Desk →';
+    ctaButtonText = 'Access Chapter Administration Desk &rarr;';
     ctaButtonBg = '#4338CA';
   } else if (params.role === 'supervisor') {
     roleLabel = 'Faculty Advisor & Chapter Supervisor';
@@ -525,7 +544,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
     roleBadgeBorder = '#BAE6FD';
     subject = isReset
       ? `[CAS NHS Security] Your Faculty Supervisor Access Code Has Been Reset`
-      : `CAS NHS Chapter • Faculty Sponsor & Supervisor Credentials`;
+      : `CAS NHS Chapter - Faculty Sponsor & Supervisor Credentials`;
     headline = isReset
       ? `Your Faculty Supervisor Access Code Has Been Reset`
       : `Faculty Sponsor & Chapter Supervisor Onboarding`;
@@ -542,7 +561,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
       '<strong>Constitutional Governance:</strong> Supervise student chapter officers and ensure all activities align with NHS national standards.',
     ];
     signInDestination = 'You will be routed directly to the <strong>Proposal Review Desk</strong>.';
-    ctaButtonText = 'Access Faculty Review Desk →';
+    ctaButtonText = 'Access Faculty Review Desk &rarr;';
     ctaButtonBg = '#0284C7';
   } else if (params.role === 'leadership') {
     roleLabel = 'Chapter Officer (Student Leadership)';
@@ -552,7 +571,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
     roleBadgeBorder = '#FDE68A';
     subject = isReset
       ? `[CAS NHS Security] Your Chapter Leadership Access Code Has Been Reset`
-      : `CAS NHS Chapter • Leadership Core Appointment & Credentials`;
+      : `CAS NHS Chapter - Leadership Core Appointment & Credentials`;
     headline = isReset
       ? `Your Leadership Access Code Has Been Reset`
       : `Chapter Leadership Core Appointment`;
@@ -569,7 +588,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
       '<strong>Core Leadership Standing:</strong> Executive officers are granted chapter leadership standing and manage chapter initiatives.',
     ];
     signInDestination = 'You will have full access to the <strong>Governance Desk</strong> and Chapter Management tools.';
-    ctaButtonText = 'Open Leadership Governance Desk →';
+    ctaButtonText = 'Open Leadership Governance Desk &rarr;';
     ctaButtonBg = '#0A1E3F';
   } else {
     // Default: Member (Student)
@@ -580,7 +599,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
     roleBadgeBorder = '#A7F3D0';
     subject = isReset
       ? `[CAS NHS Security] Your Chapter Portal Access Code Has Been Reset`
-      : `Welcome to Casablanca American School NHS Chapter • Your Access Credentials`;
+      : `Welcome to Casablanca American School NHS Chapter - Your Access Credentials`;
     headline = isReset
       ? `Your Access Code Has Been Reset`
       : `Welcome to the CAS National Honor Society`;
@@ -597,7 +616,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
       '<strong>Constitution & Policies:</strong> Review CAS NHS bylaws, induction requirements, and chapter rules.',
     ];
     signInDestination = 'Navigate to your Member Dashboard to view upcoming meetings and active service projects.';
-    ctaButtonText = 'Sign In to Member Portal →';
+    ctaButtonText = 'Sign In to Member Portal &rarr;';
     ctaButtonBg = '#0A1E3F';
   }
 
@@ -725,7 +744,7 @@ export function generateMemberWelcomeEmailTemplate(params: MemberWelcomeEmailPar
           <tr>
             <td style="background-color: #F8FAFC; padding: 20px 30px; border-top: 1px solid #E2E8F0; text-align: center;">
               <p style="font-size: 11px; color: #64748B; margin: 0 0 4px 0;">
-                Casablanca American School • Route de la Mecque, Casablanca, Morocco
+                Casablanca American School &bull; Route de la Mecque, Casablanca, Morocco
               </p>
               <p style="font-size: 11px; color: #94A3B8; margin: 0;">
                 CAS National Honor Society Chapter Automated Identity & Access System
@@ -773,7 +792,7 @@ Security Notice: Please keep this passcode confidential. Contact nhs@cas.ac.ma i
 Casablanca American School National Honor Society Chapter
   `.trim();
 
-  return { subject, htmlBody, plainText };
+  return { subject: sanitizeEmailSubject(subject), htmlBody, plainText };
 }
 
 export async function sendMemberWelcomeEmail(params: SendMemberWelcomeEmailParams): Promise<{

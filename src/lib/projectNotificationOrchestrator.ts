@@ -449,7 +449,7 @@ export async function notifyStage3Decision(
       userId: project.creator_id,
       projectId: project.id,
       type,
-      title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
+      title: isApproved ? 'Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
       message: isApproved
         ? `"${project.project_title}" has received final Level 3 authorization from Chapter Administrator ${administrator.full_name}. You may now recruit volunteers!`
         : `Chapter Administrator review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,
@@ -468,7 +468,7 @@ export async function notifyStage3Decision(
           userId: cl.id,
           projectId: project.id,
           type,
-          title: isApproved ? '🎉 Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
+          title: isApproved ? 'Project Officially Approved!' : 'Notice: Revisions Requested by Administrator',
           message: isApproved
             ? `"${project.project_title}" has received final Level 3 authorization from Chapter Administrator ${administrator.full_name}. You may now recruit volunteers!`
             : `Chapter Administrator review for "${project.project_title}": ${notes || 'See review notes on chapter portal.'}`,

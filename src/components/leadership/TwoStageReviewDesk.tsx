@@ -238,7 +238,7 @@ export const TwoStageReviewDesk: React.FC = () => {
             .catch(err => console.error('[NotificationOrchestrator] Error notifying direct approval:', err));
 
           await alert({
-            title: '🎉 Project Officially Approved!',
+            title: 'Project Officially Approved!',
             message: `Stage 2 supervisor approval recorded for "${selectedProposal.project_title}"! The proposal has been officially approved and ratified for chapter execution.`,
             variant: 'success',
           });
@@ -259,7 +259,7 @@ export const TwoStageReviewDesk: React.FC = () => {
           .catch(err => console.error('[NotificationOrchestrator] Error notifying Stage 3 decision:', err));
 
         await alert({
-          title: decision === 'approved' ? '🎉 Project Officially Approved!' : 'Proposal Revision Requested by Administrator',
+          title: decision === 'approved' ? 'Project Officially Approved!' : 'Proposal Revision Requested by Administrator',
           message: decision === 'approved'
             ? `Stage 3 executive authorization granted for "${selectedProposal.project_title}"! Official approval emails and chapter notifications have been dispatched.`
             : `Administrative decision recorded. Revision instructions have been dispatched to the project leadership team.`,

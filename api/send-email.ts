@@ -2,6 +2,20 @@
 // Vercel Serverless Function to securely dispatch emails using server-side RESEND_API_KEY.
 // This ensures RESEND_API_KEY is never exposed to the client browser bundle.
 
+function sanitizeEmailSubject(subject: string): string {
+  return String(subject || '')
+    .replace(/\uFFFD/g, '')
+    .replace(/[\uD800-\uDFFF]/g, '')
+    .replace(/[•·]/g, '-')
+    .replace(/[—–]/g, '-')
+    .replace(/→/g, '->')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^\x20-\x7E\u00C0-\u017F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default async function handler(req: any, res: any) {
   // Enable CORS for all environments (production, preview deployments, and localhost)
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -34,7 +48,8 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { to, subject, html, text, fromName } = body;
+    const { to, subject: rawSubject, html, text, fromName } = body;
+    const subject = sanitizeEmailSubject(rawSubject);
 
     if (!to || !subject || !html) {
       return res.status(400).json({

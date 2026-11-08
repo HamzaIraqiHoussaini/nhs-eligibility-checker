@@ -108,7 +108,7 @@ function generateProjectEmailTemplate(params) {
       break;
 
     case 'stage2_approved':
-      subject = `🎉 [CAS NHS Approved] Congratulations! "${params.projectTitle}" Officially Authorized`;
+      subject = `[CAS NHS Approved] Congratulations! "${params.projectTitle}" Officially Authorized`;
       headline = 'Project Officially Authorized & Ready for Volunteers!';
       badgeColor = '#0A1E3F';
       badgeText = 'OFFICIALLY APPROVED';
@@ -247,7 +247,8 @@ test('Stage 2 Approval celebration email congratulates creator and confirms auth
     isReviewerNotification: false,
   });
 
-  assert.strictEqual(res.subject.includes('🎉 [CAS NHS Approved] Congratulations!'), true);
+  assert.strictEqual(res.subject.includes('[CAS NHS Approved] Congratulations!'), true);
+  assert.strictEqual(/[\uD800-\uDFFF\uFFFD]/.test(res.subject), false, 'Subject must not contain emojis or replacement chars');
   assert.strictEqual(res.htmlBody.includes('OFFICIALLY APPROVED'), true);
   assert.strictEqual(res.htmlBody.includes('ready for execution'), true);
 });
